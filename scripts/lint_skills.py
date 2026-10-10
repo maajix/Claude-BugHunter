@@ -6,12 +6,12 @@ Enforces the rules documented in CONTRIBUTING.md and the repo's hard rule that
 NO real client/engagement identifiers ever land in the public tree.
 
 Checks per skills/<name>/SKILL.md:
-  STRUCTURE (errors)
+  STRUCTURE (errors) — SKILL.md only
     - frontmatter block present (between the first two `---` lines)
     - `name` present, matches ^[a-z0-9-]+$, and equals the directory name
     - `description` present and <= 1024 chars
     - body (everything after frontmatter) <= 500 lines
-  SAFETY (errors)
+  SAFETY (errors) — SKILL.md *and* every other .md in the skill dir (references/)
     - client-identifier denylist: hashes every 1- and 2-word shingle of the file
       and compares against scripts/.identifier-denylist.sha256 (+ optional
       .identifier-denylist.local). Plaintext names never live in the repo.
@@ -46,9 +46,14 @@ MAX_BODY_LINES = 500
 GROUNDING_STRICT = True
 
 # --- real-secret patterns (kept tight to avoid flagging documented regexes) ---
+PRIVATE_KEY_LABEL = "Private key block"
+# Body of a real key: one long run of base64. Its absence after a BEGIN header is
+# what separates a documented detection pattern from a leaked key.
+B64_KEY_MATERIAL = re.compile(r"[A-Za-z0-9+/=]{40,}")
+
 SECRET_PATTERNS = [
     ("AWS access key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
-    ("Private key block", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----")),
+    (PRIVATE_KEY_LABEL, re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----")),
     ("JWT", re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")),
     ("Slack token", re.compile(r"\bxox[baprs]-[0-9A-Za-z-]{10,}\b")),
     ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
@@ -192,7 +197,45 @@ def lint_skill(skill_dir, denylist):
         elif not re.fullmatch(r"\d+", rc.strip()):
             grounding.append(f"{name}: `report_count: {rc}` must be a non-negative integer")
 
-    # client-identifier denylist
+    # SAFETY: scan SKILL.md *and* every other markdown file in the skill (references/
+    # carries the bulk of the prose in reference-heavy skills, and a leak there is
+    # exactly as public as one in SKILL.md).
+    for label, text in [(name, raw)] + extra_markdown(skill_dir, name):
+        errors += safety_errors(label, text, denylist)
+    return errors, warnings
+
+
+def extra_markdown(skill_dir, name):
+    """Return [(label, text)] for every .md under the skill except SKILL.md."""
+    out = []
+    for root, _dirs, files in os.walk(skill_dir):
+        for fn in sorted(files):
+            if not fn.endswith(".md") or (root == skill_dir and fn == "SKILL.md"):
+                continue
+            full = os.path.join(root, fn)
+            rel = os.path.relpath(full, skill_dir)
+            try:
+                with open(full, encoding="utf-8") as fh:
+                    out.append((f"{name}/{rel}", fh.read()))
+            except (OSError, UnicodeError) as exc:
+                out.append((f"{name}/{rel}", ""))
+                print(f"WARN  {name}/{rel}: unreadable ({exc}) — not scanned")
+    return out
+
+
+def documented_key_header(lines, idx):
+    """True when a `-----BEGIN ... PRIVATE KEY-----` line carries no key material.
+    The secret-catalog skills list that header as a *detection pattern*; a real
+    leak has base64 body on one of the next few lines."""
+    for nxt in lines[idx + 1: idx + 4]:
+        if B64_KEY_MATERIAL.search(nxt):
+            return False
+    return True
+
+
+def safety_errors(label, raw, denylist):
+    """Client-identifier denylist + real-secret scan over one file's text."""
+    errors = []
     if denylist:
         hit = set()
         for sh in shingles(raw):
@@ -200,20 +243,21 @@ def lint_skill(skill_dir, denylist):
                 hit.add(sh)
         if hit:
             errors.append(
-                f"{name}: CLIENT-IDENTIFIER MATCH — {len(hit)} banned shingle(s). "
+                f"{label}: CLIENT-IDENTIFIER MATCH — {len(hit)} banned shingle(s). "
                 f"Remove client/engagement identifiers before committing."
             )
-
-    # real-secret scan
-    for lineno, line in enumerate(raw.splitlines(), 1):
-        for label, pat in SECRET_PATTERNS:
+    lines = raw.splitlines()
+    for lineno, line in enumerate(lines, 1):
+        for secret_label, pat in SECRET_PATTERNS:
             for m in pat.finditer(line):
                 snippet = m.group(0)
                 window = line[max(0, m.start() - 8): m.end() + 8]
                 if SECRET_ALLOW.search(window) or SECRET_ALLOW.search(snippet):
                     continue
-                errors.append(f"{name}:{lineno}: possible {label} leaked — '{snippet[:24]}...'")
-    return errors, warnings
+                if secret_label == PRIVATE_KEY_LABEL and documented_key_header(lines, lineno - 1):
+                    continue
+                errors.append(f"{label}:{lineno}: possible {secret_label} leaked — '{snippet[:24]}...'")
+    return errors
 
 
 def main(argv):
