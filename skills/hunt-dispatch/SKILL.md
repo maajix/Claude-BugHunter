@@ -249,7 +249,16 @@ hunt-websocket       hunt-grpc            hunt-laravel
 hunt-springboot      hunt-k8s             hunt-cicd
 hunt-source-leak     hunt-tls-network     hunt-payment-api
 hunt-xs-leaks        hunt-exposed-services
+hunt-jwt-crypto      hunt-forgot-password hunt-shadow-api
+hunt-spa-api         hunt-fintech-graphql hunt-rag-vector
+hunt-captcha-bypass  hunt-html-injection  hunt-clickjacking
+hunt-exceptional-conditions
 ```
+
+every installed `hunt-*` skill except `hunt-misc` (catch-all, listed above) and
+this router appears in the set. `scripts/check_dispatch_coverage.py` enforces
+that, so a skill added without a dispatch entry fails CI rather than silently
+becoming unreachable from `/hunt`.
 
 report format: `report-writing` (`bugcrowd-reporting` if the target is on bugcrowd).
 
