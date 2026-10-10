@@ -216,6 +216,7 @@ hunt-http-smuggling
 hunt-cloud-misconfig
 hunt-sharepoint
 hunt-aspnet
+hunt-exposed-services
 ```
 
 report format: `redteam-report-template` (subject / observations / description / impact / recommendation / poc).
@@ -246,7 +247,8 @@ hunt-brute-force     hunt-session         hunt-ldap
 hunt-nextjs          hunt-nodejs          hunt-dom
 hunt-websocket       hunt-grpc            hunt-laravel
 hunt-springboot      hunt-k8s             hunt-cicd
-hunt-source-leak     hunt-tls-network
+hunt-source-leak     hunt-tls-network     hunt-payment-api
+hunt-xs-leaks        hunt-exposed-services
 ```
 
 report format: `report-writing` (`bugcrowd-reporting` if the target is on bugcrowd).

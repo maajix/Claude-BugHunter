@@ -66,6 +66,9 @@ CLASS_SKILL = {
     "cicd": ["hunt-cicd"], "k8s": ["hunt-k8s"], "cloud-misconfig": ["hunt-cloud-misconfig"],
     "ldap": ["hunt-ldap"], "ntlm-info": ["hunt-ntlm-info"], "tls-network": ["hunt-tls-network"],
     "subdomain-takeover": ["hunt-subdomain"],
+    "payment-api": ["hunt-payment-api", "hunt-business-logic"],
+    "xs-leaks": ["hunt-xs-leaks"],
+    "exposed-service": ["hunt-exposed-services"],
 }
 
 # detected tech -> tech-specific skill(s)
@@ -127,7 +130,10 @@ CLASS_PROBE = {
     "http-smuggling": "curl -s --http1.1 \"{u}\" -H 'Transfer-Encoding: chunked' -H 'Content-Length: 6'   # desync probe; confirm with Burp's HTTP Request Smuggler",
     "mfa": "curl -s \"{u}\"   # after the password step: reach the post-login URL directly, replay an OTP, or omit the MFA field",
     "race-condition": "curl -s -X POST \"{u}\"   # fire N copies in parallel (Turbo Intruder single-packet); >1 success means the limit is racy",
-    "business-logic": "curl -s \"{u}\"   # replay the same action twice / skip a step / try qty 0 or negative; diff the resulting state",
+    "payment-api": "curl -s \"{u}\"   # webhook: forged signature at a canary order id; checkout: tamper amount/currency, replay capture (sandbox only)",
+    "xs-leaks": "curl -sD - -o /dev/null \"{u}\"   # check COOP/COEP/CORP + Fetch-Metadata; the oracle itself needs a real browser, not curl",
+    "exposed-service": "curl -sI \"{u}\"   # non-HTTP port? read-only banner/version first (nmap -sV --script=<named safe script>, never -sC/-A)",
+    "business-logic": "curl -s \"{u}\"   # replay the same action twice / skip a step / try qty 0 or negative; diff theresulting state",
 }
 
 

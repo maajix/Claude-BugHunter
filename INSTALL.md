@@ -58,7 +58,7 @@ pwsh ./scripts/install.ps1
 > script aborts with a `syntax error` and cannot fix itself.
 
 This copies:
-- All 83 skills → `~/.claude/skills/` (macOS/Linux) or `%USERPROFILE%\.claude\skills\` (Windows)
+- All 86 skills → `~/.claude/skills/` (macOS/Linux) or `%USERPROFILE%\.claude\skills\` (Windows)
 - All 15 slash commands → `~/.claude/commands/`
 - The `hunt` scaffolder → `~/.claude/scripts/hunt.sh` (sourced from your `.zshrc`/`.bashrc`) on macOS/Linux, or `~\.claude\scripts\hunt.ps1` (dot-sourced from your PowerShell `$PROFILE`) on Windows
 
@@ -258,6 +258,6 @@ and `osint-methodology` — are **kept** if Claude-OSINT's manifest still claims
 so uninstalling one bundle never breaks the other. (Install backups under
 `~/.claude/install-backups/` are left in place; delete them manually if you want.)
 
-If you installed via the **plugin** instead of the script: `/plugin uninstall claude-bughunter@elementalsouls`.
+If you installed via the **plugin** instead of the script: `/plugin uninstall bughunter@maajix`.
 
 Burp MCP, if you wired it, is removed separately: `claude mcp remove burp`.

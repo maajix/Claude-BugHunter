@@ -6,9 +6,9 @@ description: Run the Claude-BugHunter skills on OpenCode, Codex, Hermes Agent, a
 
 # Multi-harness install
 
-The 83 skills are plain **Agent Skills** (`SKILL.md` = `name` + `description` frontmatter + Markdown). That format is an open standard, so the *knowledge* runs on more than Claude Code. This page shows how to install it on **OpenCode**, **OpenAI Codex CLI**, **Hermes Agent**, and **Google AntiGravity**.
+The 86 skills are plain **Agent Skills** (`SKILL.md` = `name` + `description` frontmatter + Markdown). That format is an open standard, so the *knowledge* runs on more than Claude Code. This page shows how to install it on **OpenCode**, **OpenAI Codex CLI**, **Hermes Agent**, and **Google AntiGravity**.
 
-> **What ports and what doesn't.** The **83 skills** (payloads, methodology, bypass tables, disclosed-report patterns) port to every harness below. The **`/hunt` slash commands, the plugin marketplace, and the `hunt-dispatch` subagent routing are Claude-Code-specific** and do **not** port — other harnesses get the knowledge, not the orchestration engine. **Burp MCP** ports to all of them (it's just an MCP server).
+> **What ports and what doesn't.** The **86 skills** (payloads, methodology, bypass tables, disclosed-report patterns) port to every harness below. The **`/hunt` slash commands, the plugin marketplace, and the `hunt-dispatch` subagent routing are Claude-Code-specific** and do **not** port — other harnesses get the knowledge, not the orchestration engine. **Burp MCP** ports to all of them (it's just an MCP server).
 
 ## Compatibility matrix (verified mid-2026)
 

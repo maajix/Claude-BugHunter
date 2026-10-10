@@ -7,6 +7,45 @@ versioning is loosely [SemVer](https://semver.org/) at the bundle level.
 ## [Unreleased]
 
 ### Added
+- **Three new skills (83 → 86; `hunt-*` 58 → 61)**, each grounded in primary sources
+  verified at authoring time:
+  - `hunt-payment-api` — payment and billing API defects in the merchant's wrapper
+    code and in what it accepts back from the PSP: webhook signature forgery and
+    raw-body mismatch, amount/currency and minor-unit confusion, checkout
+    state-machine abuse, idempotency and double-spend, refund/payout/ledger
+    asymmetry. 9 cited GHSA advisories. Money-moving steps are sandbox-or-sign-off
+    only, with an explicit velocity posture (card-testing looks like a BIN attack
+    to the acquirer).
+  - `hunt-xs-leaks` — cross-site leaks and XS-Search: frame counting, connection-pool
+    and event-loop timing, cache probing, error events, navigation detection, with
+    COOP/COEP/CORP, `SameSite` and Fetch Metadata as the defences. Confirmation
+    requires a blinded interleaved A/B oracle (≥20 runs, ≥95% accuracy, plus a state
+    flip) and a pinned browser build — a missing header is a hardening note, not a
+    finding. Noisy channels carry per-channel cost, cadence and cleanup gates.
+  - `hunt-exposed-services` — internet-exposed non-HTTP services and management
+    interfaces across 7 reference families (databases, management interfaces,
+    remote-debug, brokers, printers/storage, industrial/IoT, legacy/info-leak):
+    IPMI/BMC, SNMP, JDWP, Java RMI, Elasticsearch, MQTT, RTSP, VNC, ADB, PJL/IPP,
+    Modbus/BACnet and more. Triage layer routes an open port to one reference.
+    `nmap -sC`/`-A` are banned (the `default` category contains scripts that cross
+    the auth boundary or relay to third parties); ICS and camera work is
+    detection-only. Scope ends at "unauthenticated access confirmed"; SMB, MSSQL,
+    FTP, RDP and Kerberos stay out per `SECURITY.md`.
+
+### Fixed
+- **`lint_skills.py` safety scan only read `SKILL.md`** — the client-identifier
+  denylist and secret regexes never saw `references/*.md`, which is where
+  reference-heavy skills keep most of their prose (e.g. `offensive-osint`, and
+  ~1,550 lines of the new `hunt-exposed-services`). A planted AWS key in a
+  reference file passed CI. The scan now walks every `.md` in the skill directory,
+  including nested ones; structure and frontmatter checks remain `SKILL.md`-only.
+  A `-----BEGIN ... PRIVATE KEY-----` header with no base64 body after it is
+  treated as a documented detection pattern, not a leak, so the secret-catalog
+  skills do not false-positive. New `scripts/test_lint_skills.py` (7 cases) guards
+  the behaviour and runs in the `skill-lint` workflow; it fails on the pre-fix code.
+- **`cbh/data/skill_index.json` was stale** — listed 82 skills and 24 reports
+  (missing `hunt-fintech-graphql`). Regenerated: 86 skills, 36 reports.
+- **`scripts/install.ps1` skill count** said 82.
 - **Disclosed-report grounding, content-verified** — 28 `hunt-*` skills strengthened
   with cited public HackerOne disclosures. **433 distinct disclosed reports** are now
   individually cited across **36 pattern-library files** in `docs/disclosed-reports/`.
