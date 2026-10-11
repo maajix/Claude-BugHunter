@@ -1,7 +1,7 @@
 ---
 name: hunt-sqli
-description: Hunting skill for sqli vulnerabilities. Built from 12 public bug bounty reports including modern NoSQL injection (Rocket.Chat CVE-2021-22911 MongoDB $regex, Mongoose ORM CVE-2024-53900 $where bypass), modern ORM raw-fragment SQLi (Django CVE-2024-42005, Sequelize GHSA-wrh9-cjv3-2hpw), second-order SOQL injection (HackerOne Salesforce), time-based blind SQLi in GraphQL resolvers, and SQLi on OIDC-proxy backends. Use when hunting SQLi on any target. Dedicated NoSQL operator injection (MongoDB/CouchDB $where/$regex/$ne) is owned by hunt-nosqli — NoSQL appears here only as adjacent ORM/WAF context.
-sources: github, hackerone_public, github_security_advisories, snyk_research, sonarsource_research
+description: "Hunting skill for sqli vulnerabilities. Built from 12 public bug bounty reports including modern NoSQL injection (Rocket.Chat CVE-2021-22911 MongoDB $regex, Mongoose ORM CVE-2024-53900 $where bypass), modern ORM raw-fragment SQLi (Django CVE-2024-42005, Sequelize GHSA-wrh9-cjv3-2hpw), second-order SOQL injection (HackerOne Salesforce), time-based blind SQLi in GraphQL resolvers, and SQLi on OIDC-proxy backends. Use when hunting SQLi on any target. Dedicated NoSQL operator injection (MongoDB/CouchDB $where/$regex/$ne) is owned by hunt-nosqli — NoSQL appears here only as adjacent ORM/WAF context. Also covers PostgreSQL escalation (dblink, lo_import, COPY FROM PROGRAM, pg_read_file), Cypher injection in Neo4j, MS Access and Jet dialect injection, ORM leaks and relational filtering (Django, Prisma, Sequelize, Ransack, Strapi, Directus), and RSQL/FIQL and OData filter-language injection."
+sources: github, hackerone_public, github_security_advisories, snyk_research, sonarsource_research, hacktricks_coverage_checklist, postgresql_documentation, neo4j_documentation, vendor_documentation, elttam_research, bishopfox_research, odata_spec, rsql_parser, cve_database
 report_count: 29
 ---
 
@@ -167,11 +167,21 @@ admin'--
 
 -- MSSQL
 '; WAITFOR DELAY '0:0:5'--
-1; EXEC xp_cmdshell('ping -n 5 127.0.0.1')--
 
 -- SQLite
 ' AND (SELECT LIKE('ABCDEFG',UPPER(HEX(RANDOMBLOB(300000000/2)))))==1--
 ```
+
+`WAITFOR DELAY` is the whole MSSQL time primitive. Do not reach for
+`xp_cmdshell('ping -n 5 …')` to get a delay: it costs you command execution
+on the target to buy a sleep you already have for free, and it turns a
+detection request into an exploitation one. Command execution is Stage B
+(Phase 9), after the injection is already confirmed by a delay.
+
+The SQLite payload has no sleep to call, so it buys its delay by hashing a
+150 MB blob. That is real CPU on the target. Send it once, read the timing,
+and never put it in a loop or an Intruder set — repeated, it is a denial of
+service, which `SECURITY.md` puts out of scope.
 
 **UNION-Based (enumerate columns first):**
 ```sql
@@ -217,19 +227,19 @@ grep -rE "db\.query\(.*\+" src/
 **curl time-based detection:**
 ```bash
 # Baseline
-curl -o /dev/null -s -w "%{time_total}\n" "https://target.com/search?q=test"
+curl -o /dev/null -s -w "%{time_total}\n" "https://target.example/search?q=test"
 
 # Inject
-curl -o /dev/null -s -w "%{time_total}\n" "https://target.com/search?q=test' AND SLEEP(5)--"
+curl -o /dev/null -s -w "%{time_total}\n" "https://target.example/search?q=test' AND SLEEP(5)--"
 
 # SQLMap quick scan
-sqlmap -u "https://target.com/search?q=test" --dbs --level=3 --risk=2 --batch
+sqlmap -u "https://target.example/search?q=test" --dbs --level=3 --risk=2 --batch
 
 # SQLMap with POST
-sqlmap -u "https://target.com/api/filter" --data="category=electronics&sort=price" --dbs --batch
+sqlmap -u "https://target.example/api/filter" --data="category=electronics&sort=price" --dbs --batch
 
 # SQLMap with cookie auth
-sqlmap -u "https://target.com/admin/report" --cookie="session=TOKEN" --dbs --batch --level=5
+sqlmap -u "https://target.example/admin/report" --cookie="session=TOKEN" --dbs --batch --level=5
 ```
 
 **Burp Intruder payload list for column enumeration:**
@@ -313,9 +323,9 @@ INTO OUTFILE  (different extraction method)
 
 *Header-based injection to avoid URL WAFs:*
 ```bash
-curl -H "X-Forwarded-For: 127.0.0.1' AND SLEEP(5)--" https://target.com/
-curl -H "User-Agent: test' AND SLEEP(5)--" https://target.com/
-curl -H "Referer: https://evil.com/' AND SLEEP(5)--" https://target.com/
+curl -H "X-Forwarded-For: 127.0.0.1' AND SLEEP(5)--" https://target.example/
+curl -H "User-Agent: test' AND SLEEP(5)--" https://target.example/
+curl -H "Referer: https://evil.example/' AND SLEEP(5)--" https://target.example/
 ```
 
 *JSON/NoSQL WAF bypass:*
@@ -413,10 +423,74 @@ The following real, verified bug-bounty / CVE / coordinated-disclosure cases ext
 
 ---
 
+## Dialect & Filter-Language Escalation (references)
+
+Several surfaces in this class need dialect-specific syntax, a non-SQL query
+language, or an out-of-band channel, and getting that wrong looks identical to
+"not vulnerable". Depth for each lives in `references/`. Load the one file the
+trigger phrases point to, not all of them.
+
+**The confirmation ladder is ordered, and stopping early is the correct
+outcome.** A boolean or error differential proves injection. A version string
+proves the dialect. Those two alone are already a critical finding and are
+enough to report. File read, outbound connection from the database and command
+execution are **Stage B**: each needs explicit written sign-off that names the
+blast radius, and each is proved with a unique canary plus a body diff against a
+saved baseline, in the style of `vmware-vcenter-attack/SKILL.md` Step 4.
+
+**Never write a payload that modifies or destroys data.** No `UPDATE`, no
+`INSERT` into an application table, no `DROP`, no `lo_export` or `COPY ... TO`
+against a live path. On PostgreSQL the privilege question is answerable
+read-only: `pg_has_role(current_user, 'pg_execute_server_program', 'USAGE')`
+proves command execution is reachable without executing anything. **One DDL
+exception exists and only one**: a randomly named session-scoped
+`CREATE TEMP TABLE`, under RCE sign-off, because `COPY ... FROM PROGRAM` has no
+form that works without a target table. It vanishes with the session, needs no
+`DROP`, and `references/postgresql-escalation.md` states its blast radius.
+
+**Outbound connections from the database touch a different host.** PostgreSQL
+`dblink`, Neo4j `LOAD CSV` and the MS Access `IN '\\host\share'` clause all make
+the database the request origin. That is an SSRF-shaped primitive (see
+`hunt-ssrf`) and a **separate authorization question** from the injection
+itself. Get a second written answer naming the target host before one connection
+is attempted, and never loop it over ports or addresses.
+
+**Time-based payload guards.** Delay 5s, never above 10s. Serial only, with a
+gap between trials, maximum 10 trials per parameter. A long `SLEEP` or
+`pg_sleep` holds a backend out of the connection pool for its whole duration;
+enough of them exhaust the pool and take the site down for real users. That is a
+denial of service, not a proof.
+
+### References Index
+
+Each file is self-contained and carries its own Stage A / Stage B split, request
+cadence and caps, because an agent routed by a trigger phrase reads only that
+file.
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `postgresql-escalation.md` | Read-only privilege ladder (`version()`, `current_setting('is_superuser')`, `pg_has_role`), the three predefined roles quoted verbatim, `pg_read_file` / `pg_read_binary_file` / `pg_ls_dir` / `pg_stat_file` canary reads with a missing-file control, `COPY ... FROM PROGRAM` with its temp-table blast radius, large objects and `COPY` writes documented as capability-only, `dblink` preconditions and the port-oracle restraint, UNC forced-auth stopping point | postgres sqli, postgresql escalation, dblink, dblink_connect, dblink_connect_u, lo_import, lo_export, lo_get, pg_read_file, pg_largeobject, COPY FROM PROGRAM, pg_execute_server_program, pg_read_server_files, CVE-2019-9193, database port scan, pg_sleep, pg_hba.conf trust |
+| `cypher-graph-injection.md` | Why Cypher is string-parsed rather than operator-object injection, the three constructs Neo4j cannot parameterise, syntax and boolean differentials, `dbms.components()` and the non-admin schema procedures, the Cypher `UNION` column-name rule, `LOAD CSV` outbound requests as Stage B, APOC enumeration with `SHOW PROCEDURES` | cypher injection, neo4j, graph database injection, LOAD CSV, apoc.load, dbms.components, dbms.listConfig, bolt 7687, SHOW PROCEDURES |
+| `ms-access.md` | The seven dialect differences (no comments, no stacked queries, `FROM` required in subqueries, `TOP` / `LAST` instead of `LIMIT`, `&` / `+` concatenation, chained-equality oracle, `IIf` / `Mid`), ANSI-89 against ANSI-92 wildcards by provider, remote-table timing with no native `SLEEP`, error-differential file and path oracles, `MSysObjects` enumeration | ms access injection, jet database engine, ace engine, MSysObjects, IIf, chained equals, classic asp sqli, mdb accdb, AllowQueryRemoteTables, KB5002984 |
+| `orm-leak-and-filter-languages.md` | ORM leaks and relational filtering (Django lookups, Prisma `where` / `select` / `include` and type confusion, Sequelize `replacements` against `bind`, Beego and Harbor first-segment validation, Ransack, Strapi CVE-2026-27886, Directus CVE-2025-64748, Entity Framework reflection helpers), Django raw sinks (`raw()`, `extra()`, `RawSQL`, `cursor.execute`), the RSQL / FIQL operator table, OData `$filter` comparison oracles, collation calibration, the always-false proof ladder | ORM leak, ORM injection, relational filtering, django extra, django raw, QuerySet filter unpacking, prisma queryRawUnsafe, prisma where operator, sequelize replacements, ransack, strapi where clause, directus search leak, RSQL, FIQL, OData filter, filter[] parameter, JSON:API filter, boolean oracle count, pagination total oracle |
+| `oob-dns-confirmation.md` | Out-of-band DNS as the confirmation the Gate 0 and triage-validation steps demand: the marker-then-value ladder, MSSQL `xp_dirtree` / `xp_fileexist` / `xp_subdirs` / `fn_trace_gettable` / `fn_get_audit_file` with the 63/253 label-splitting idiom, the DNS-only discipline and the NTLM-capture stopping point, pointers to `dblink` (Postgres) and the Oracle/MySQL OOB surface | OOB DNS, out of band exfiltration, DNS callback, collaborator, interactsh, xp_dirtree, xp_fileexist, xp_subdirs, fn_trace_gettable, DNS exfil split, blind sqli confirmation |
+
+Attribution: the technique coverage list behind these reference files was checked
+against the HackTricks `pentesting-web/sql-injection`,
+`pentesting-web/orm-injection` and `pentesting-web/rsql-injection` pages
+(<https://github.com/HackTricks-wiki/hacktricks>, CC BY-NC 4.0), used as a
+checklist only. All prose, tables, staging and safety guidance in those files is
+written against the vendor documentation and primary research each file cites.
+
+---
+
 ## Related Skills & Chains
 
 - **`hunt-rce`** — A SQLi against a DB user with `FILE`, `xp_cmdshell`, or `COPY FROM PROGRAM` privileges is an RCE primitive, not just a data-read. Chain primitive: MSSQL union-based SQLi → `EXEC xp_cmdshell 'whoami'` → RCE as `NT AUTHORITY\SYSTEM`; Postgres SQLi with `pg_read_server_files` or `COPY ... FROM PROGRAM 'id'` → RCE; MySQL SQLi with `FILE` → write webshell to web-root via `INTO OUTFILE`.
 - **`hunt-idor`** — Once SQLi gives you arbitrary read on the users table, you have the IDs/UUIDs needed to enumerate IDOR endpoints at scale. Chain primitive: blind SQLi extracts `users.uuid` column → feed UUIDs into `/api/users/{uuid}/profile` → confirmed mass IDOR-with-PII rather than a theoretical broken-access-control.
-- **`hunt-auth-bypass`** — Classic `' OR 1=1 --` in login forms or session tables is auth-bypass-via-SQLi. Chain primitive: SQLi on the `password_reset_tokens` table → read or insert a token row for `admin@target.com` → ATO without ever seeing the original password.
+- **`hunt-auth-bypass`** — Classic `' OR 1=1 --` in login forms or session tables is auth-bypass-via-SQLi. Chain primitive: SQLi on the `password_reset_tokens` table → read or insert a token row for `admin@target.example` → ATO without ever seeing the original password.
 - **`security-arsenal`** — Reach for the SQLi payload tree (WAF-bypass union variants `/**/UnIoN/**/SeLeCt/**/`, MSSQL `WAITFOR DELAY '0:0:10'`, MySQL `SLEEP(10)`, Postgres `pg_sleep(10)`, Oracle `DBMS_PIPE.RECEIVE_MESSAGE`, NoSQLi `{"$ne": null}` / `{"$where": "sleep(5000)"}`, second-order via stored-then-rendered fields).
 - **`triage-validation`** — Apply the Reproducibility Gate before reporting. A 200ms delta on a sleep-10 payload is noise, not blind SQLi. Require statistical evidence (5 trials at 0s vs 5 trials at 10s, non-overlapping confidence intervals) or an OOB DNS callback with a unique marker. The hunt-sqli internal sentinel/baseline pattern exists for exactly this.
+- **`hunt-nosqli`** — Owns operator-object injection, where a JSON value arrives where a string was expected and the driver evaluates `{"$ne": null}` as structured data. Cypher injection (`references/cypher-graph-injection.md`) is the opposite shape: Cypher is a string-parsed language, so quote breaking and clause termination work and `$ne` payloads do nothing. Routing rule: a JSON body whose values become operators goes to `hunt-nosqli`; a query assembled with `+` or an f-string stays here, whatever the database is called.
+- **`hunt-ssrf`** — PostgreSQL `dblink`/`dblink_connect`, Neo4j `LOAD CSV` and the MS Access `IN '\\host\share'` clause turn the database into the request origin, which is an SSRF primitive reached through SQLi. Chain primitive: injection on the web tier → one `dblink_connect` (or `LOAD CSV`) to a host **you own**, carrying a unique canary → the inbound connection and its source IP prove the database can originate outbound traffic. That is the whole finding. Internal targets, address sweeps and service fingerprinting from inside the perimeter are out of scope for this bundle; apply the `hunt-ssrf` target-selection discipline and treat the destination host as a separate authorization question.
+- **`hunt-file-upload`** — A file-write primitive from the DB layer (MySQL `INTO OUTFILE`, Postgres `COPY ... TO` or `lo_export`) lands in the same place an upload bypass does: attacker-controlled bytes at a server-chosen path. Both are gated identically here, and `references/postgresql-escalation.md` documents the Postgres write path as capability-only rather than something to execute.

