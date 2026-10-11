@@ -1,7 +1,7 @@
 ---
 name: hunt-dom
-description: "Hunt client-side DOM vulnerabilities — DOM Clobbering (overwrite JS globals via HTML injection), PostMessage hijacking (missing origin check), Service Worker abuse (intercept requests from same-origin script), CSS Injection/Exfiltration (attribute selectors → token char-by-char via OOB), client-side template injection, dangerouslySetInnerHTML. Grounded in named public research: Gareth Heyes / PortSwigger DOM-clobbering + DOM-Invader, Michał Bentkowski DOMPurify clobbering bypasses, jQuery htmlPrefilter XSS (CVE-2020-11022 / CVE-2020-11023), d0nut CSS-exfil research. Use when hunting DOM-XSS, client-side auth bypass, or token exfiltration without server-side interaction."
-sources: portswigger_research, hackerone_public, github_security_advisories
+description: "Hunt client-side DOM vulnerabilities — DOM Clobbering (overwrite JS globals via HTML injection), PostMessage hijacking (missing origin check), Service Worker abuse (intercept requests from same-origin script), CSS Injection/Exfiltration (attribute selectors → token char-by-char via OOB), client-side template injection, dangerouslySetInnerHTML. Grounded in named public research: Gareth Heyes / PortSwigger DOM-clobbering + DOM-Invader, Michał Bentkowski DOMPurify clobbering bypasses, jQuery htmlPrefilter XSS (CVE-2020-11022 / CVE-2020-11023), d0nut CSS-exfil research. Also covers client-side path traversal (CSPT/OSRF, chained to CSPT2CSRF, e.g. Grafana CVE-2025-4123) and iframe-trap persistence of same-origin XSS. Use when hunting DOM-XSS, CSPT, client-side auth bypass, or token exfiltration without server-side interaction."
+sources: portswigger_research, hackerone_public, github_security_advisories, doyensec_research, grafana_advisory
 report_count: 14
 ---
 
@@ -52,15 +52,15 @@ user bio / display name / comment / markdown preview / SVG upload / CMS rich-tex
 # Inject MARKUP (no script) at a sink that lets named/id'd elements through.
 
 # Single-level clobber of window.config:
-#   <a id="config" href="https://evil.com">
+#   <a id="config" href="https://evil.example">
 # Clobber a NON-built-in global the app reads (built-in methods like getElementById can't be shadowed this way):
 #   <a id="config"></a><a id="config" name="url">   # window.config.url resolves to an attacker-controlled element/string
 # Clobber a string-coerced URL value (anchor toString() == href):
-#   <a id="x"></a><a id="x" name="y" href="https://evil.com">   # x.y -> href
+#   <a id="x"></a><a id="x" name="y" href="https://evil.example">   # x.y -> href
 # Nested window.a.b.c via form/inputs:
 #   <form id="a"><input id="b" name="c" value="clobbered"></form>
 # baseURI / relative-URL hijack:
-#   <base href="https://evil.com/">      # bends every relative src/href
+#   <base href="https://evil.example/">      # bends every relative src/href
 ```
 
 ```javascript
@@ -104,7 +104,7 @@ grep -rnE "postMessage\([^,]+,\s*['\"]\*['\"]\)" recon/$TARGET/ --include="*.js"
 
 ```html
 <!-- PoC A: drive a no-origin-check LISTENER from an attacker page -->
-<!-- Host on attacker.com; frames target and pushes a privileged message -->
+<!-- Host on attacker.example; frames target and pushes a privileged message -->
 <iframe id="f" src="https://TARGET/page-with-listener"></iframe>
 <script>
   document.getElementById('f').onload = () => {
@@ -130,7 +130,7 @@ addEventListener('message', e => {
 </script>
 ```
 
-> False-positive guard: a handler with a *partial* check (`origin.indexOf('target.com')>-1`, `endsWith('target.com')`, regex `target\.com`) is still vulnerable — bypass with `target.com.evil.com` or `eviltarget.com`. Confirm by serving the PoC from such a look-alike host and showing the message still lands.
+> False-positive guard: a handler with a *partial* check (`origin.indexOf('target.example')>-1`, `endsWith('target.example')`, regex `target\.com`) is still vulnerable — bypass with `target.example.evil.example` or `eviltarget.com`. Confirm by serving the PoC from such a look-alike host and showing the message still lands.
 
 ---
 
@@ -139,7 +139,7 @@ Beyond static origin/sender checks: some handlers trust the FIRST message, or re
 
 ## Phase 3 — Service Worker Abuse
 
-**Hard rule (corrects a common mistake):** a SW script URL **must be same-origin** as the page calling `register()`. A cross-origin script URL (`https://evil.com/sw.js`) throws `SecurityError` — there is **no header that enables cross-origin SW *script* registration**. `Service-Worker-Allowed` only widens the **scope** a same-origin script may control, not where the script may live.
+**Hard rule (corrects a common mistake):** a SW script URL **must be same-origin** as the page calling `register()`. A cross-origin script URL (`https://evil.example/sw.js`) throws `SecurityError` — there is **no header that enables cross-origin SW *script* registration**. `Service-Worker-Allowed` only widens the **scope** a same-origin script may control, not where the script may live.
 
 So the realistic path is: get a SW script **onto the target origin** (file upload that serves JS, open-redirect/path the origin reflects as a script, a JSON/JSONP endpoint with `text/javascript`, or an existing route under your control), then register it from same-origin XSS.
 
@@ -238,6 +238,62 @@ grep -rnE "angular|vue|handlebars|mustache|nunjucks|alpinejs|\bv-|ng-app" recon/
 
 ---
 
+## Phase 7 — Client-Side Path Traversal (CSPT / OSRF)
+
+CSPT (also **on-site request forgery, OSRF**) is a *client-side* bug: the front-end builds an API path by concatenating attacker-influenced input, so `../` dot-segments in that value retarget the browser's own authenticated request to a **different endpoint on the same origin**. The rerouted request still carries the session cookie and any auth header the JS attaches, so a harmless-looking parameter becomes a CSRF / account-action primitive. Doyensec's *CSPT2CSRF* defines the two halves precisely: the **source** is any user-controlled data that feeds the path (URL fragment, query/path parameter, or data read back from the DB); the **sink** is the legitimate request that gets rerouted — and the attacker usually does **not** control the method, headers, or body, only where the path lands.
+
+```bash
+# Signal: SPA builds fetch()/XHR paths from route params, slugs, or stored values,
+# and attaches credentials. Look for string concatenation into an /api/ path.
+grep -rnE "fetch\(|axios\.|XMLHttpRequest|\.open\(" recon/$TARGET/ --include="*.js" 2>/dev/null \
+  | grep -E "\+|\`|\$\{" | grep -iE "/api/|/proxy/|/v[0-9]+/"
+```
+
+```javascript
+// Browser console: flag requests whose path carries dot-segments AND credentials.
+// Detection only — logs candidates, performs no action.
+const of = window.fetch;
+window.fetch = function (i, init) {
+  const u = typeof i === 'string' ? i : i?.url;
+  if (u && /(\.\.\/|%2e%2e|\.\.;)/i.test(u))
+    console.log('[CSPT candidate]', u, init?.method || 'GET', init?.credentials);
+  return of.apply(this, arguments);
+};
+```
+
+**GET sink vs POST sink (Doyensec):** a **GET** sink standalone leaks data or feeds XSS; its real use is as a *gadget* — reroute a GET to an endpoint whose JSON response you can influence (e.g. an `id`), then feed that into a **POST/PUT/DELETE** sink to drive a state change (CSPT→CSPT2CSRF). Dot-segment variants to try when the router normalises: `../`, `%2e%2e/`, `..%2f`, `..;/`. A static-looking suffix (`.json`, `.css`) can additionally flip a CDN into caching the rerouted authenticated response — that crosses into cache deception, so chain `hunt-cache-poison`.
+
+> **Real case (verified this session):** Grafana **CVE-2025-4123** (CVSS 7.6, PR:N/UI:R) — a CSPT in `/public/plugins/<id>/...` path handling chained with an open redirect loaded an attacker plugin module → XSS; no editor permission required, and exploitable under anonymous access. Fixed in 10.4.18, 11.2.9, 11.3.6, 11.4.4, 11.5.4, 11.6.1 and 12.0.0 (all `+security-01`). ([Grafana advisory](https://grafana.com/blog/2025/05/22/grafana-security-release-high-severity-security-fix-for-cve-2025-4123/))
+
+> **Safety — CSPT performs a real action as the victim.** Prove it on *your own* account only. Prefer a **read-only** endpoint for the redirect PoC (show the rerouted request reaching an endpoint the UI never meant to call). Run a state-changing variant only against your own account and keep it reversible. **Never** write a step that performs a state change on a third party. A `../` that resolves back to the intended endpoint is not a finding.
+
+> Tooling: Doyensec's CSPT Burp extension (source→sink correlation), Eval Villain, and the CSPT Playground are the standard aids — verify the current repo URL before citing any in a report (house rule).
+
+---
+
+## Phase 8 — Iframe Traps (same-origin XSS persistence)
+
+An iframe trap is a **persistence** primitive, not an entry point: it assumes you **already** have same-origin XSS (reflected or stored), then keeps that execution alive by trapping the rest of the victim's navigation inside a full-viewport same-origin iframe while the attacker-controlled top window survives and observes. The top page can mirror the framed path into the address bar with `history.replaceState()` so the victim believes they are browsing normally.
+
+```javascript
+// Detection PoC — YOUR OWN BROWSER ONLY. Frames a same-origin route and logs that
+// navigation survives in the top window. No exfil, no input capture.
+const f = document.createElement('iframe');
+f.src = '/';                 // any same-origin route
+f.style = 'position:fixed;inset:0;border:0;width:100vw;height:100vh;z-index:2147483647';
+document.body.appendChild(f);
+f.addEventListener('load', () =>
+  console.log('[iframe-trap] top-window alive, framed path =', f.contentWindow.location.pathname));
+```
+
+- **Header reality (verified against the technique's own write-ups):** `X-Frame-Options: SAMEORIGIN` and CSP `frame-ancestors 'self'` do **not** stop a same-origin trap — the app is framing itself. Only `DENY` / `frame-ancestors 'none'` on the sensitive routes defeat it.
+- **SPA targets:** a real trap hooks `fetch`, `XMLHttpRequest`, `pushState`/`replaceState` and form events inside the framed app; a top-level guard stops the implant re-framing itself on every route. (Describe these in the report — do not ship a data-collecting implant against anyone but yourself.)
+- **Limits:** cross-origin navigation kills DOM access (SOP); closing the tab, typing a new URL, or any browser-chrome action the page cannot suppress ends the trap; fullscreen needs a user gesture and is concealment, not containment.
+
+> **Safety — affects a real user's browsing.** Demonstrate only in your own browser: a same-origin frame of a sensitive route that survives N navigations, logged to the console, with **no** exfiltration and **no** keystroke/field capture. This is not a standalone finding — it requires a confirmed same-origin XSS first.
+
+---
+
 ## Chain Table
 
 | DOM finding | Chain to | Impact |
@@ -248,6 +304,8 @@ grep -rnE "angular|vue|handlebars|mustache|nunjucks|alpinejs|\bv-|ng-app" recon/
 | CSS exfil (OOB-confirmed) | leak CSRF token → fire CSRF | CSRF chain (Medium+) |
 | Same-origin Service Worker via XSS | intercept all in-scope fetch + auth headers | Persistent ATO (Critical) |
 | dangerouslySetInnerHTML, no sanitizer | stored DOM-XSS | XSS → ATO |
+| CSPT (GET sink) → id gadget → CSPT (POST sink) | retarget authenticated request → state change (own-account PoC) | CSPT2CSRF (High) |
+| Iframe trap after same-origin XSS | persist execution + observe framed navigation (own browser) | XSS persistence (scales with what the XSS reaches) |
 
 ---
 
@@ -270,6 +328,8 @@ Match the repo standard: a technique that *fires in DevTools* is not a finding u
 - **PostMessage** — distinguish a *missing* check from a *weak* one; bypass weak checks from a look-alike origin and capture via OOB. A noisy `message` log alone is not proof — show the privileged action or token exfil.
 - **CSS exfil** — **OOB callback per correct character is the only proof.** Read CSP first: `img-src`/`style-src`/`connect-src`/`default-src` restricting external origins kills it. A blocked `url()` is indistinguishable from success in the Network tab — confirm on the Collaborator side.
 - **Service Worker** — registration must be **same-origin script**; a `SecurityError` means you cited the wrong origin. Prove *persistence* (close tabs → reopen → fresh OOB hit, no XSS re-fire).
+- **CSPT** — proof is the *rerouted* request reaching an endpoint the UI never meant to call, shown on your own account. A traversal that resolves back to the intended endpoint, or a same-origin reflection with no path reroute, is not CSPT. Run state-change proofs on your own account only, reversible.
+- **Iframe trap** — not a standalone finding: requires a confirmed same-origin XSS first. Prove only in your own browser with a console log of surviving navigation; no third-party data, no keystroke capture.
 - **General** — unique per-test markers (`btoa(domain)+nonce`) so an OOB hit is attributable to YOUR payload and not background traffic; body-diff the rendered DOM, not the raw HTML, since these are client-side.
 
 **Severity:**

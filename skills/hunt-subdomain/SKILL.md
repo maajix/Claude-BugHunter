@@ -1,6 +1,6 @@
 ---
 name: hunt-subdomain
-description: Hunting skill for subdomain takeover vulnerabilities. Includes modern provider fingerprints — Microsoft Azure DevOps `cloudapp.azure.com` regional-pool re-issue (1-click OAuth ATO via wildcard `reply_to`, Binary Security), Zendesk help-desk takeover → email interception → password reset chain (0xprial writeup), Vercel `cname.vercel-dns.com` deleted-project takeover, plus general Fastly CDN service re-attach and S3 dangling-bucket cookie-scope techniques. Use when hunting subdomain takeover — emphasis on ATO-chain primitives (OAuth `redirect_uri`, cookie-domain, email DNS).
+description: Hunting skill for subdomain takeover vulnerabilities. Includes modern provider fingerprints — Microsoft Azure DevOps `cloudapp.azure.com` regional-pool re-issue (1-click OAuth ATO via wildcard `reply_to`, Binary Security), Zendesk help-desk takeover → email interception → password reset chain (0xprial writeup), Vercel `cname.vercel-dns.com` deleted-project takeover, plus general Fastly CDN service re-attach and S3 dangling-bucket cookie-scope techniques. Also covers broken-link hijacking of dead external references (lapsed domains, removed CDN assets, dead social handles) the target links to. Use when hunting subdomain takeover or broken-link hijacking — emphasis on ATO-chain primitives (OAuth `redirect_uri`, cookie-domain, email DNS).
 sources: github, hackerone_public, binarysecurity_research, can-i-take-over-xyz_research
 report_count: 3
 ---
@@ -53,10 +53,10 @@ Subdomain takeover is high-value because it allows an attacker to serve content 
 ## Step-by-Step Hunting Methodology
 
 1. **Enumerate all subdomains** for the target using passive + active sources:
-   - `subfinder -d target.com -all`
-   - `amass enum -passive -d target.com`
-   - `assetfinder --subs-only target.com`
-   - Certificate transparency: `crt.sh/?q=%.target.com`
+   - `subfinder -d target.example -all`
+   - `amass enum -passive -d target.example`
+   - `assetfinder --subs-only target.example`
+   - Certificate transparency: `crt.sh/?q=%.target.example`
 
 2. **Resolve all subdomains** and flag those with:
    - NXDOMAIN responses
@@ -72,9 +72,9 @@ Subdomain takeover is high-value because it allows an attacker to serve content 
    ```
 
 4. **Manual verification** for each flagged subdomain:
-   - `dig CNAME subdomain.target.com` — confirm CNAME exists
+   - `dig CNAME subdomain.target.example` — confirm CNAME exists
    - `dig A <cname-target>` — confirm NXDOMAIN or no resolution
-   - `curl -sk https://subdomain.target.com` — check for provider error string
+   - `curl -sk https://subdomain.target.example` — check for provider error string
 
 5. **Confirm claimability** — attempt to register the resource:
    - GitHub Pages: check if `<username>.github.io/<repo>` or org page is unclaimed
@@ -85,13 +85,13 @@ Subdomain takeover is high-value because it allows an attacker to serve content 
 
 6. **Claim the resource** (only enough to prove control — do NOT serve malicious content):
    - Create a minimal index page with your HackerOne username and a timestamp
-   - Take screenshot showing your content served on `subdomain.target.com`
+   - Take screenshot showing your content served on `subdomain.target.example`
 
 7. **Document the chain**: CNAME record → provider target → unclaimed resource → your content
 
 8. **Assess impact escalation**:
    - Does the subdomain appear in OAuth redirect allowlists?
-   - Does it share cookies with parent domain (`domain=.target.com`)?
+   - Does it share cookies with parent domain (`domain=.target.example`)?
    - Is it referenced in the app's CSP?
    - Can it receive authenticated API calls?
 
@@ -133,13 +133,13 @@ curl -sk "https://$subdomain" | grep -iE \
 
 **Check if subdomain is in scope for cookies (shared parent domain):**
 ```bash
-curl -Isk "https://target.com" | grep -i "set-cookie" | grep "domain=.target.com"
+curl -Isk "https://target.example" | grep -i "set-cookie" | grep "domain=.target.example"
 ```
 
 **Fastly-specific detection:**
 ```bash
-curl -sI "https://subdomain.target.com" -H "Host: subdomain.target.com" | grep -i "fastly\|x-served-by\|x-cache"
-curl -sk "https://subdomain.target.com" | grep -i "fastly error"
+curl -sI "https://subdomain.target.example" -H "Host: subdomain.target.example" | grep -i "fastly\|x-served-by\|x-cache"
+curl -sk "https://subdomain.target.example" | grep -i "fastly error"
 ```
 
 **S3 unclaimed bucket check:**
@@ -149,7 +149,7 @@ aws s3api head-bucket --bucket <extracted-bucket-name> 2>&1 | grep -i "NoSuchBuc
 
 **GitLab Pages specific:**
 ```bash
-dig CNAME sub.target.com
+dig CNAME sub.target.example
 # If pointing to *.gitlab.io — visit the gitlab.io URL directly
 # 404 from gitlab.io project = claimable
 ```
@@ -168,7 +168,7 @@ dig CNAME sub.target.com
 
 5. **GitHub/GitLab Pages namespace not reserved** — Organization renames, user accounts deleted, or repos made private/deleted while the Pages CNAME still points to the old namespace.
 
-6. **Wildcard DNS entries** — `*.target.com` pointing to a cloud provider means *any* unclaimed subdomain potentially resolves to claimable infrastructure.
+6. **Wildcard DNS entries** — `*.target.example` pointing to a cloud provider means *any* unclaimed subdomain potentially resolves to claimable infrastructure.
 
 7. **Acquired/divested company DNS not cleaned** — Post-acquisition, former brand subdomains (like `oberlo.com` under Shopify) retain CNAMEs to services that are no longer paid for.
 
@@ -180,7 +180,7 @@ dig CNAME sub.target.com
 - Bypass: Use alternative error strings — providers change their 404 pages. Maintain an up-to-date fingerprint list. Some providers show *different* errors on HTTP vs HTTPS. Test both.
 
 **Defense: Scope restrictions (only main domain in scope)**
-- Bypass: Check program's asset list carefully — `*.target.com` wildcards often include subdomains implicitly. Escalate impact to get it in scope.
+- Bypass: Check program's asset list carefully — `*.target.example` wildcards often include subdomains implicitly. Escalate impact to get it in scope.
 
 **Defense: "Can't reproduce" responses due to timing**
 - Bypass: Screenshot immediately after claiming. Record a video walkthrough. The window can be short for popular subdomains.
@@ -199,17 +199,40 @@ dig CNAME sub.target.com
 
 ---
 
+## Broken-Link Hijacking (dead external references)
+
+Same takeover family, different claimable asset: instead of the target's own dangling DNS, the target's pages **reference a dead external resource** — a lapsed domain, a removed CDN asset, or a dead social handle — that an attacker can register and then serve content, script, or harvest traffic from. The reference carries the target's trust the same way a sibling subdomain does.
+
+**Detection:**
+```bash
+# Crawl for external references, then test whether each host is claimable.
+# Serial with jitter — a link crawl is noisy; pace it.
+curl -s "https://target.example/" \
+  | grep -oiE '(href|src)="https?://[^"]+"' | sort -u
+# For each external host: is the domain unregistered, or the handle dead?
+rdap <extracted-domain>          # RDAP/WHOIS "no record" => registrable
+dig +short A <extracted-domain>  # NXDOMAIN / no answer => candidate
+# Social handle: fetch the profile URL — a 404 means the handle is free to claim.
+```
+A broken-link checker (`blc` / broken-link-checker, or an online dead-link checker) automates the crawl — read the tool's `--help` for current flags before relying on them.
+
+**Severity scales with the reference type:** a dead `<script src>` or `<link rel="stylesheet">` executes/loads in the referencing page's origin context = serious (a claimed script host is near-XSS on that page); an `<a href>` to a dead social profile or an `<img>` is low (traffic redirection / phishing only).
+
+> **Safety — claiming is a real-world action.** The finding is complete at **"this dead reference is claimable"** plus evidence the name is unregistered: RDAP/WHOIS returning no record, NXDOMAIN on the domain, or a 404 on the social profile. Actually **registering** the domain or handle has real cost and attribution and requires explicit written sign-off before you do it. Never serve script to real visitors from a claimed reference. Cross-reference `hunt-misc` for the DNS/email-hygiene checks that often sit alongside these.
+
+---
+
 ## Gate 0 Validation
 
 1. **What can the attacker DO right now?**
    Can you register the unclaimed resource (GitHub repo, S3 bucket, Heroku app, UserVoice account) and serve arbitrary content — including phishing pages, credential harvesters, or malicious scripts — under the target's trusted domain name?
 
 2. **What does the victim LOSE?**
-   Users lose trust and safety: they see a company-branded URL serving attacker content. The company loses brand integrity, potentially leaks session cookies if the subdomain is in `domain=.target.com` scope, and may have OAuth/SSO flows hijacked. Depending on CSP configuration, XSS against the main application may be possible.
+   Users lose trust and safety: they see a company-branded URL serving attacker content. The company loses brand integrity, potentially leaks session cookies if the subdomain is in `domain=.target.example` scope, and may have OAuth/SSO flows hijacked. Depending on CSP configuration, XSS against the main application may be possible.
 
 3. **Can it be reproduced in 10 minutes from scratch?**
-   - `dig CNAME subdomain.target.com` → confirms CNAME to provider
-   - `curl -sk https://subdomain.target.com` → confirms provider error string
+   - `dig CNAME subdomain.target.example` → confirms CNAME to provider
+   - `curl -sk https://subdomain.target.example` → confirms provider error string
    - Visit provider registration page → confirms namespace is available
    - Screenshots of all three steps = reproducible in under 10 minutes
 
@@ -266,23 +289,23 @@ Subdomain takeover by itself is Low-Medium / Informational on most mature progra
 
 ### Chain 1 — Takeover + OAuth `redirect_uri` Whitelist → Auth-Code Theft → 1-Click ATO
 
-- **A.** Enumerate the OAuth `redirect_uri` allowlist via `/oauth/authorize` flow. Look for any wildcard `*.target.com` or any takeover-candidate hostname in the static list (e.g., `feedsprod.feeds.visualstudio.com`, `legacy.target.com`).
+- **A.** Enumerate the OAuth `redirect_uri` allowlist via `/oauth/authorize` flow. Look for any wildcard `*.target.example` or any takeover-candidate hostname in the static list (e.g., `feedsprod.feeds.visualstudio.com`, `legacy.target.example`).
 - **B.** Find a takeover-able subdomain in that allowlist. Claim it via the provider's onboarding (Vercel project, Azure cloudapp regional pool, S3 bucket, Heroku app, Zendesk, Shopify storefront — see the Disclosed Report Citations above).
-- **C.** Host an OAuth callback receiver on the claimed subdomain. Send victim to `/oauth/authorize?redirect_uri=https://legacy.target.com/cb&response_type=code&client_id=<legit>`. Victim's browser already has session → auth happens transparently → auth code lands on attacker host. Exchange via token endpoint → ATO.
+- **C.** Host an OAuth callback receiver on the claimed subdomain. Send victim to `/oauth/authorize?redirect_uri=https://legacy.target.example/cb&response_type=code&client_id=<legit>`. Victim's browser already has session → auth happens transparently → auth code lands on attacker host. Exchange via token endpoint → ATO.
 - **Impact:** Persistent 1-click ATO across every user of the target. OAuth flow is implicit-to-the-user (no consent screen if previously consented), so requires only a single click on attacker's link.
 - **Real shape:** Microsoft Azure DevOps `cloudapp.azure.com` + wildcard `*.visualstudio.com` reply_to chain (Binary Security, Nov 2022 — Disclosed Report Citation #12). Multiple H1 disclosures on SaaS programs with permissive OAuth allowlists.
 
 ### Chain 2 — Takeover at Sibling Subdomain + Cookie-Domain Wildcard → Session Fixation on Parent App
 
-- **A.** Inspect cookies set by the main app (`app.target.com`). If `Set-Cookie` has `Domain=.target.com` (parent-scoped) instead of host-only, cookies bleed to every sibling subdomain — including taken-over ones.
-- **B.** Take over any sibling (`legacy.target.com`, `feedback.target.com`, `assets.target.com`). The taken-over host can now `Set-Cookie` for the parent domain.
-- **C.** Plant `Set-Cookie: SESSIONID=<attacker_session>; Domain=.target.com` via a script on the taken-over host. Victim visits `app.target.com` with attacker's session cookie attached. Server treats them as the attacker's account → session-fixation ATO.
+- **A.** Inspect cookies set by the main app (`app.target.example`). If `Set-Cookie` has `Domain=.target.example` (parent-scoped) instead of host-only, cookies bleed to every sibling subdomain — including taken-over ones.
+- **B.** Take over any sibling (`legacy.target.example`, `feedback.target.example`, `assets.target.example`). The taken-over host can now `Set-Cookie` for the parent domain.
+- **C.** Plant `Set-Cookie: SESSIONID=<attacker_session>; Domain=.target.example` via a script on the taken-over host. Victim visits `app.target.example` with attacker's session cookie attached. Server treats them as the attacker's account → session-fixation ATO.
 - **Impact:** ATO without OAuth or password reset — pure cookie-domain bleed. Especially effective when the parent app uses a non-`__Host-` prefixed session cookie.
-- **Real shape:** Discussed extensively in `hunt-auth-bypass` Duende BFF Attack Class 2 (cookie-domain wildcarding turns subdomain takeover into session fixation). Pattern class: S3-bucket-takeover combined with parent-scoped (`Domain=.target.com`) cookies.
+- **Real shape:** Discussed extensively in `hunt-auth-bypass` Duende BFF Attack Class 2 (cookie-domain wildcarding turns subdomain takeover into session fixation). Pattern class: S3-bucket-takeover combined with parent-scoped (`Domain=.target.example`) cookies.
 
 ### Chain 3 — Takeover + CSP `script-src` Includes the Taken-Over Host → Persistent Stored XSS on Main App
 
-- **A.** Inspect CSP header on the main app's HTML response. Look for `script-src 'self' assets.target.com cdn.target.com legacy.target.com ...`.
+- **A.** Inspect CSP header on the main app's HTML response. Look for `script-src 'self' assets.target.example cdn.target.example legacy.target.example ...`.
 - **B.** Take over one of the CSP-allowlisted subdomains (especially common: stale CNAMEs to deleted CDNs, deleted Vercel/Netlify projects, archived analytics services).
 - **C.** Host attacker-controlled JavaScript at the takeover host. Every page load on the main app fetches `<script src="//taken-over-host/x.js">` because the host is on the CSP allowlist. JS executes with main-app origin — full session access, can call any same-origin API.
 - **Impact:** Stored XSS-equivalent on every page of the main app, persistent until the CSP is updated. Bypasses every input sanitiser because the JS source is "trusted" per CSP.
@@ -290,17 +313,17 @@ Subdomain takeover by itself is Low-Medium / Informational on most mature progra
 
 ### Chain 4 — Takeover + CORS `Access-Control-Allow-Origin` Regex Match → Credentialed Cross-Origin API Read
 
-- **A.** Inspect the API's CORS configuration. Look for any regex / wildcard / suffix-match in `Access-Control-Allow-Origin` that includes `*.target.com` or `target.com.*` (the second is a common bug).
-- **B.** Take over any subdomain that the CORS regex would accept (or register a new `target.com.attacker.com` host if suffix-match is broken).
-- **C.** Attacker page hosted on the taken-over subdomain issues `fetch('https://api.target.com/account', {credentials:'include'})`. CORS preflight passes. Server returns credentialed response. Attacker's JS reads it.
+- **A.** Inspect the API's CORS configuration. Look for any regex / wildcard / suffix-match in `Access-Control-Allow-Origin` that includes `*.target.example` or `target.example.*` (the second is a common bug).
+- **B.** Take over any subdomain that the CORS regex would accept (or register a new `target.example.attacker.example` host if suffix-match is broken).
+- **C.** Attacker page hosted on the taken-over subdomain issues `fetch('https://api.target.example/account', {credentials:'include'})`. CORS preflight passes. Server returns credentialed response. Attacker's JS reads it.
 - **Impact:** Mass cross-tenant API read with credentials — sessions, PATs, account data, billing records — all reachable from a single attacker page.
 - **Real shape:** Multiple disclosed cases; cross-refs `hunt-api-misconfig` CORS subsection. Pairs with `hunt-misc` step 1 (CORS regex enumeration).
 
 ### Chain 5 — Takeover at Email DNS (DKIM / SPF / MX) → Email Spoofing → Phishing Trusted by Parent Brand
 
-- **A.** Enumerate the target's email DNS — DKIM selectors (`selector1._domainkey.target.com`), SPF includes (`include:_spf.takeover-candidate.com`), MX records (`mx.target.com → defunct-provider.example`).
-- **B.** Take over any DKIM-selector or SPF-include host. Now the attacker can publish DKIM/SPF records that authorise their own server to send mail "from" `@target.com`.
-- **C.** Send phishing email `From: support@target.com` to victim. Recipient mail server passes SPF + DKIM checks (because the takeover server is now authorised). Email lands in inbox with `target.com` brand, no security warning.
+- **A.** Enumerate the target's email DNS — DKIM selectors (`selector1._domainkey.target.example`), SPF includes (`include:_spf.takeover-candidate.com`), MX records (`mx.target.example → defunct-provider.example`).
+- **B.** Take over any DKIM-selector or SPF-include host. Now the attacker can publish DKIM/SPF records that authorise their own server to send mail "from" `@target.example`.
+- **C.** Send phishing email `From: support@target.example` to victim. Recipient mail server passes SPF + DKIM checks (because the takeover server is now authorised). Email lands in inbox with `target.example` brand, no security warning.
 - **Impact:** Highly-effective phishing campaign exploiting the parent brand. Victims trust the email because every authentication check passes. Credential harvesting, BEC fraud, supply-chain access.
 - **Real shape:** Multiple historical disclosures on DKIM selector takeover / SPF include chain hijacking. Cross-refs DMARC / SPF / DKIM section in `offensive-osint`.
 
@@ -309,7 +332,7 @@ Subdomain takeover by itself is Low-Medium / Informational on most mature progra
 The five chains above are exhaustive in practice — virtually every senior-tier subdomain-takeover payout maps to one of them. Before reporting any takeover, run through the checklist:
 
 1. **OAuth `redirect_uri` allowlist** — does the taken-over host appear? → Chain 1, Critical.
-2. **Parent-domain cookies** — does the main app set `Domain=.target.com`? → Chain 2, High.
+2. **Parent-domain cookies** — does the main app set `Domain=.target.example`? → Chain 2, High.
 3. **CSP `script-src`** — does the taken-over host appear in the allowlist? → Chain 3, Critical.
 4. **CORS allowlist** — does any regex match the taken-over host? → Chain 4, High.
 5. **Email DNS (DKIM selector / SPF include)** — does the taken-over host appear? → Chain 5, High.
@@ -328,8 +351,8 @@ Cross-references:
 ## Related Skills & Chains
 
 - **`hunt-cloud-misconfig`** — Most stale CNAMEs point at deleted cloud assets (S3, CloudFront, Heroku). Chain primitive: Cloud misconfig (S3 deleted) + `hunt-subdomain` → unclaimed CNAME points to bucket → claim bucket name → full subdomain control.
-- **`hunt-oauth`** — A takeover on an OAuth `redirect_uri` host = persistent ATO across the entire SSO surface. Chain primitive: Subdomain takeover at `auth.target.com` + OAuth redirect_uri allowlist → auth code theft → ATO every user that re-authenticates.
-- **`hunt-api-misconfig`** — CORS regexes routinely allowlist a takeoverable subdomain. Chain primitive: Subdomain takeover + CORS `*.target.com` with credentials → credentialed cross-origin API read → mass IDOR.
-- **`hunt-xss`** — A claimed subdomain is same-origin to session-cookie-domain siblings. Chain primitive: Subdomain takeover at `feedback.target.com` + cookie scope `.target.com` → JS hosted on takeover host reads main-app cookies → session hijack.
+- **`hunt-oauth`** — A takeover on an OAuth `redirect_uri` host = persistent ATO across the entire SSO surface. Chain primitive: Subdomain takeover at `auth.target.example` + OAuth redirect_uri allowlist → auth code theft → ATO every user that re-authenticates.
+- **`hunt-api-misconfig`** — CORS regexes routinely allowlist a takeoverable subdomain. Chain primitive: Subdomain takeover + CORS `*.target.example` with credentials → credentialed cross-origin API read → mass IDOR.
+- **`hunt-xss`** — A claimed subdomain is same-origin to session-cookie-domain siblings. Chain primitive: Subdomain takeover at `feedback.target.example` + cookie scope `.target.example` → JS hosted on takeover host reads main-app cookies → session hijack.
 - **`security-arsenal`** — Load the 27+ Subdomain Takeover Fingerprint Table (NoSuchBucket, "no such app", GitHub Pages 404 strings, Heroku, Shopify, Fastly) and the `subzy`/`subjack` automation patterns.
 - **`triage-validation`** — Apply the Unique-Marker gate: takeover claim is informational on its own; submit only after publishing a unique HTML marker on the claimed host AND demonstrating a downstream impact (cookie read, OAuth chain, CSP bypass).

@@ -1,15 +1,32 @@
 ---
 name: hunt-ssti
-description: "Hunt server-side template injection (SSTI) across Jinja2 (Flask/Django), Twig (Symfony), Freemarker (Java), ERB (Rails), Spring, Velocity, Mako, Thymeleaf, Smarty. Detection probes use double-curly and dollar-curly math expressions evaluated server-side. Once an engine is fingerprinted, escalate to RCE via the engine-specific class-walker, callback-registrar, or Execute-utility patterns documented in disclosed reports. Detection patterns: error messages reveal engine, blank or numeric eval reveals expression mode. Targets: email templates, PDF/report generators, CMS preview features, error pages with user input. Use when hunting RCE via template rendering, when content shows engine fingerprints, when finding endpoints that compose strings with user input before render."
-sources: hackerone_public, cve_database, public_research
+description: "Hunt server-side template injection (SSTI) across Jinja2 (Flask/Django), Twig (Symfony), Freemarker (Java), ERB (Rails), Spring, Velocity, Mako, Thymeleaf, Smarty. Detection probes use double-curly and dollar-curly math expressions evaluated server-side. Once an engine is fingerprinted, escalate to RCE via the engine-specific class-walker, callback-registrar, or Execute-utility patterns documented in disclosed reports. Detection patterns: error messages reveal engine, blank or numeric eval reveals expression mode. Targets: email templates, PDF/report generators, CMS preview features, error pages with user input. Also covers Server-Side Includes (SSI) on Apache/nginx and Edge-Side Includes (ESI) injection at the CDN edge (Fastly/Varnish/Akamai), where supported-directive differences decide exploitability. Use when hunting RCE via template rendering, when content shows engine fingerprints, when finding endpoints that compose strings with user input before render."
+sources: hackerone_public, cve_database, public_research, apache_httpd_docs, nginx_docs, fastly_docs, varnish_docs, gosecure_research
 report_count: 6
 ---
 
 ## Autonomous Testing Priority
 
-**Escalate straight to RCE — don't stop at arithmetic detection.**
+**Don't stop at arithmetic detection — but don't jump to RCE either.**
 
-Arithmetic probes (`{{7*7}}→49`) confirm the injection point but are not proof of impact. The real goal is OS command execution. Arithmetic detection also fails silently when the app echoes the input back (e.g. inside an HTML attribute like `<input value="{{7*7}}">`), producing a false negative even when injection exists.
+Arithmetic probes (`{{7*7}}→49`) confirm the injection point and are not proof of
+impact. They also fail silently when the app echoes the input back (e.g. inside an
+HTML attribute like `<input value="{{7*7}}">`), producing a false negative even
+where injection exists. So arithmetic alone is neither sufficient nor reliable:
+identify the **engine** next, through its distinguishing syntax and its error
+messages, because engine plus a reachable sink is already a critical finding and
+it is what tells you which payload family even applies.
+
+**OS command execution is Stage B.** It needs explicit written sign-off naming the
+host, a benign marker only (`id`, a sleep, an echoed canary — never a shell, a
+write or persistence), and a unique canary diffed against a baseline captured
+before the request, in the house style of `vmware-vcenter-attack` Step 4. The
+payloads below use `popen('id')` for exactly that reason: keep it that way.
+
+This priority is about **evidence quality, not speed**. Reporting "SSTI confirmed,
+engine Jinja2, RCE reachable and not executed pending sign-off" is a complete,
+critical finding. Running the command without the sign-off is not a better report,
+it is an unauthorized intrusion.
 
 **Order of attack:**
 1. **Try Jinja2 RCE first** (covers Python/Flask — the most common stack in modern web apps):
@@ -107,11 +124,56 @@ preview). PortSwigger's *"SSTI using documentation"* class is this shape. Three 
 
 ---
 
+## 15. SSI — SERVER-SIDE INCLUDES INJECTION
+
+> **The engine-identification priority at the top of this skill applies here too, and the Stage B gate applies doubly.** SSI/ESI run at the web server or CDN edge, not in an application template engine, so a directive that executes hits shared infrastructure rather than one application. Command execution exists on **Apache only** and only when `Options Includes` (not `IncludesNOEXEC`) is set; **nginx SSI has no command-exec directive at all** (verified against the nginx `ngx_http_ssi_module` docs). Detect first; gate anything that reads a file, fetches a URL, or runs a command behind explicit operator sign-off.
+
+SSI are directives placed in HTML and evaluated by the server as the page is served, format `<!--#directive param="value" -->`. File extensions `.shtml` / `.shtm` / `.stm` hint SSI but are not required. Apache enables it with `Options +Includes` plus `AddOutputFilter INCLUDES .shtml` (or `XBitHack`); nginx with `ssi on;` (and `ssi_types` to parse MIME types beyond `text/html` — relevant because nginx will parse SSI in a proxied upstream response if configured).
+
+**Directive support differs by server (verified against vendor docs):**
+
+| Server | echo / config / set / if | include (file read / internal fetch) | exec (OS command) |
+| :-- | :-: | :-: | :-: |
+| Apache `mod_include` | Yes | `#include file=`/`virtual=` (virtual can hit CGI) | `#exec cmd=` via `/bin/sh` — off under `IncludesNOEXEC` |
+| nginx `ngx_http_ssi_module` | `echo`/`config`/`set`/`if`/`block`/`include` | `include` (subrequest) | **none — no exec command exists** |
+
+**Stage A — detect (benign, non-destructive).** Reflect a value-echo directive into any field that lands in server-parsed HTML and see if it renders instead of echoing literally:
+```
+<!--#echo var="DATE_LOCAL" -->      # renders a date  => SSI is being parsed
+<!--#printenv -->                    # Apache: dumps CGI env (info disclosure on its own)
+```
+A literal echo of the directive back = not parsed = no finding.
+
+**Stage B — execute (requires explicit scope sign-off).** `#include virtual="/internal/..."` performs an internal request (SSRF-shaped — inherit the `hunt-ssrf` gate before firing one at a non-public path); `#include file=` reads a server file; `#exec cmd=` is Apache-only RCE. Confirm with a unique benign canary echoed back and a body-diff against the pre-injection baseline before claiming impact. Do not run a command that writes, deletes, or opens a network connection off-box.
+
+## 16. ESI — EDGE-SIDE INCLUDES INJECTION
+
+ESI are cache-edge directives: a CDN or caching proxy resolves `<esi:...>` tags before serving. If an attacker injects an ESI tag into content the edge then parses, the edge renders attacker markup — **and because the response is cached, it is served to every visitor.** The supported-directive set is the whole finding: it varies sharply by vendor, so a payload that works on one edge is inert on another.
+
+**Vendor support (verified this session against Fastly and Varnish docs; Akamai extensions marked):**
+
+| Edge | Tags supported | Variables | Cookies | Enable / notes |
+| :-- | :-- | :-: | :-: | :-- |
+| **Fastly** | `esi:include`, `esi:comment`, `esi:remove` only | No | No | must flag the request with the `esi()` statement in `vcl_fetch` |
+| **Varnish** | `esi:include`, `esi:remove` only | No | No | variable/cookie substitution not implemented; `src="https://…"` includes ignored unless `esi_ignore_https` feature set |
+| **Akamai** | `esi:include` + `esi:vars`, `esi:choose/when/otherwise`, `esi:assign` | Yes | Yes (Property Manager `pass_set_cookie` passes origin cookies to the ESI processor) | the extended attack directives GoSecure documented (`$add_header`, `esi:debug`, `$(HTTP_COOKIE)`) are per their research, **not vendor-confirmed this session — treat as unverified** |
+
+**Stage A — detect (benign, cache-busted).** The response header `Surrogate-Control: content="ESI/1.0"` announces ESI, but its absence does not prove ESI is off. Blind test with a comment-strip, which performs no fetch:
+```
+hell<!--esi-->o        # if it renders as "hello", the edge is parsing ESI
+```
+Always add a unique cache-buster query param to every probe so it lands on a cache MISS under a throwaway key — never persist a poisoned entry under the real, victim-shared key (same discipline as `hunt-cache-poison`).
+
+**Stage B — execute (requires explicit scope sign-off).** `<esi:include src="…">` that fetches an attacker-controlled or internal URL is **SSRF** — inherit the `hunt-ssrf` gate before firing one. **Never reference a cookie or ESI variable inside an include**, since on a cookie-capable edge that exfiltrates a real user's session to wherever the include points. Confirm interpretation with a benign canary + body-diff; stop at "the edge executed my benign tag."
+
+---
+
 ## Related Skills & Chains
 
 - **`hunt-rce`** — SSTI is the easiest path to RCE on Python/Ruby/PHP/Java stacks because the template language already exposes the runtime. Chain primitive: Jinja2 `{{config.__class__.__init__.__globals__['os'].popen('id').read()}}` or Freemarker `<#assign x="freemarker.template.utility.Execute"?new()>${x("id")}` → unauthenticated RCE as the rendering worker. Always escalate fingerprint → class-walker → cmd exec.
 - **`hunt-xss`** — When the template engine sandboxes the runtime (or you only get the rendered output back as HTML), the same `{{7*7}}` reflection often still yields stored XSS. Chain primitive: sandboxed Jinja2 SSTI without escapes → inject `<script>` into rendered email template → stored XSS hitting every recipient who views the message.
 - **`hunt-ssrf`** — Template engines often expose URL fetchers/filters before they expose the runtime, giving you SSRF before RCE. Chain primitive: Twig `{{ include('http://169.254.169.254/latest/meta-data/iam/security-credentials/') }}` or Jinja2 with `url_for`/custom filters → AWS metadata exfil → cloud creds.
 - **`hunt-file-upload`** — Office docs, SVGs, and email templates uploaded by the user are common SSTI surfaces (the server re-renders them). Chain primitive: upload a DOCX whose `word/document.xml` contains `${T(java.lang.Runtime).getRuntime().exec("id")}` to a Velocity/Freemarker-driven mail-merge → RCE.
+- **`hunt-cache-poison`** — ESI injection (§16) lives at the CDN/cache edge, so an interpreted `<esi:...>` tag in a cacheable response is stored and served to every visitor. Chain primitive: inject an ESI tag reflected into a cached page → edge renders attacker markup for all clients hitting that edge = cache poisoning at ESI level. Always cache-bust detection probes; cross-reference that skill's unkeyed-input and blast-radius discipline.
 - **`security-arsenal`** — Reach for the engine-specific escape payload tree: Jinja2 class-walker variants (`__subclasses__()[N]` index hunting), Twig `_self.env` registerUndefinedFilterCallback, Freemarker `?new()` Execute, ERB backticks, Velocity `$class.inspect`, Smarty `{php}...{/php}`, plus the WAF-bypass variants (`{{request|attr('application')|...}}`, Unicode escapes, `{%print(...)%}`).
 - **`triage-validation`** — Apply the Pre-Severity Gate before claiming Critical RCE. A `{{7*7}} → 49` reflection inside a sandboxed engine (e.g., Twig sandbox mode, Jinja2 SandboxedEnvironment with no escape) is Medium SSTI, not Critical RCE. Prove `id`/OOB DNS callback with a unique marker before writing the report.
