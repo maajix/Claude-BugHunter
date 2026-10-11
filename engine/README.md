@@ -59,7 +59,7 @@ python3 engine/engine.py --scope my-engagement.json --hunt --allow-intrusive   #
 python3 engine/engine.py --scope engine/engagement.example.json --base /tmp/eng --mock --hunt
 
 # standalone recon (deterministic, no engine state):
-python3 engine/recon.py https://target/ target.com
+python3 engine/recon.py https://target/ target.example
 ```
 Key flags: `--hunt` (opt into agents) · `--allow-intrusive` (default OFF = read-only) ·
 `--parallel N` (concurrent agents, default 3) · `--phases a,b,c` (explicit override).

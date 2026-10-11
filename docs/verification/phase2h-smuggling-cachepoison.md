@@ -30,7 +30,7 @@ docker-compose up -d --build
 **Skill that auto-triggers:** `hunt-cache-poison` — description includes "unkeyed inputs (X-Forwarded-Host, X-Original-URL, custom headers)".
 
 **Technique from `hunt-cache-poison`:**
-> `X-Forwarded-Host: attacker.com` (poisons script src URLs) → response gets cached → all subsequent visitors served the poisoned page.
+> `X-Forwarded-Host: attacker.example` (poisons script src URLs) → response gets cached → all subsequent visitors served the poisoned page.
 
 ### Live attack
 

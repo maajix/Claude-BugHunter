@@ -271,7 +271,7 @@ done
 ```bash
 # git-dumper (reconstruct exposed .git)
 pip3 install git-dumper
-git-dumper "https://target.com/.git/" /tmp/repo/
+git-dumper "https://target.example/.git/" /tmp/repo/
 
 # sourcemap-explorer (visualize what's in bundles)
 npm install -g source-map-explorer

@@ -21,9 +21,9 @@ def main():
         if got != want:
             fails.append(f"classify {rec['title']!r}: got {got!r} want {want!r}")
 
-    # genericize: real hostnames -> target.com; example/h1 hosts untouched
+    # genericize: real hostnames -> target.example; example/h1 hosts untouched
     if D.genericize("go to https://acme-bank.com/reset then https://evil.io") \
-            != "go to https://target.com/reset then https://target.com":
+            != "go to https://target.example/reset then https://target.example":
         fails.append("genericize did not rewrite real hostnames")
     if "hackerone.com/reports/1" not in D.genericize("https://hackerone.com/reports/1"):
         fails.append("genericize wrongly rewrote the hackerone source URL")
@@ -32,7 +32,7 @@ def main():
     sk = D.skeleton({"title": "IDOR on https://acme.com/api/user/5", "url": "https://hackerone.com/reports/9",
                      "reporter": "x", "program": "p", "severity": "High", "bounty": 500,
                      "summary": "leaked data from https://acme.com"})
-    for must in ("**Source:**", "TODO", "target.com"):
+    for must in ("**Source:**", "TODO", "target.example"):
         if must not in sk:
             fails.append(f"skeleton missing {must!r}")
     if "acme.com" in sk:

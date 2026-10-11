@@ -23,7 +23,7 @@ DO NOT skip this because "the app needs login" — that's exactly when this pays
 
 ### 1. Pull the shell + enumerate the bundles
 ```bash
-curl -s https://console.target.com/ -o index.html
+curl -s https://console.target.example/ -o index.html
 # React/CRA:
 grep -oE '/static/js/[^"]+\.js' index.html
 # Next.js:
@@ -35,7 +35,7 @@ Download every bundle (they can be multi-MB — that's fine, it's all route data
 ```bash
 mkdir bundles
 for j in $(grep -oE '/static/js/[^"]+\.js' index.html | sort -u); do
-  curl -s "https://console.target.com$j" -o "bundles/$(echo "$j"|tr '/' '_')"
+  curl -s "https://console.target.example$j" -o "bundles/$(echo "$j"|tr '/' '_')"
 done
 ```
 
@@ -65,7 +65,7 @@ grep -oE '[0-9]+:"[a-f0-9]+"' bundles/*main*.js        # {chunkId:"hash"} pairs
 ### 3. Establish a CONTROL — find an endpoint that IS gated
 Before declaring anything vulnerable, send an unauthenticated request to an endpoint you expect to be protected, and capture what *correct* rejection looks like:
 ```bash
-curl -s -X POST https://api.target.com/api/users -H 'Content-Type: application/json' -d '{}'
+curl -s -X POST https://api.target.example/api/users -H 'Content-Type: application/json' -d '{}'
 # secure → {"error":"Missing or invalid authorization header"} or HTTP 401
 ```
 This is your differential. A sibling API (e.g. a second API host, or a different route group on the same host) is the ideal control — same stack, so a different response = real authz gap, not a quirk.
@@ -74,7 +74,7 @@ This is your differential. A sibling API (e.g. a second API host, or a different
 For every discovered route, send it with **no `Authorization` header** and compare to the control:
 ```bash
 for r in <routes>; do
-  curl -s -o /tmp/r -w "[%{http_code}] $r\n" -X POST -H 'Content-Type: application/json' -d '{}' "https://api.target.com/api/v2/$r"
+  curl -s -o /tmp/r -w "[%{http_code}] $r\n" -X POST -H 'Content-Type: application/json' -d '{}' "https://api.target.example/api/v2/$r"
 done
 ```
 Interpret:
@@ -95,8 +95,8 @@ Interpret:
 ## What "the API behind the SSO login" really means
 
 A common, dangerous architecture:
-- `console.target.com` (the SPA) → login is **Entra/Okta/Google OAuth** (looks airtight).
-- `api.target.com` (the backend) → some route groups enforce the bearer token, **some route groups forgot the middleware.**
+- `console.target.example` (the SPA) → login is **Entra/Okta/Google OAuth** (looks airtight).
+- `api.target.example` (the backend) → some route groups enforce the bearer token, **some route groups forgot the middleware.**
 
 The frontend login is theatre if the API doesn't independently validate the token on every route. Always test the API directly, bare, regardless of how locked-down the login UI is.
 

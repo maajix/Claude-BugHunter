@@ -76,7 +76,7 @@ account are required."
 **Environment:**
 - Attacker account: attacker@test.com, user_id = 123
 - Victim account: victim@test.com, user_id = 456
-- Target: https://target.com
+- Target: https://target.example
 
 **Steps:**
 
@@ -86,7 +86,7 @@ account are required."
 
 ```
 GET /api/users/456/orders HTTP/1.1
-Host: target.com
+Host: target.example
 Authorization: Bearer ATTACKER_TOKEN_HERE
 ```
 
@@ -189,7 +189,7 @@ Include: endpoint, method, parameter, data exposed, required privileges.]
 
 \```http
 METHOD /endpoint HTTP/1.1
-Host: target.com
+Host: target.example
 Authorization: Bearer ATTACKER_TOKEN
 Content-Type: application/json
 
@@ -468,7 +468,7 @@ Key fields:
 
 \```
 GET /api/v2/resource/222 HTTP/1.1
-Host: target.com
+Host: target.example
 Authorization: Bearer ACCOUNT_A_TOKEN
 \```
 

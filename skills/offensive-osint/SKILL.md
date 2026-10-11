@@ -214,7 +214,7 @@ This skill is a **lean operational index**. Most concrete data (wordlists, regex
 
 **Loading rules of thumb:**
 - Single-class question (e.g., "what's the regex for AWS keys?") → load `secret-patterns.md` only.
-- Multi-class engagement (e.g., "do an external recon on target.com") → load `probes-and-wordlists.md` first, then add others as the engagement narrows.
+- Multi-class engagement (e.g., "do an external recon on target.example") → load `probes-and-wordlists.md` first, then add others as the engagement narrows.
 - Severity / triage question → load `severity-matrix.md`.
 
 ---
@@ -369,7 +369,7 @@ Drop these prompts into a fresh Claude session to verify the skill loads correct
 28. *"Severity matrix for `android:debuggable=true` on prod app?"* → §40.
 29. *"Install commands for the standard recon toolkit (subfinder/httpx/nuclei/etc.)?"* → §46.
 30. *"For a healthcare engagement, what additional ports / protocols matter?"* → §47.1.
-31. *"Pull HudsonRock breach corpus for `target.com` via direct API (no UI)."* → §15.0.1.
+31. *"Pull HudsonRock breach corpus for `target.example` via direct API (no UI)."* → §15.0.1.
 32. *"Run the full §16.14 email security audit from a Windows box (PowerShell)."* → §16.14 PowerShell parallel.
 33. *"crt.sh just 502'd. What's the fallback chain?"* → §27.0.1.
 34. *"Bulk IP → ASN lookup for 200 IPs without burning bgpview rate limit."* → §28.1 (Cymru bulk).

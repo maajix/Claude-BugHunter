@@ -58,7 +58,7 @@ Works out of the box. All HTTP goes via Python `urllib`. No Burp required.
 
 ```bash
 cbh recon hackerone.com
-cbh classify "https://api.target.com/v1/users/42?next=..."
+cbh classify "https://api.target.example/v1/users/42?next=..."
 ```
 
 ### Mode 2 — Burp Suite Pro integration
@@ -70,14 +70,14 @@ Two integration points:
 ```bash
 # Start Burp Suite Pro, ensure Proxy listener is on 127.0.0.1:8080
 cbh recon hackerone.com --burp
-cbh classify "https://target.com/api/users/42" --burp
+cbh classify "https://target.example/api/users/42" --burp
 
 # Or use a custom proxy URL (Burp on a different port, mitmproxy, ZAP, etc.)
 cbh recon hackerone.com --proxy http://127.0.0.1:8081
 
 # Or set the env var once
 export CBH_BURP_PROXY=http://127.0.0.1:8080
-cbh recon target.com   # auto-detected
+cbh recon target.example   # auto-detected
 ```
 
 What happens after: every host `cbh recon` probes appears in Burp's Target → Site map. Each title-extracted live host is one click from Repeater. You drive the actual attacks from Burp; `cbh` did the bulk discovery + classification.
@@ -147,7 +147,7 @@ slash command. See [`docs/recon-manifest.md`](recon-manifest.md) for the full co
 ### `cbh classify <url>` — pattern-match URL → hunt-* skills
 
 ```bash
-cbh classify "https://api.target.com/v1/users/42?next=https://evil.com"
+cbh classify "https://api.target.example/v1/users/42?next=https://evil.example"
 ```
 
 Two-stage matcher:
@@ -201,12 +201,12 @@ The draft will have `(fill in)` placeholders wherever the finding text didn't in
 
 ```bash
 # Day 1 — intake
-cbh recon target.com
-# → recon/target.com/RECON_SUMMARY.md
+cbh recon target.example
+# → recon/target.example/RECON_SUMMARY.md
 
 # Day 2 — hunt
 # Find an interesting URL in the recon summary, classify it
-cbh classify "https://api.target.com/v1/users/42?token=abc"
+cbh classify "https://api.target.example/v1/users/42?token=abc"
 # → matches hunt-idor + hunt-api-misconfig + hunt-ssrf
 # → read docs/disclosed-reports/hunt-idor.md for the IDOR pattern library
 

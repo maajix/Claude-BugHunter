@@ -1233,7 +1233,7 @@ What to look for: an IP that resolved 1–5 years ago and is **not** in the curr
 
 Certificates often get re-issued with the same SAN list across origin and CDN. Search CT logs:
 
-- crt.sh `?q=%.<target.com>&exclude=expired` — find certs with the target's domain in SAN.
+- crt.sh `?q=%.<target.example>&exclude=expired` — find certs with the target's domain in SAN.
 - Cross-reference issued certs against current CDN-fronted cert. The "extra" cert (not the CDN one) often points to origin via its CN/SAN.
 - Tools like `cero` (`go install github.com/glebarez/cero@latest`) crawl IPs and pull certs; correlate IPs whose certs include the target's hostname.
 
@@ -1369,9 +1369,9 @@ For an authorized engagement, the operator typically wants three lists:
 If you found a takeover-able subdomain (companion skill §16.12), you can host phishing content **on a subdomain of the actual target**. This bypasses every brand-impersonation defense the user has.
 
 **Procedure:**
-1. Confirm takeover signature on the candidate (`<sub>.target.com` CNAMEd to unclaimed `<x>.herokuapp.com`).
+1. Confirm takeover signature on the candidate (`<sub>.target.example` CNAMEd to unclaimed `<x>.herokuapp.com`).
 2. Register the unclaimed resource (`<x>.herokuapp.com` on Heroku).
-3. Now `<sub>.target.com` serves your content.
+3. Now `<sub>.target.example` serves your content.
 4. **Stop and consult the engagement lead before going live with phishing content.** Even in authorized engagements, the takeover step itself may need explicit client sign-off.
 
 ### 29.3 Email spoof feasibility

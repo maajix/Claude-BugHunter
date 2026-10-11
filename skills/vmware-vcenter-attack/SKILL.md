@@ -24,7 +24,7 @@ Do NOT use for:
 ## Step 1 — Version fingerprinting
 
 ```bash
-TARGET="vcenter.target.com"
+TARGET="vcenter.target.example"
 
 # Build info endpoint (often public; revealing exact patch level)
 curl -sk "https://$TARGET/sdk/vimServiceVersions.xml"

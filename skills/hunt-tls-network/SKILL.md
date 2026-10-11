@@ -15,8 +15,8 @@ Most findings in this class are **Info/Low and routinely rejected** as "best-pra
 2. **Does the program accept it?** Many programs explicitly list missing SPF/DMARC, missing security headers, weak ciphers without exploit, and CAA as **out of scope**. Read scope first; quote the in-scope line in your report.
 
 **What actually pays in this class (in order):**
-- **Dangling-CNAME / dangling-A subdomain takeover** — you control content on `target.com` subdomain. Real impact, real bounty. (Owned in depth by `hunt-subdomain`; covered here for the TLS/DNS recon angle.)
-- **Spoofable DMARC, proven by delivered-to-inbox email** — not "p=none exists" but an actual mail from `ceo@target.com` landing in a real inbox with a passing/none DMARC verdict in the headers.
+- **Dangling-CNAME / dangling-A subdomain takeover** — you control content on `target.example` subdomain. Real impact, real bounty. (Owned in depth by `hunt-subdomain`; covered here for the TLS/DNS recon angle.)
+- **Spoofable DMARC, proven by delivered-to-inbox email** — not "p=none exists" but an actual mail from `ceo@target.example` landing in a real inbox with a passing/none DMARC verdict in the headers.
 - **DNS AXFR returning internal hosts** — full internal hostname/IP map. Concrete recon value, often Medium.
 - **mTLS / client-cert bypass on an internal service** — reaching authenticated-only functionality without the cert. Real auth bypass = High.
 - **Exploited TLS weakness with a working decrypt/MitM PoC** — almost never achievable remotely in 2024-2026 against a patched stack; see Phase 1 caveats.
@@ -118,7 +118,7 @@ dig TXT $TARGET +short | grep "v=spf1"
 
 # Check DMARC
 dig TXT _dmarc.$TARGET +short
-# Missing DMARC → attacker can send as @target.com with no enforcement
+# Missing DMARC → attacker can send as @target.example with no enforcement
 
 # Check DKIM selectors (common: default, google, mail, k1)
 for selector in default google mail k1 selector1 selector2 s1 s2 dkim; do
@@ -216,7 +216,7 @@ comm -23 <(sort recon/$TARGET/ct-subdomains.txt) \
 
 ## Phase 6.5 — Dangling Records → Subdomain Takeover (the finding that actually pays)
 
-This is the highest-impact item in the whole skill. A CNAME/A record pointing at a deprovisioned third-party resource (S3 bucket, Azure CDN/App Service, GitHub Pages, Heroku, Fastly, etc.) lets you claim that resource and serve content from `*.target.com`. Full depth lives in `hunt-subdomain`; here is the TLS/DNS-recon entry point.
+This is the highest-impact item in the whole skill. A CNAME/A record pointing at a deprovisioned third-party resource (S3 bucket, Azure CDN/App Service, GitHub Pages, Heroku, Fastly, etc.) lets you claim that resource and serve content from `*.target.example`. Full depth lives in `hunt-subdomain`; here is the TLS/DNS-recon entry point.
 
 ```bash
 # For each subdomain from CT logs, resolve the CNAME chain and check for a live origin
@@ -237,7 +237,7 @@ done < recon/$TARGET/ct-subdomains.txt | tee recon/$TARGET/cname-map.txt
 2. **Register the resource yourself** and serve a unique canary file, e.g. `https://$sub/<random>.txt` returning a string only you know. Screenshot it served over the victim subdomain with valid TLS.
 3. Tear it down immediately after PoC; never leave attacker-controlled content live on the target's domain.
 
-Impact: cookie scope theft (cookies set for `.target.com`), OAuth `redirect_uri`/CORS-trust abuse, phishing on a trusted origin. Typically **High** (Critical if it sits at an OAuth/SSO redirect or shares session cookies).
+Impact: cookie scope theft (cookies set for `.target.example`), OAuth `redirect_uri`/CORS-trust abuse, phishing on a trusted origin. Typically **High** (Critical if it sits at an OAuth/SSO redirect or shares session cookies).
 
 ---
 
@@ -303,7 +303,7 @@ Severities below are calibrated to what triage actually accepts. They are delibe
 
 | TLS/DNS finding | Realistic standalone severity | Notes / what raises it |
 |----------------|------|------|
-| Dangling-CNAME subdomain takeover (claimed + canary served) | **High** | Critical if at OAuth `redirect_uri`/SSO or sharing `.target.com` session cookies |
+| Dangling-CNAME subdomain takeover (claimed + canary served) | **High** | Critical if at OAuth `redirect_uri`/SSO or sharing `.target.example` session cookies |
 | mTLS / client-cert bypass reaching authed functionality | **High** | Must show privileged data/action, not just a 200 |
 | AXFR returning internal hosts/IPs | **Medium** | Recon value; pairs with internal-service findings |
 | Spoofable DMARC, **delivered to a real inbox** (PoC headers) | **Medium** | Often OOS — check scope; Inbox (not Spam) + delivered required. *Reading `p=none` from `dig` alone = Info, do not file* |
@@ -337,10 +337,10 @@ curl -s "https://dmarcian.com/dmarc-inspector/?domain=$TARGET" 2>/dev/null
 
 Each finding ships only with the proof listed — never the `dig`/header output alone.
 
-- **Subdomain takeover:** you registered the dangling resource and served a unique canary over `https://sub.target.com/` with valid TLS. Screenshot + canary string. (Tear down after.)
+- **Subdomain takeover:** you registered the dangling resource and served a unique canary over `https://sub.target.example/` with valid TLS. Screenshot + canary string. (Tear down after.)
 - **mTLS bypass:** spoofed client-verify header returns *privileged* data/action that the cert-required path otherwise denies. Burp request/response pair.
 - **AXFR:** zone transfer returns internal hostnames/IPs from an authoritative NS. Full transcript.
-- **DMARC spoof:** swaks-sent mail with `From: @target.com` **delivered to a real Inbox** (not Spam), raw `Authentication-Results` headers attached. A bounce or Spam landing = no finding.
+- **DMARC spoof:** swaks-sent mail with `From: @target.example` **delivered to a real Inbox** (not Spam), raw `Authentication-Results` headers attached. A bounce or Spam landing = no finding.
 - **HSTS missing:** only reportable with a working downgrade PoC capturing a victim cookie over plaintext — otherwise it is best-practice noise.
 
 **Severity (conservative — matches the Chain Table):**

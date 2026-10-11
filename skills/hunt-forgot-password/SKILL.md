@@ -11,7 +11,7 @@ report_count: 6
 
 **Pattern 1 — Username enumeration (response difference for valid vs invalid email):**
 1. POST to the forgot-password endpoint with a clearly invalid email (e.g. `nonexistent@fakedomain12345.com`) — record the response body, status code, and length
-2. POST with an email you know exists (or try common patterns like `admin@target.com`, `test@target.com`, `user@target.com`)
+2. POST with an email you know exists (or try common patterns like `admin@target.example`, `test@target.example`, `user@target.example`)
 3. Compare responses: different message ("Email sent" vs "Email not found"), different HTTP status, or meaningfully different body length = username enumeration confirmed
 4. Proof: enumeration is confirmed when the two responses differ measurably (baseline vs probe) in message text, status code, or body length
 

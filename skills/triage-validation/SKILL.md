@@ -52,7 +52,7 @@ Common tiers:
 ### Q3: Is the root cause in an in-scope asset?
 
 Confirm:
-- Vulnerable domain is on the in-scope list (not `*.internal.target.com`)
+- Vulnerable domain is on the in-scope list (not `*.internal.target.example`)
 - It's a production asset (not staging/dev unless explicitly in scope)
 - It's not a third-party service the company just uses (not Stripe, Salesforce, Google Auth)
 

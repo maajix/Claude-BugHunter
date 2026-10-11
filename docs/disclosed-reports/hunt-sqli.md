@@ -21,7 +21,7 @@ SQL injection has been on the OWASP Top 10 since 2003 and still pays out at the 
 ### HackerOne hacktivity — widely-documented SQLi disclosures across GitHub, Uber, Shopify, Verizon
 - **Source:** HackerOne's public hacktivity feed (hackerone.com/hacktivity) contains hundreds of SQLi disclosures across major programs. The class is well-documented as a category — cite the body of disclosed reports rather than individual report IDs (which can change disclosure status).
 - **Pattern shape:** The recurring shape across public disclosures: a *non-obvious* parameter (HTTP header, second-order field, JSON sub-object) reached a query construction that the primary parameter-validation layer never inspected. Top examples that recur across programs: tracking subdomain parameters, third-party plugins on enterprise WordPress installs, internal admin tools exposed externally (Airflow, GitLab, Jenkins), regional `.cn` / `.co` / `.io` variants on a slower patch cadence.
-- **Key trick:** Hunt the *attack surface periphery*. The flagship API on `api.target.com` has been hardened by ten years of pentests. The marketing site on `events.target.com` running an unmaintained WordPress plugin has not.
+- **Key trick:** Hunt the *attack surface periphery*. The flagship API on `api.target.example` has been hardened by ten years of pentests. The marketing site on `events.target.example` running an unmaintained WordPress plugin has not.
 - **Why it matters:** SQLi-as-a-class still pays because new attack surface gets added faster than old surface gets audited. Recon discipline (subdomain enum, parameter mining, JS bundle harvest) determines whether you find the candidate at all.
 
 ### MSSQL `xp_dirtree` UNC-path OOB exfiltration (well-documented operator pattern)

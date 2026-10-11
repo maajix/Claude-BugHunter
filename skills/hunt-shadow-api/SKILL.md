@@ -142,7 +142,7 @@ are the finding.
 - **`hunt-api-misconfig`** — owns exploitation once a spec or endpoint is in hand (mass
   assignment, JWT attacks, OData, Swagger-chain attacks). This skill hands it a sharper target:
   "here's a zombie endpoint with weaker validation than the current one."
-- **`hunt-subdomain`** — owns host/subdomain-level discovery (`api-v1.target.com` as its own
+- **`hunt-subdomain`** — owns host/subdomain-level discovery (`api-v1.target.example` as its own
   host, potential takeover). This skill owns what happens once you're inside a given host's
   version surface.
 - **`hunt-source-leak`** — JS-bundle grep for internal/undocumented calls; reused here

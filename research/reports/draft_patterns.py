@@ -5,7 +5,7 @@ draft_patterns.py — auto-draft SKELETON pattern entries for curation. Never co
 For a chosen skill, turns its uncovered high-signal reports (from the raw corpus)
 into skeleton entries in the repo's Family-B format (`### <title>` + `**Source:**`),
 filling what's extractable from the summary and leaving TODO markers for the
-judgment parts. Hostnames are genericized to `target.com` (the corpus convention);
+judgment parts. Hostnames are genericized to `target.example` (the corpus convention);
 the report URL is cited for attribution. Output goes to research/reports/drafts/
 (gitignored) — YOU review, edit, and move approved entries into
 docs/disclosed-reports/<skill>.md, then update the SKILL.md + report_count.
@@ -26,14 +26,14 @@ sys.path.insert(0, HERE)
 import classify_reports as C          # noqa: E402
 import report_coverage as RC          # noqa: E402
 
-# Genericize any real hostname to target.com (keep path shape). Skip example/H1 hosts.
+# Genericize any real hostname to target.example (keep path shape). Skip example/H1 hosts.
 HOST_RE = re.compile(r"https?://(?!(?:target\.com|example\.|hackerone\.com))[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
 
 def genericize(text):
     if not text:
         return text
-    return HOST_RE.sub("https://target.com", text)
+    return HOST_RE.sub("https://target.example", text)
 
 
 def skeleton(rec):

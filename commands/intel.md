@@ -1,6 +1,6 @@
 ---
 name: intel
-description: On-demand intelligence fetch for a target — CVEs, disclosed reports, new features. Pulls NVD/GitHub-Advisory CVEs + bundled disclosed reports + hunt memory context. Usage: /intel target.com
+description: On-demand intelligence fetch for a target — CVEs, disclosed reports, new features. Pulls NVD/GitHub-Advisory CVEs + bundled disclosed reports + hunt memory context. Usage: /intel target.example
 ---
 
 # /intel
@@ -19,25 +19,25 @@ Fetch actionable intelligence for a target.
 ## Usage
 
 ```
-/intel target.com
+/intel target.example
 ```
 
 ## Output
 
 ```
-INTEL: target.com
+INTEL: target.example
 ═══════════════════════════════════════
 
 ALERTS:
 [CRITICAL] CVE-2026-XXXX — Next.js middleware bypass (CVSS 9.1)
-  target.com runs Next.js 14.2.3 (vulnerable). Patch: 14.2.4.
+  target.example runs Next.js 14.2.3 (vulnerable). Patch: 14.2.4.
   → You haven't tested this endpoint yet. Hunt candidate.
 
 [HIGH] New feature detected: /api/v3/billing/invoices
   Not in your tested_endpoints list. 3 new paths.
   → New = unreviewed. Priority hunt target.
 
-[INFO] 2 new disclosed reports on HackerOne for target.com
+[INFO] 2 new disclosed reports on HackerOne for target.example
   → Read for methodology insights before hunting.
 
 MEMORY CONTEXT:

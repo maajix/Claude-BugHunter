@@ -118,9 +118,9 @@ The vulnerability class IS real — but the working attack shape depends on whet
 
 | Server prefix | Working @-userinfo attack | Result |
 |---|---|---|
-| `https://acme.example` (NO trailing slash) | `https://acme.example@evil.com/x` | Browser navigates to `evil.com` ✓ |
-| `https://acme.example/` (trailing slash) | `https://acme.example/@evil.com/x` | Browser stays on `acme.example` ✗ |
-| `https://acme.example` (substring match) | `https://acme.example.evil.com/x` | Browser navigates to `acme.example.evil.com` ✓ |
+| `https://acme.example` (NO trailing slash) | `https://acme.example@evil.example/x` | Browser navigates to `evil.example` ✓ |
+| `https://acme.example/` (trailing slash) | `https://acme.example/@evil.example/x` | Browser stays on `acme.example` ✗ |
+| `https://acme.example` (substring match) | `https://acme.example.evil.example/x` | Browser navigates to `acme.example.evil.example` ✓ |
 
 See `docs/verification/phase3-playwright-browser-execution.md` Test 29 for the live Playwright trace confirming the correct attack shape against a no-trailing-slash prefix.
 

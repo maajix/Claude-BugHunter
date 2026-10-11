@@ -184,7 +184,7 @@ Direct string concatenation. The `--` comments out the password check.
 > **DOM XSS via hash/search:**
 > ```javascript
 > location.hash = '#"><img src=x onerror=alert(1)>'
-> location.href = 'https://target.com/page#<script>alert(1)</script>'
+> location.href = 'https://target.example/page#<script>alert(1)</script>'
 > ```
 
 ### Live verification (source inspection)

@@ -100,7 +100,7 @@ If a finding was confirmed and then stopped working, that is almost always a CLI
 
 ### 2. Don't hedge in the Impact section
 Bad: "An attacker could potentially be able to access user data, which may lead to..."
-Good: "An attacker reads any user's profile data. Demonstrated on test user `victim@target.com` at 14:22 IST."
+Good: "An attacker reads any user's profile data. Demonstrated on test user `victim@target.example` at 14:22 IST."
 
 ### 3. Don't generic-CIA the impact
 Bad: "Loss of confidentiality and integrity of customer data"

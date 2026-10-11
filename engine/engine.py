@@ -410,7 +410,7 @@ MOCK_RECON = {
 }
 MOCK_HUNT = {
     ("http://localhost:3002/api/account?id=5", "idor"): {"vulnerable": True, "severity": "high", "evidence": "id=N returns other users' PII", "request": "GET /api/account?id=6"},
-    ("http://localhost:3002/redirect?next=x", "open-redirect"): {"vulnerable": True, "severity": "medium", "evidence": "302 to external", "request": "GET /redirect?next=//evil.com"},
+    ("http://localhost:3002/redirect?next=x", "open-redirect"): {"vulnerable": True, "severity": "medium", "evidence": "302 to external", "request": "GET /redirect?next=//evil.example"},
     ("http://localhost:3002/search?q=x", "xss"): {"vulnerable": False},
 }
 MOCK_VALIDATE = {

@@ -90,7 +90,7 @@ Slash commands, the plugin marketplace, and the `/hunt` engine are Claude-Code-o
 
 ## Step 3 — (Optional) Set up Burp MCP
 
-**Skip this step if you don't have Burp Suite Pro.** The bundle works fine in curl-only mode (`cbh recon target.com` etc.). Set this up later when/if you adopt Burp.
+**Skip this step if you don't have Burp Suite Pro.** The bundle works fine in curl-only mode (`cbh recon target.example` etc.). Set this up later when/if you adopt Burp.
 
 In Burp Suite:
 1. Go to **Extensions** → **BApp Store** → search for "MCP Server" → Install

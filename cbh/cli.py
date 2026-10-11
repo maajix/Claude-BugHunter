@@ -26,7 +26,7 @@ Stdlib + optional `requests`. No build step. Drop on PATH:
 
 Or run inline:
 
-    scripts/cbh.py recon target.com
+    scripts/cbh.py recon target.example
 """
 from __future__ import annotations
 import argparse
@@ -886,8 +886,8 @@ def main() -> int:
         epilog=textwrap.dedent("""\
             Examples:
               cbh recon hackerone.com
-              cbh recon target.com --burp                  # route via Burp proxy
-              cbh classify "https://api.target.com/v1/users/42?next=https://evil.com"
+              cbh recon target.example --burp                  # route via Burp proxy
+              cbh classify "https://api.target.example/v1/users/42?next=https://evil.example"
               cbh triage findings/idor-2026-05-15.md
               cbh report findings/idor-2026-05-15.md --platform bugcrowd --out draft.md
 

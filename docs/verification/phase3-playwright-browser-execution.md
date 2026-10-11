@@ -132,7 +132,7 @@ Failed (DNS-blocked):
 |---|---|
 | `http://acme.example` (no slash) | `@`-userinfo: `http://acme.example@evil/` |
 | `http://acme.example/` (trailing slash) | `@`-userinfo does NOT work in browsers; need path-traversal, open-redirect chain, subdomain takeover, or backslash-tricks |
-| `http://acme.example` (substring match) | Subdomain extension: `http://acme.example.evil.com/` |
+| `http://acme.example` (substring match) | Subdomain extension: `http://acme.example.evil.example/` |
 
 **Phase 2F Test 14 Attack B is corrected to reflect this.**
 
@@ -155,11 +155,11 @@ Add a "Browser-parse vs server-parse" subsection clarifying:
 > | Attack URL | Server `startswith()` check | Browser actual host |
 > |---|---|---|
 > | `https://acme.example/x` | passes | acme.example ✓ |
-> | `https://acme.example.attacker.com/x` | passes (substring match!) — fails strict-startswith | acme.example.attacker.com — **exploit** |
-> | `https://acme.example@attacker.com/x` | passes (prefix is `https://acme.example`, no slash) | attacker.com — **exploit** |
-> | `https://acme.example/@attacker.com/x` | passes (prefix is `https://acme.example/`) | acme.example (path normalization) — **NOT exploit** |
-> | `https://acme.example/../@attacker.com/x` | passes (passes startswith) | acme.example (path traversal normalized) — usually NOT exploit |
-> | `https://acme.example/\@attacker.com/x` | passes | depends on backslash handling per browser — sometimes exploit |
+> | `https://acme.example.attacker.example/x` | passes (substring match!) — fails strict-startswith | acme.example.attacker.example — **exploit** |
+> | `https://acme.example@attacker.example/x` | passes (prefix is `https://acme.example`, no slash) | attacker.example — **exploit** |
+> | `https://acme.example/@attacker.example/x` | passes (prefix is `https://acme.example/`) | acme.example (path normalization) — **NOT exploit** |
+> | `https://acme.example/../@attacker.example/x` | passes (passes startswith) | acme.example (path traversal normalized) — usually NOT exploit |
+> | `https://acme.example/\@attacker.example/x` | passes | depends on backslash handling per browser — sometimes exploit |
 >
 > Operational rule: server-side prefix-match flaw is necessary but NOT sufficient for browser-level ATO. Always headless-test the final navigation when claiming an OAuth chain → ATO finding.
 

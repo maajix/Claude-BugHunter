@@ -58,7 +58,7 @@ curl -sk -m 10 "https://www.postman.com/_api/collection/$COL_ID" | jq '.collecti
 **Ownership scoring signals:**
 - Creator/team name mentions target domain or brand → strong.
 - Workspace name/description mentions target → strong.
-- Request URLs contain `*.target.com` → strongest signal (workspace is actively used against target's APIs).
+- Request URLs contain `*.target.example` → strongest signal (workspace is actively used against target's APIs).
 
 **Run secret catalog (§17) over every text blob extracted** from the requests, env vars, pre-request scripts, and test scripts.
 

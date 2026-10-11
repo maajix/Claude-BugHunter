@@ -13,6 +13,8 @@ on:
       - "scripts/lint_skills.py"
       - "scripts/test_lint_skills.py"
       - "scripts/check_dispatch_coverage.py"
+      - "scripts/check_destructive_payloads.py"
+      - "scripts/test_check_destructive_payloads.py"
       - "scripts/.identifier-denylist.sha256"
       - ".github/workflows/skill-lint.yml"
   push:
@@ -23,6 +25,8 @@ on:
       - "scripts/lint_skills.py"
       - "scripts/test_lint_skills.py"
       - "scripts/check_dispatch_coverage.py"
+      - "scripts/check_destructive_payloads.py"
+      - "scripts/test_check_destructive_payloads.py"
   workflow_dispatch:
 
 permissions:
@@ -46,6 +50,18 @@ jobs:
 
       - name: Validate skills (structure + identifier/secret scan)
         run: python3 scripts/lint_skills.py
+
+      # A skill is read by an agent that may run what it sees. Two blocks shipped
+      # exploitation under the heading "detection": a $(id) written into a Palo
+      # Alto log path, and DROP TABLE as the illustrative OData payload. The gate
+      # is deliberately narrow (irreversible data loss, a write to the target's
+      # filesystem, a reverse shell) because two broader versions produced 80
+      # false positives. Self-check first: its value is entirely its precision.
+      - name: Self-check the destructive-payload gate
+        run: python3 scripts/test_check_destructive_payloads.py
+
+      - name: Validate skills (no ungated destructive payloads)
+        run: python3 scripts/check_destructive_payloads.py
 
       # The routing maps are only useful if every mapped skill is installed and
       # every installed hunt-* skill is reachable. skill_map.py checks both and

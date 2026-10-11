@@ -66,7 +66,7 @@ def oauth_authorize():
     Issue an authorization code.
     Vulnerabilities:
       A) redirect_uri validated by prefix-match, not exact-match
-         → https://acme.example/.attacker.com or https://acme.example/@attacker.com bypass
+         → https://acme.example/.attacker.example or https://acme.example/@attacker.example bypass
       B) No state parameter requirement (CSRF on the callback)
       C) Code returned in query string
     """

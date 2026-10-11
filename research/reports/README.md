@@ -17,7 +17,7 @@ collects, finds coverage gaps, and drafts skeletons. You own the curation.
 - **Intigriti has no public feed** (disclosure is approval-gated). `harvest_intigriti.py`
   is an honest stub; curate Intigriti write-ups by hand.
 - **Never verbatim.** Reports are copyrighted by their authors; the repo distills
-  patterns + cites the URL and genericizes targets to `target.com`. Raw corpus,
+  patterns + cites the URL and genericizes targets to `target.example`. Raw corpus,
   drafts, and gaps stay gitignored.
 - **Rate-limited, resumable, personal-research scale.** No official bulk API exists.
 

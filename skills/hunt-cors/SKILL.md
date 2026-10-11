@@ -11,7 +11,7 @@ sources: hackerone_public
 
 CORS pays High **only** when an attacker-controlled origin can perform a
 **credentialed** cross-origin read of sensitive authenticated data, and you
-have a browser PoC proving the response body is readable from `evil.com`.
+have a browser PoC proving the response body is readable from `evil.example`.
 
 Two hard browser rules that kill most "findings" — check these FIRST:
 
@@ -70,25 +70,25 @@ tokens, CSRF tokens, or other secrets in the body.
 # and -I sends HEAD which may be handled differently.
 while read url; do
   result=$(curl -s -D - -o /dev/null "$url" \
-    -H "Origin: https://evil.com" \
+    -H "Origin: https://evil.example" \
     -H "Cookie: $SESSION_COOKIE" | grep -i "access-control")
   [ -n "$result" ] && echo "=== $url ===" && echo "$result"
 done < recon/$TARGET/api-endpoints.txt
 
 # httpx bulk check
 cat recon/$TARGET/live-hosts.txt | awk '{print $1}' | \
-  httpx -H "Origin: https://evil.com" -match-string "access-control-allow-origin"
+  httpx -H "Origin: https://evil.example" -match-string "access-control-allow-origin"
 ```
 
 ### Phase 2 — Reflect-any-origin + null origin
 ```bash
 # Does the server reflect an arbitrary Origin back?
 curl -s -D - -o /dev/null https://$TARGET/api/me \
-  -H "Origin: https://evil.com" \
+  -H "Origin: https://evil.example" \
   -H "Cookie: $SESSION_COOKIE" | grep -i "access-control"
 
 # Vulnerable (the High case):
-#   Access-Control-Allow-Origin: https://evil.com   <- reflects attacker origin
+#   Access-Control-Allow-Origin: https://evil.example   <- reflects attacker origin
 #   Access-Control-Allow-Credentials: true          <- + credentials => readable
 #
 # NOT exploitable for credentialed theft:
@@ -107,24 +107,24 @@ The right payload depends on **which** regex flaw the server has. Identify the
 class first, then send the matching payload. Getting this wrong wastes the test
 and produces false negatives.
 
-| Server regex (intended: trust `*.target.com`) | Flaw | Bypass origin that matches | Why |
+| Server regex (intended: trust `*.target.example`) | Flaw | Bypass origin that matches | Why |
 |---|---|---|---|
-| `^https?://.*\.target\.com$` | **None** — escaped dot + end-anchor. Correct. | (no simple bypass) | `evil.target.com` is in-scope by design; `x.target.com.evil.com` ENDS in `.evil.com`, fails `$`. Move on or look for subdomain-takeover. |
+| `^https?://.*\.target\.com$` | **None** — escaped dot + end-anchor. Correct. | (no simple bypass) | `evil.target.example` is in-scope by design; `x.target.example.evil.example` ENDS in `.evil.example`, fails `$`. Move on or look for subdomain-takeover. |
 | `^https?://.*target\.com$` | **Missing dot separator** (no `\.` before `target`) | `https://eviltarget.com` | `.*target\.com$` matches `eviltarget.com` — attacker registers `eviltarget.com`. |
-| `^https?://.*\.target\.com` | **Missing end-anchor `$`** | `https://x.target.com.evil.com` | regex matches a prefix; `.target.com` appears, then `.evil.com` is ignored (no `$`). |
-| `^https?://target\.com` | **Prefix-only, no `$`** | `https://target.com.evil.com` | matches the `target.com` prefix; the rest is unconstrained. |
-| `^https?://.*\.target\.com$` but dot in regex is **unescaped** (`.*.target.com$`) | **Unescaped dot** = "any char" | `https://xtargetXcom...` style, or `https://evilZtargetZcom` where `Z` is any single char | `.` matches any character, widening the match. |
-| Any of the above | **Special chars browsers send in Origin** | `https://target.com%60.evil.com`, `https://target.com\x60evil.com` | some parsers treat backtick/underscore as letters; Safari/older browsers may emit unusual origins. Confirm the browser actually sends it. |
+| `^https?://.*\.target\.com` | **Missing end-anchor `$`** | `https://x.target.example.evil.example` | regex matches a prefix; `.target.example` appears, then `.evil.example` is ignored (no `$`). |
+| `^https?://target\.com` | **Prefix-only, no `$`** | `https://target.example.evil.example` | matches the `target.example` prefix; the rest is unconstrained. |
+| `^https?://.*\.target\.com$` but dot in regex is **unescaped** (`.*.target.example$`) | **Unescaped dot** = "any char" | `https://xtargetXcom...` style, or `https://evilZtargetZcom` where `Z` is any single char | `.` matches any character, widening the match. |
+| Any of the above | **Special chars browsers send in Origin** | `https://target.example%60.evil.example`, `https://target.example\x60evil.com` | some parsers treat backtick/underscore as letters; Safari/older browsers may emit unusual origins. Confirm the browser actually sends it. |
 
 ```bash
 # Send each class-specific payload and watch what the server reflects.
 for ORIGIN in \
-  "https://evil.target.com" \
+  "https://evil.target.example" \
   "https://eviltarget.com" \
-  "https://x.target.com.evil.com" \
-  "https://target.com.evil.com" \
-  "https://target.com%60.evil.com" \
-  "http://target.com"; do
+  "https://x.target.example.evil.example" \
+  "https://target.example.evil.example" \
+  "https://target.example%60.evil.example" \
+  "http://target.example"; do
   RESULT=$(curl -s -D - -o /dev/null "https://$TARGET/api/me" \
     -H "Origin: $ORIGIN" \
     -H "Cookie: $SESSION_COOKIE" | grep -i "access-control")
@@ -132,8 +132,8 @@ for ORIGIN in \
 done
 ```
 A bypass is real only if the server reflects **your registerable origin** into
-`ACAO` with `ACAC: true`. `evil.target.com` reflecting back is NOT a bug unless
-you can actually control a `*.target.com` host (then see Phase 6 / hunt-subdomain).
+`ACAO` with `ACAC: true`. `evil.target.example` reflecting back is NOT a bug unless
+you can actually control a `*.target.example` host (then see Phase 6 / hunt-subdomain).
 
 ### Phase 3b — Trusted insecure (HTTP) origin
 If ACAO reflects/allows any `http://` origin (even a correctly-anchored in-scope one) with ACAC:true, a network attacker on that cleartext host injects a page that reads the authed cross-origin body — no regex flaw needed, the plaintext scheme IS the flaw.
@@ -155,11 +155,11 @@ things to test:
 
 ```bash
 curl -s -D - -o /dev/null -X OPTIONS "https://$TARGET/api/account/email" \
-  -H "Origin: https://evil.com" \
+  -H "Origin: https://evil.example" \
   -H "Access-Control-Request-Method: PUT" \
   -H "Access-Control-Request-Headers: x-custom-auth, content-type" \
   | grep -i "access-control"
-# Vulnerable: ACAO reflects evil.com + ACAC:true +
+# Vulnerable: ACAO reflects evil.example + ACAC:true +
 #   Access-Control-Allow-Methods: PUT  +  Access-Control-Allow-Headers: x-custom-auth
 # => attacker origin can issue authed PUT/DELETE with custom headers.
 ```
@@ -174,7 +174,7 @@ curl -s -D - -o /dev/null -X OPTIONS "https://$TARGET/api/account/email" \
 curl does NOT enforce CORS — it will happily show you a reflected header even
 when a browser would block the read. **Every CORS High needs a browser PoC.**
 
-**5a. Reflect-any-origin read** (host on evil.com, open while logged into target):
+**5a. Reflect-any-origin read** (host on evil.example, open while logged into target):
 ```html
 <!doctype html><body><pre id="out"></pre>
 <script>
@@ -224,9 +224,9 @@ grep -rEn "addEventListener\(['\"]message" recon/$TARGET/ --include="*.js" \
   | grep -v "\.origin"
 # Then audit each hit: does it check event.origin against an allowlist
 # BEFORE using event.data? Weak checks to flag:
-#   .indexOf("target.com") > -1      <- "target.com.evil.com" passes
-#   .endsWith("target.com")          <- "eviltarget.com" passes
-#   startsWith("https://target")     <- "https://target.evil.com" passes
+#   .indexOf("target.example") > -1      <- "target.example.evil.example" passes
+#   .endsWith("target.example")          <- "eviltarget.com" passes
+#   startsWith("https://target")     <- "https://target.evil.example" passes
 #   no check at all
 ```
 postMessage is a separate class from HTTP CORS — impact is DOM-side (XSS,
@@ -265,16 +265,16 @@ Every automated hit is a lead, not a finding. Reproduce 5a/5b in a browser.
 ## Validation discipline (read before submitting)
 
 - **Browser proof mandatory.** curl reflecting a header is NOT exploitation.
-  Show a screenshot/console log of the authed body read from `evil.com`. If the
+  Show a screenshot/console log of the authed body read from `evil.example`. If the
   fetch throws / logs `BLOCKED`, you have nothing.
 - **`ACAO: *` + credentials = not a finding.** Browsers block it. Only pursue
   wildcard if the data is sensitive unauthenticated (then it is usually Low).
 - **`ACAC: true` alone proves nothing** — it must pair with your reflected
   origin AND a successful readable cross-origin body.
 - **Match the regex class to the payload (Phase 3).** Do not submit
-  `target.com.evil.com` against an end-anchored escaped-dot regex — it does not
+  `target.example.evil.example` against an end-anchored escaped-dot regex — it does not
   match and is not a bug.
-- **`evil.target.com` reflecting is not automatically a bug** — it is an
+- **`evil.target.example` reflecting is not automatically a bug** — it is an
   in-scope subdomain by design unless you can actually control it.
 - **OOB confirmation** for blind/headless contexts: exfil the read body to a
   Burp Collaborator / oastify host and show the interaction. Use a unique

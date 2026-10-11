@@ -346,7 +346,7 @@ if any part of the hunt is delegated to subagents, scope does **not** inherit
 implicitly. every subagent prompt must carry:
 
 1. **the authorized host list, verbatim, as data.** not "the target estate", not
-   "*.target.com" — the explicit list. a subagent cannot infer the boundary.
+   "*.target.example" — the explicit list. a subagent cannot infer the boundary.
 2. **the discovered-host rule:** hosts found mid-run (via CT logs, CSP headers,
    JS bundles, CNAME chains, error messages) are **report-only**. resolve DNS,
    record, hand back. never probe, never write, until the operator re-authorizes.

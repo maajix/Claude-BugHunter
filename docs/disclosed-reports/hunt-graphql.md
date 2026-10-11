@@ -126,7 +126,7 @@ Additional high-signal public disclosures exemplifying the patterns above; read 
   Response: `{"errors":[{"message":"Cannot query field \"userrr\" on type \"Query\". Did you mean \"user\" or \"users\"?"}]}`
 - **Validation:** "Did you mean" responses are present. Tooling — `clairvoyance` (`pip install clairvoyance`) automates this against a wordlist:
   ```bash
-  clairvoyance -o schema.json -w wordlist.txt https://target.com/graphql
+  clairvoyance -o schema.json -w wordlist.txt https://target.example/graphql
   ```
 - **Pay-grade rationale:** Recon. Same as introspection — informational standalone; load-bearing for downstream findings.
 
@@ -195,7 +195,7 @@ Additional high-signal public disclosures exemplifying the patterns above; read 
   GET /graphql?query={user(id:1){email}} HTTP/1.1
   Cookie: session=victim_session
   ```
-  Confirm via browser-clickable link served on attacker.com — if cookies attach and the GraphQL query fires with the victim's session, CSRF is viable.
+  Confirm via browser-clickable link served on attacker.example — if cookies attach and the GraphQL query fires with the victim's session, CSRF is viable.
 - **Validation:** Cross-origin request with `Cookie` header attached executes the query.
 - **Pay-grade rationale:** Medium standalone (CSRF on a read). High when GET also accepts mutations (rare but seen — usually a misconfiguration). Verify the side effect happened, not just that the request returned 200.
 
@@ -203,7 +203,7 @@ Additional high-signal public disclosures exemplifying the patterns above; read 
 - **When to suspect:** Server treats `mutation` body identically regardless of HTTP method.
 - **Test:**
   ```
-  GET /graphql?query=mutation{changeEmail(newEmail:"attacker@evil.com")} HTTP/1.1
+  GET /graphql?query=mutation{changeEmail(newEmail:"attacker@evil.example")} HTTP/1.1
   Cookie: session=victim_session
   ```
 - **Validation:** Email actually changed (verify with a follow-up `GET /api/me` showing the new email). Without verification, the 200 means nothing.
@@ -285,7 +285,7 @@ Additional high-signal public disclosures exemplifying the patterns above; read 
 - **When to suspect:** Server authorizes mutations strictly but treats `query` as anonymous-readable. A side-effecting resolver was registered as a query rather than a mutation.
 - **Test:** Look for any field whose name suggests an action (`createUser`, `sendEmail`, `resetPassword`, `transferFunds`) registered under `Query` instead of `Mutation`. Fire it as a query:
   ```graphql
-  { resetPassword(email: "victim@target.com") { success } }
+  { resetPassword(email: "victim@target.example") { success } }
   ```
 - **Validation:** Side effect happened (email sent, password reset, fund transferred) despite the auth middleware only guarding mutations.
 - **Pay-grade rationale:** Critical.
@@ -300,7 +300,7 @@ Additional high-signal public disclosures exemplifying the patterns above; read 
 - **How to disprove:** Introspection enabled returns a populated `types` array. `null` data is *disabled*. Fall through to field-suggestion fuzzing (`{ userrr { id } }`) and clairvoyance to enumerate the schema by other means.
 
 ### `errors: null` in response claimed as "data leaked successfully"
-- **Looks like:** Response is `{"data": {"user": {"email": "victim@target.com"}}, "errors": null}`. Operator concludes the query succeeded.
+- **Looks like:** Response is `{"data": {"user": {"email": "victim@target.example"}}, "errors": null}`. Operator concludes the query succeeded.
 - **Actually is:** Some GraphQL servers strip the `data` field on partial errors and return `{"data": null, "errors": [...]}`. Other servers return partial data with `errors` populated. The combination `data` populated and `errors: null` *can* be a misconfiguration where the server returned data it should not have — but it can also be a legitimate query the operator already had permission to make. Body-Diff Rule: compare the response from your session to the response from an unauthenticated session and to a victim-session-token-equivalent request. If only your authorized session sees the data, no IDOR happened.
 - **How to disprove:** Use *two* sessions — attacker (you) and victim (a second account you control). If attacker session queries victim's data and returns it, that's the IDOR. If both sessions return their own data and neither reaches the other, the API is correctly scoped.
 

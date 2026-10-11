@@ -95,11 +95,11 @@ def _selftest():
     assert not ok("https://admin.example.com")       # out-of-scope (deny wins)
     assert not ok("https://internal.example.com/x")  # out-of-scope
     assert ok("https://test.example.com")            # in scope via bare example.com rule
-    assert not ok("https://evil.com")                # default deny
+    assert not ok("https://evil.example")                # default deny
     assert not ok("https://notexample.com")          # suffix-confusion guard
-    assert not ok("https://example.com.evil.com")    # suffix-confusion guard
+    assert not ok("https://example.com.evil.example")    # suffix-confusion guard
     assert not ok("https://11.0.0.1")                # outside CIDR
-    assert s.reject_reason("https://evil.com")
+    assert s.reject_reason("https://evil.example")
     assert s.reject_reason("https://example.com") is None
     # wildcard depth: *.test.example.com needs a label deeper than test.example.com
     s2 = Scope(in_scope=["*.test.example.com"])

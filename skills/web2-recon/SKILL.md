@@ -56,7 +56,7 @@ which subfinder httpx dnsx nuclei katana waybackurls gau dalfox ffuf anew gf int
 ### Pre-Hunt: Always Run First
 
 ```bash
-TARGET="target.com"
+TARGET="target.example"
 
 # Step 0: Passive — crt.sh certificate transparency (no API key needed)
 curl -s "https://crt.sh/?q=%.${TARGET}&output=json" \
@@ -99,7 +99,7 @@ nuclei -l /tmp/live.txt -t ~/nuclei-templates/ -severity critical,high,medium -o
 ### Output to Organized Directory
 
 ```bash
-TARGET="target.com"
+TARGET="target.example"
 RECON_DIR="recon/$TARGET"
 mkdir -p $RECON_DIR
 
@@ -157,7 +157,7 @@ cat /tmp/urls.txt | gf rce | tee /tmp/rce-candidates.txt
 source ~/tools/SecretFinder/.venv/bin/activate
 
 # Scan a single JS file
-python3 ~/tools/SecretFinder/SecretFinder.py -i "https://target.com/static/js/main.js" -o cli
+python3 ~/tools/SecretFinder/SecretFinder.py -i "https://target.example/static/js/main.js" -o cli
 
 # Scan all JS URLs found in recon
 cat /tmp/urls.txt | grep "\.js$" | head -50 | while read url; do
@@ -174,10 +174,10 @@ deactivate
 source ~/tools/LinkFinder/.venv/bin/activate
 
 # Single JS file
-python3 ~/tools/LinkFinder/linkfinder.py -i "https://target.com/app.js" -o cli
+python3 ~/tools/LinkFinder/linkfinder.py -i "https://target.example/app.js" -o cli
 
 # All pages (crawls JS from HTML)
-python3 ~/tools/LinkFinder/linkfinder.py -i "https://target.com" -d -o cli
+python3 ~/tools/LinkFinder/linkfinder.py -i "https://target.example" -d -o cli
 
 deactivate
 ```
@@ -190,7 +190,7 @@ deactivate
 
 ```bash
 # Directory discovery on a live host
-ffuf -u "https://target.com/FUZZ" \
+ffuf -u "https://target.example/FUZZ" \
      -w ~/wordlists/common.txt \
      -mc 200,201,204,301,302,307,401,403 \
      -ac \
@@ -198,7 +198,7 @@ ffuf -u "https://target.com/FUZZ" \
      -o /tmp/ffuf-dirs.json
 
 # API endpoint discovery
-ffuf -u "https://target.com/api/FUZZ" \
+ffuf -u "https://target.example/api/FUZZ" \
      -w ~/wordlists/api-endpoints.txt \
      -mc 200,201,204,301,302 \
      -ac \
@@ -251,7 +251,7 @@ Score before spending time. Skip if score < 4.
 
 ```bash
 # Response headers reveal backend
-curl -sI https://target.com | grep -iE "server|x-powered-by|x-aspnet|x-runtime|x-generator"
+curl -sI https://target.example | grep -iE "server|x-powered-by|x-aspnet|x-runtime|x-generator"
 
 # Common signals:
 # Server: nginx + X-Powered-By: PHP/7.4 → PHP backend
@@ -292,7 +292,7 @@ Set up once per target. Alerts you before other hunters.
 
 ```bash
 #!/bin/bash
-TARGET="target.com"
+TARGET="target.example"
 KNOWN="/tmp/$TARGET-subs-known.txt"
 
 subfinder -d $TARGET -silent > /tmp/$TARGET-subs-fresh.txt
@@ -574,7 +574,7 @@ API spec endpoints are the single highest-leverage recon target on any modern .N
 
 ```bash
 # After live-hosts.txt is built (Phase 1 / 2), run:
-ffuf -w swagger-paths.txt -u "https://FUZZ.target.com" -mc 200,302 -fs 0 -t 50 -o swagger-hits.json
+ffuf -w swagger-paths.txt -u "https://FUZZ.target.example" -mc 200,302 -fs 0 -t 50 -o swagger-hits.json
 # Or with httpx for content-aware filtering:
 httpx -l live-hosts.txt -path swagger-paths.txt -mc 200 -mr "swagger|openapi" -json | tee swagger-hits.jsonl
 # For every hit:
@@ -624,7 +624,7 @@ Full attack-chain analysis is in `hunt-api-misconfig` → `NSwag / Swagger / Ope
 
 ### Cross-TLD pivot discipline
 
-Phase 2C's HackerOne VDP recon walked from `hackerone.com` (24 subdomains) into a sister TLD `hacker.one` (12 more subdomains found in JS bundle references). Operators who only enumerate `*.target.com` miss attack surface that the target legitimately operates on a different domain.
+Phase 2C's HackerOne VDP recon walked from `hackerone.com` (24 subdomains) into a sister TLD `hacker.one` (12 more subdomains found in JS bundle references). Operators who only enumerate `*.target.example` miss attack surface that the target legitimately operates on a different domain.
 
 Always grep JS bundles for plausible sibling TLDs:
 
@@ -640,7 +640,7 @@ for j in $(cat js-urls.txt); do
 done | sort -u > sibling-tld-candidates.txt
 ```
 
-Common sibling-TLD patterns: `target.com → target.io / target.app / target.one / target.dev / target.test / target-corp.com / target-cdn.net`. Always validate via WHOIS or by checking if the cert chain trusts the same internal CA before treating the sister TLD as in-scope.
+Common sibling-TLD patterns: `target.example → target.io / target.app / target.one / target.dev / target.test / target-corp.com / target-cdn.net`. Always validate via WHOIS or by checking if the cert chain trusts the same internal CA before treating the sister TLD as in-scope.
 
 ### Subdomain wordlist priorities by 2026
 
@@ -656,7 +656,7 @@ employee-*         hr.*               jobs.*
 sso.*              auth.*             id.*
 ```
 
-Internal-looking subdomains often expose more surface than the marketing site — `partner.target.com` and `vendor-portal.target.com` frequently have weaker auth than the main app because they're scoped for "trusted" external users. Always send a probe to the long-tail wordlist after the standard subfinder run completes.
+Internal-looking subdomains often expose more surface than the marketing site — `partner.target.example` and `vendor-portal.target.example` frequently have weaker auth than the main app because they're scoped for "trusted" external users. Always send a probe to the long-tail wordlist after the standard subfinder run completes.
 
 ### Live-host probe: how to fingerprint stack quickly
 

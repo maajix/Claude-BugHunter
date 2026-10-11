@@ -1,6 +1,6 @@
 ---
 name: recon
-description: Run full recon pipeline on a target — subdomain enum (Chaos API + subfinder), live host discovery (dnsx + httpx), URL crawl (katana + waybackurls + gau), gf pattern classification, nuclei scan. Outputs to recon/<target>/ directory. Usage: /recon target.com
+description: Run full recon pipeline on a target — subdomain enum (Chaos API + subfinder), live host discovery (dnsx + httpx), URL crawl (katana + waybackurls + gau), gf pattern classification, nuclei scan. Outputs to recon/<target>/ directory. Usage: /recon target.example
 ---
 
 # /recon
@@ -19,14 +19,14 @@ Run the full recon pipeline on a target and produce a prioritized attack surface
 ## Usage
 
 ```
-/recon target.com
+/recon target.example
 ```
 
 Or with specific focus:
 ```
-/recon target.com --focus api
-/recon target.com --focus auth
-/recon target.com --fast     (skip historical URLs)
+/recon target.example --focus api
+/recon target.example --focus auth
+/recon target.example --fast     (skip historical URLs)
 ```
 
 ## Steps
@@ -293,7 +293,7 @@ subzy.txt                   # Subdomain takeover candidates
 2. Check `nuclei.txt` — any high/critical findings?
 3. Review `api-endpoints.txt` — start IDOR testing
 4. Check for admin panels: grep live-hosts for `/admin`, `/jenkins`, `/grafana`
-5. Run `/hunt target.com` to start active vulnerability testing
+5. Run `/hunt target.example` to start active vulnerability testing
 
 ## 5-Minute Rule
 

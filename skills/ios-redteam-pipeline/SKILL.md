@@ -187,7 +187,7 @@ curl -s "https://<domain>/.well-known/apple-app-site-association" | python3 -m j
 
 For each custom scheme found (e.g. `myapp://`):
 - Trigger it from Safari/Notes and observe what the app does with parameters:
-  `myapp://reset-password?token=x&redirect=https://evil.com` — does the app trust an
+  `myapp://reset-password?token=x&redirect=https://evil.example` — does the app trust an
   attacker-supplied `redirect`/`url`/`callback` param and load it in a WebView (open-redirect →
   WebView-XSS chain) or use it to bypass an auth screen?
 - If the scheme is also registered by another app on the device (scheme squatting), a malicious

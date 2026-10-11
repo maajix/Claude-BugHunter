@@ -1,6 +1,6 @@
 ---
 name: surface
-description: Show ranked attack surface for a target from its recon manifest + hunt memory. Deterministic backing is `cbh surface <target>` (reads recon/<target>/manifest.json); LLM layer adds ledger signal. Usage: /surface target.com
+description: Show ranked attack surface for a target from its recon manifest + hunt memory. Deterministic backing is `cbh surface <target>` (reads recon/<target>/manifest.json); LLM layer adds ledger signal. Usage: /surface target.example
 ---
 
 # /surface
@@ -22,34 +22,34 @@ View the prioritized attack surface for a target.
 ## Usage
 
 ```
-/surface target.com
+/surface target.example
 ```
 
 ## Prerequisites
 
-Run `/recon target.com` first. If no recon data exists, you'll be prompted to run recon.
+Run `/recon target.example` first. If no recon data exists, you'll be prompted to run recon.
 
 ## Output
 
 ```
-ATTACK SURFACE: target.com
+ATTACK SURFACE: target.example
 ═══════════════════════════════════════
 
 Priority 1 (start here):
-1. api.target.com/v2/users/{id} — IDOR candidate
+1. api.target.example/v2/users/{id} — IDOR candidate
    Tech: Express + PostgreSQL | First seen 12 days ago
    Suggested: numeric ID swap on GET/PUT/DELETE
 
-2. api.target.com/graphql — introspection enabled, 47 mutations
+2. api.target.example/graphql — introspection enabled, 47 mutations
    Suggested: field-level auth check on sensitive mutations
 
 Priority 2 (after P1):
-1. cdn.target.com:8443/upload — file upload endpoint
+1. cdn.target.example:8443/upload — file upload endpoint
    Suggested: extension bypass, magic bytes
 
 Kill List (skip):
-- static.target.com — CDN only
-- docs.target.com — third-party hosted
+- static.target.example — CDN only
+- docs.target.example — third-party hosted
 
 Memory:
 - Pattern from alpha.com (same tech): auth bypass via method override ($800)

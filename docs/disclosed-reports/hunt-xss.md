@@ -47,7 +47,7 @@ XSS pays when it combines privileged context (admin UI, billing flow, SSO callba
 - **Pay-grade rationale:** Medium to high depending on the context. Stored DOM XSS (where the payload persists via localStorage) pays higher.
 
 ### postMessage origin-check bypass
-- **When to suspect:** Page registers `window.addEventListener('message', handler)` where `handler` does not check `event.origin` strictly, or uses `indexOf` / `startsWith` checks that allow `https://target.attacker.com`.
+- **When to suspect:** Page registers `window.addEventListener('message', handler)` where `handler` does not check `event.origin` strictly, or uses `indexOf` / `startsWith` checks that allow `https://target.attacker.example`.
 - **Test:** Host a page at attacker-controlled origin, `iframe` the target, call `iframe.contentWindow.postMessage(payload, '*')`. If handler trusts the message and reaches a DOM sink with payload data, you have XSS.
 - **Validation:** `alert` fires on the target origin after the postMessage.
 - **Pay-grade rationale:** High when the handler is on a sensitive page; chain via XSS-to-ATO.

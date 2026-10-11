@@ -80,8 +80,8 @@ gh repo clone "$ORG/$repo_name"
 
 ```bash
 # JS bundles are the easiest source of internal npm names
-curl -sk https://target.com/main.js | grep -oE '@[a-z-]+/[a-z-]+' | sort -u
-curl -sk https://target.com/main.js | grep -oE 'require\("[^"]+"\)' | sort -u
+curl -sk https://target.example/main.js | grep -oE '@[a-z-]+/[a-z-]+' | sort -u
+curl -sk https://target.example/main.js | grep -oE 'require\("[^"]+"\)' | sort -u
 
 # Look for scoped names that are NOT public on npm
 for pkg in @target/utils @target-internal/api @companybrand/sdk; do
@@ -370,8 +370,8 @@ Known-compromised CDNs and analytics services have been weaponized. Check target
 
 ```bash
 # Detect usage of polyfill.io and similar historically-compromised services
-curl -s https://target.com | grep -i polyfill
-curl -s https://target.com | grep -iE '(polyfill\.io|cdn\.jsdelivr\.net.*polyfill|babel\.min\.js)'
+curl -s https://target.example | grep -i polyfill
+curl -s https://target.example | grep -iE '(polyfill\.io|cdn\.jsdelivr\.net.*polyfill|babel\.min\.js)'
 
 # Check JavaScript bundles
 for bundle in public/*.js main.*.js app.*.js; do

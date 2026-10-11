@@ -116,8 +116,8 @@ curl -H "Authorization: Bearer $TOKEN" /profile/1
 The endpoint reflects the requested URL in its error message:
 
 ```bash
-curl "/fetch?url=http://attacker.com/x"
-# → {"error":"Could not fetch http://attacker.com/x — destination unreachable"}
+curl "/fetch?url=http://attacker.example/x"
+# → {"error":"Could not fetch http://attacker.example/x — destination unreachable"}
 ```
 
 A naive operator sees the URL echoed back, assumes the server processed it, and claims SSRF.

@@ -16,13 +16,13 @@ The web UI wraps a **public, unauthenticated JSON API**. Hit it directly:
 
 ```bash
 # By domain (canonical first call)
-curl -sk -m 30 "https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-domain?domain=target.com" | jq .
+curl -sk -m 30 "https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-domain?domain=target.example" | jq .
 
 # By email (single-account check)
-curl -sk -m 30 "https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-email?email=alice@target.com" | jq .
+curl -sk -m 30 "https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-email?email=alice@target.example" | jq .
 
 # By URL (when target's app is the breach victim)
-curl -sk -m 30 "https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-url?url=https://app.target.com" | jq .
+curl -sk -m 30 "https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-url?url=https://app.target.example" | jq .
 ```
 
 PowerShell:
@@ -45,7 +45,7 @@ $hr.data.clients_urls   | Sort-Object -Property occurrence -Descending | Select-
 - `data.dates_compromised[]` — `{_key, _value}` → temporal distribution.
 
 **Free-tier caveats (CRITICAL to know):**
-- Subdomain hostnames in `data.*_urls[]` past the first few are **redacted with asterisks** (`*****.target.com`). Pivot to paid Cavalier tier or other sources for unredacted.
+- Subdomain hostnames in `data.*_urls[]` past the first few are **redacted with asterisks** (`*****.target.example`). Pivot to paid Cavalier tier or other sources for unredacted.
 - Free endpoint returns counts + sample URLs only. Cleartext passwords + emails are **never** in the free response.
 - Rate limit ~1 req/sec/IP; 429 on burst. Sleep 1s between calls.
 - For unredacted creds + bulk enumeration → paid Cavalier portal.

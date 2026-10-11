@@ -35,7 +35,7 @@ OAuth flaws pay top-tier bounties because they bridge the gap between "a small c
 ### redirect_uri manipulation → authorization-code / token theft
 - **Source:** A path traversal in the OAuth `redirect_uri` leaking the authorization code to an attacker-controlled destination (<https://hackerone.com/reports/1861974>, $2,000); stealing OAuth codes/access-tokens via `postMessage` in the redirect flow (<https://hackerone.com/reports/1567186>).
 - **Pattern shape:** The authorization server validates `redirect_uri` loosely — prefix match, path traversal, subdomain wildcard, or a `postMessage` relay — so the code/token is delivered to an attacker-controlled URL. With the code, the attacker completes the flow and takes over the account.
-- **Key trick:** Test every `redirect_uri` mutation (append path, `../`, `.attacker.com`, `@attacker.com`, open-redirect on an allowed host) and watch where the `code`/`access_token` lands. Chains with `hunt-open-redirect`.
+- **Key trick:** Test every `redirect_uri` mutation (append path, `../`, `.attacker.example`, `@attacker.example`, open-redirect on an allowed host) and watch where the `code`/`access_token` lands. Chains with `hunt-open-redirect`.
 - **Why it matters:** The dominant OAuth ATO primitive — one loose validation = full account takeover.
 
 ### OAuth flow SSRF (authorization / callback fetches a URL)
@@ -76,13 +76,13 @@ Additional high-signal public disclosures exemplifying the patterns above; read 
 
 ### `redirect_uri` host injection
 - **When to suspect:** OAuth authorization endpoint accepts `redirect_uri` and the registered URI is enforced loosely.
-- **Test:** Iterate alternatives against the registered URI `https://app.target.com/cb`:
-  - Subdomain: `https://attacker.app.target.com/cb`.
-  - Suffix: `https://app.target.com.attacker.com/cb`.
-  - Userinfo: `https://app.target.com@attacker.com/cb`.
-  - Path suffix: `https://app.target.com/cb/../@attacker.com/`.
-  - Open-redirect chain: `https://app.target.com/redirect?to=https://attacker.com/`.
-  - Fragment: `https://app.target.com/cb#@attacker.com/`.
+- **Test:** Iterate alternatives against the registered URI `https://app.target.example/cb`:
+  - Subdomain: `https://attacker.app.target.example/cb`.
+  - Suffix: `https://app.target.example.attacker.example/cb`.
+  - Userinfo: `https://app.target.example@attacker.example/cb`.
+  - Path suffix: `https://app.target.example/cb/../@attacker.example/`.
+  - Open-redirect chain: `https://app.target.example/redirect?to=https://attacker.example/`.
+  - Fragment: `https://app.target.example/cb#@attacker.example/`.
 - **Validation:** Authorization code or access token delivered to attacker-controlled origin. Use the code to fetch the victim's tokens at `/oauth/token`.
 - **Pay-grade rationale:** Critical. Account takeover.
 
@@ -142,13 +142,13 @@ Additional high-signal public disclosures exemplifying the patterns above; read 
 
 ### Open-redirect-on-allowed-host chain
 - **When to suspect:** `redirect_uri` is correctly validated to be the application's own origin, but the application *has* an open-redirect bug elsewhere.
-- **Test:** Set `redirect_uri=https://app.target.com/redirect?to=https://attacker.com/`. The authorization server approves (host matches the registered origin). Browser follows the redirect, which carries the code through to the attacker.
-- **Validation:** Code captured at attacker.com.
+- **Test:** Set `redirect_uri=https://app.target.example/redirect?to=https://attacker.example/`. The authorization server approves (host matches the registered origin). Browser follows the redirect, which carries the code through to the attacker.
+- **Validation:** Code captured at attacker.example.
 - **Pay-grade rationale:** Critical. ATO via the chain.
 
 ### Pre-account-takeover via OAuth registration
 - **When to suspect:** Application supports both password and SSO. SSO registration creates an account without verifying email ownership.
-- **Test:** Attacker registers an SSO account for `victim@target.com` *before* the legitimate victim signs up. When victim later registers, application merges the accounts or grants attacker access to victim's data.
+- **Test:** Attacker registers an SSO account for `victim@target.example` *before* the legitimate victim signs up. When victim later registers, application merges the accounts or grants attacker access to victim's data.
 - **Validation:** Account merge gives attacker session over victim data.
 - **Pay-grade rationale:** High to critical depending on merge semantics.
 
@@ -175,9 +175,9 @@ Additional high-signal public disclosures exemplifying the patterns above; read 
 ## Anti-Patterns (FP traps)
 
 ### `redirect_uri` validation that accepts fragment-only modifications
-- **Looks like:** You sent `redirect_uri=https://app.target.com/cb#@attacker.com/` and the authorization server returned a code.
-- **Actually is:** The browser ignores everything after `#` when navigating, so the code lands at `https://app.target.com/cb` — the legitimate origin — and not at `attacker.com`. The fragment is *visible to the legitimate app's JavaScript* but not exfiltrated to attacker.com on its own.
-- **How to disprove:** Walk through the actual browser navigation. Does the code end up at attacker.com or at the legitimate origin? If it stays at the legitimate origin, no token theft happened — the parser difference exists but the exploit doesn't land. Report only if you can demonstrate code-exfiltration via a follow-on chain (e.g., XSS at app.target.com that reads the fragment).
+- **Looks like:** You sent `redirect_uri=https://app.target.example/cb#@attacker.example/` and the authorization server returned a code.
+- **Actually is:** The browser ignores everything after `#` when navigating, so the code lands at `https://app.target.example/cb` — the legitimate origin — and not at `attacker.example`. The fragment is *visible to the legitimate app's JavaScript* but not exfiltrated to attacker.example on its own.
+- **How to disprove:** Walk through the actual browser navigation. Does the code end up at attacker.example or at the legitimate origin? If it stays at the legitimate origin, no token theft happened — the parser difference exists but the exploit doesn't land. Report only if you can demonstrate code-exfiltration via a follow-on chain (e.g., XSS at app.target.example that reads the fragment).
 
 ### State parameter "exists" but isn't validated against the session
 - **Looks like:** Authorization request has `state=abc123`, callback contains the same. Looks fine.
@@ -192,5 +192,5 @@ Additional high-signal public disclosures exemplifying the patterns above; read 
 ### "Open redirect" on a 302 that strips the fragment
 - **Looks like:** App has an endpoint that issues `Location: <user-supplied>`. Looks like open redirect, looks chainable to OAuth code theft.
 - **Actually is:** Browsers strip fragments on 302 redirects to a new origin (per spec). If the OAuth callback delivers the code in a fragment, the chained redirect drops the code. The attacker receives nothing.
-- **How to disprove:** Trace the redirect chain end-to-end with browser dev tools. If the final URL at attacker.com has no `code=` parameter or fragment, the chain doesn't reach token theft. The open redirect remains a finding on its own (lower severity), but the OAuth chain doesn't land.
+- **How to disprove:** Trace the redirect chain end-to-end with browser dev tools. If the final URL at attacker.example has no `code=` parameter or fragment, the chain doesn't reach token theft. The open redirect remains a finding on its own (lower severity), but the OAuth chain doesn't land.
 

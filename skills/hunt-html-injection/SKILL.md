@@ -12,7 +12,7 @@ HTML Injection occurs when user input is inserted into a page's HTML without esc
 **To PROVE impact unambiguously, escalate to an active vector carrying a unique numeric canary** — e.g. `"><img src=x onerror=alert(91234)>` or `<svg onload=alert(91234)>`. A distinctive 4+ digit number (not `alert(1)`) distinguishes YOUR reflected injection from the example payloads practice pages embed in their own hint text. Proof = the raw, unescaped vector with your canary appears in the response.
 
 **Impact:**
-- Phishing via injected `<form>` or `<a href="attacker.com">` tags
+- Phishing via injected `<form>` or `<a href="attacker.example">` tags
 - UI defacement — `<h1>HACKED</h1>` renders visually on the page
 - Credential harvesting via injected login forms
 - Redirect via `<meta http-equiv="refresh">`
@@ -44,7 +44,7 @@ Use a unique string as CANARY (something distinct to this test run). **Proof:** 
 **Try multiple tag types when `<b>` is filtered:**
 - `<h1>CANARY</h1>` — heading tag (often less filtered)
 - `<img src=x onerror=CANARY>` — attribute context
-- `<a href="https://attacker.com">click</a>` — link injection (phishing proof)
+- `<a href="https://attacker.example">click</a>` — link injection (phishing proof)
 
 **For stored injection:** inject into the storage endpoint, then GET the page where the value is displayed and check for unescaped tags.
 

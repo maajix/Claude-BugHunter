@@ -1,6 +1,6 @@
 ---
 name: autopilot
-description: Run autonomous hunt loop on a target — scope check → recon → rank surface → hunt → validate → report with configurable checkpoints. Usage: /autopilot target.com [--paranoid|--normal|--yolo]
+description: Run autonomous hunt loop on a target — scope check → recon → rank surface → hunt → validate → report with configurable checkpoints. Usage: /autopilot target.example [--paranoid|--normal|--yolo]
 ---
 
 # /autopilot
@@ -10,10 +10,10 @@ Autonomous hunt loop with deterministic scope safety and configurable checkpoint
 ## Usage
 
 ```
-/autopilot target.com                    # default: --paranoid mode
-/autopilot target.com --normal           # batch checkpoint after validation
-/autopilot target.com --yolo             # minimal checkpoints (still requires report approval)
-/autopilot target.com --quick            # fast surface scan, fewer checks, lower token use
+/autopilot target.example                    # default: --paranoid mode
+/autopilot target.example --normal           # batch checkpoint after validation
+/autopilot target.example --yolo             # minimal checkpoints (still requires report approval)
+/autopilot target.example --quick            # fast surface scan, fewer checks, lower token use
 /autopilot targets.txt                   # multiple targets — one domain per line in the file
 ```
 
@@ -32,15 +32,15 @@ claude  →  /autopilot targetA.com
 claude  →  /autopilot targetB.com
 ```
 
-If you must test multiple targets in one session, run `/pickup target.com` at the start of
+If you must test multiple targets in one session, run `/pickup target.example` at the start of
 each target switch to reload the correct context.
 
 ## Token Optimization
 
 Use `--quick` for faster, lower-cost scans (skips deep fuzzing and extended nuclei templates):
 ```
-/autopilot target.com --quick    # ~40% fewer tokens, covers main attack surface
-/hunt target.com --vuln-class idor   # single bug class — lowest token use
+/autopilot target.example --quick    # ~40% fewer tokens, covers main attack surface
+/hunt target.example --vuln-class idor   # single bug class — lowest token use
 ```
 
 For long hunts, run `/compact` (Claude Code built-in) periodically to compress context
@@ -91,5 +91,5 @@ vuln_class with strong **negative** history on this tech stack (`dead-class`).
 ## After Autopilot
 
 - Run `/remember` to log successful patterns to hunt memory
-- Run `/pickup target.com` next time to pick up where you left off
+- Run `/pickup target.example` next time to pick up where you left off
 - Check the ledger (`~/.claude/bughunter/memory/findings.jsonl`) or run `/memory-gc` for its size

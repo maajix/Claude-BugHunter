@@ -123,8 +123,8 @@ username=administrator%2ffield%2fpasswordResetToken%23
 ### CORS Exploitation
 ```bash
 # Test: reflected origin + credentials
-curl -s -I -H "Origin: https://evil.com" https://target.com/api/user/me
-# If: Access-Control-Allow-Origin: https://evil.com + Access-Control-Allow-Credentials: true
+curl -s -I -H "Origin: https://evil.example" https://target.example/api/user/me
+# If: Access-Control-Allow-Origin: https://evil.example + Access-Control-Allow-Credentials: true
 # → CRITICAL: attacker reads credentialed responses
 ```
 
@@ -175,9 +175,25 @@ Mixed-case operators (`Eq`, `EQ`) and obscure ones (`substringof`, `tolower`, `c
 
 ### Attack class 5 — OData → real SQLi when library passes filter raw
 
+Prove it read-only. The bug is that the filter string reaches SQL unescaped, and a
+closed quote plus a boolean differential demonstrates that without touching a row:
+
 ```
-$filter=Name eq 'x'); DROP TABLE Users--'
+$filter=Name eq 'x''                     # unbalanced quote: a raw-concat backend
+                                         # returns a SQL syntax error, LINQ returns 400
+$filter=Name eq 'x') and (1 eq 1--       # true  -> same result set as the baseline
+$filter=Name eq 'x') and (1 eq 2--       # false -> empty set. The pair IS the proof
 ```
+
+A stable true/false difference across those two, against an identical baseline, is a
+confirmed injection and a critical finding on its own. Stop there and report.
+
+**Never send a destructive payload to prove this.** A `DROP TABLE`, `DELETE FROM`,
+`UPDATE ... SET` or `TRUNCATE` in a filter is irreversible, takes the application
+down for real users, and destroys the evidence you were hired to collect. It also
+proves nothing the boolean pair above does not already prove. If the client asks for
+an impact demonstration beyond the differential, that is Stage B: explicit written
+sign-off, a restorable copy of the data, and never the production database.
 
 Only triggers when the OData layer string-concatenates into SQL instead of using LINQ. Documented in [OData/WebApi Issue #2352](https://github.com/OData/WebApi/issues/2352). The XML-deserialisation variant: **CVE-2019-17554** (Apache Olingo OData 4.0.0-4.6.0, XXE via `<!DOCTYPE foo [<!ENTITY x SYSTEM "file:///etc/passwd">]>` in `application/xml` body, CVSS 7.5). DoS variant: **CVE-2018-8269** (Microsoft.Data.OData deep `$filter` recursion → stack overflow).
 
@@ -263,6 +279,6 @@ Tools: `kiterunner` natively eats OpenAPI; `sj` (Swagger Jacker), `apidetector`,
 - **`hunt-ato`** — Mass assignment on signup/profile is the fastest path to admin. Chain primitive: API mass assignment + `hunt-ato` → `role=admin` set on signup → ATO via privileged role on first login.
 - **`hunt-auth-bypass`** — JWT flaws collapse the entire auth layer. Chain primitive: JWT `alg=none` + `hunt-auth-bypass` → impersonate any user by setting `sub` to victim ID, no signature required.
 - **`hunt-rce`** — Prototype pollution gadgets in Node.js dependencies (lodash, mongoose, jQuery) reach `child_process.spawn`. Chain primitive: Prototype pollution (`__proto__.shell=true`) + `hunt-rce` (Node.js gadget chain) → RCE on the API node.
-- **`hunt-subdomain`** — CORS regex with wildcard subdomain trusts a takeoverable host. Chain primitive: CORS allowlist `*.target.com` + subdomain takeover → attacker-controlled origin reads credentialed API responses.
+- **`hunt-subdomain`** — CORS regex with wildcard subdomain trusts a takeoverable host. Chain primitive: CORS allowlist `*.target.example` + subdomain takeover → attacker-controlled origin reads credentialed API responses.
 - **`security-arsenal`** — Load the JWT Attack Payloads section (alg=none, kid path traversal, JWK injection, embedded JWK) and the Mass-Assignment Field Wordlist (`is_admin`, `role`, `verified`, `permissions`, `org_id`, `tenant_id`).
 - **`triage-validation`** — Apply the Server-Policy-vs-State gate: a permissive CORS header alone is informational; demonstrate actual cross-origin credentialed read of sensitive data before reporting.

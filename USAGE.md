@@ -300,7 +300,7 @@ Required for external red-team work where targets are full enterprise estates ra
 
 | Task / question | Skill(s) |
 |---|---|
-| "I want to start a new engagement on `target.com`" | Run `hunt target` (shell command). Read the generated CLAUDE.md. |
+| "I want to start a new engagement on `target.example`" | Run `hunt target` (shell command). Read the generated CLAUDE.md. |
 | "How should I plan this hunt?" | `bb-methodology` + `osint-methodology` |
 | "Find subdomains / endpoints / leaked secrets" | `offensive-osint` + `web2-recon` |
 | "Which tool from my local stack does X?" | `bb-local-toolkit` |

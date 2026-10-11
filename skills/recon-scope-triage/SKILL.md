@@ -26,9 +26,9 @@ The two failure modes this skill prevents:
 | Recon source | How it collides | Verify ownership by |
 |---|---|---|
 | **GitHub repos** | Search matched the brand word in repo name / topic / a string | Repo owner is the org's GH org; commits from org emails; code references the org's real domains/infra. A repo named `<word>-backend` by a random user = noise. |
-| **Cloud buckets** (S3/GCS) | Bucket names are a **global namespace**; `<word>-static`, `<word>-data`, `<word>-public` exist for *someone* | Bucket content references the target; bucket name correlates with a *confirmed* target subdomain (`x.target.com` ↔ `x-public`) AND content matches; ACL/owner metadata. Generic content (other-language, other-industry) = not theirs. |
+| **Cloud buckets** (S3/GCS) | Bucket names are a **global namespace**; `<word>-static`, `<word>-data`, `<word>-public` exist for *someone* | Bucket content references the target; bucket name correlates with a *confirmed* target subdomain (`x.target.example` ↔ `x-public`) AND content matches; ACL/owner metadata. Generic content (other-language, other-industry) = not theirs. |
 | **Mobile apps** | Store search matched the brand word in app name / package | Publisher account = the org; package reverse-DNS = an owned domain (`com.<owneddomain>.app`); dev cert; app calls owned API hosts. Mature ASM tools emit an "apps_accepted=0" / ownership-confidence field — read it. |
-| **Breach corpora / combos** | Email local-or-domain contains the brand word | **Exact** owned-domain match only (`@target.com`), not `@<word>group.com` / `@something<word>.com`. A different domain that contains the word is a different org. |
+| **Breach corpora / combos** | Email local-or-domain contains the brand word | **Exact** owned-domain match only (`@target.example`), not `@<word>group.com` / `@something<word>.com`. A different domain that contains the word is a different org. |
 | **Typosquats** | Generated permutations of the name | These are *defensive*/brand-protection findings, not offensive scope — note and move on. |
 | **Stack/forum/paste hits** | Brand word in body | Body references the target's real domain/subdomain/employee/secret. Ownership-confidence < threshold = drop. |
 
@@ -39,9 +39,9 @@ The two failure modes this skill prevents:
 Automated `.env` / `.git` / `actuator` / admin-panel "Criticals" are overwhelmingly **soft-404s**: SPA/framework catch-alls returning HTTP 200 (or 403) for *every* path. Verify EACH before believing it:
 ```bash
 # the "finding"
-curl -s -o /tmp/a -w "%{http_code} %{size_download}\n" https://host.target.com/.env
+curl -s -o /tmp/a -w "%{http_code} %{size_download}\n" https://host.target.example/.env
 # a junk control on the same host
-curl -s -o /tmp/b -w "%{http_code} %{size_download}\n" https://host.target.com/zzz-nonsense-$RANDOM
+curl -s -o /tmp/b -w "%{http_code} %{size_download}\n" https://host.target.example/zzz-nonsense-$RANDOM
 # identical byte length / body  →  FALSE POSITIVE (catch-all), discard
 cmp -s /tmp/a /tmp/b && echo "SOFT-404 false positive" || echo "differs — investigate"
 ```

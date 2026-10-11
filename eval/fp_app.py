@@ -44,7 +44,7 @@ class H(BaseHTTPRequestHandler):
         if p == "/go":                # same-origin-validated redirect -> not open redirect
             url = g("url")
             # Reject backslashes (browsers normalize \ -> /) and control chars — otherwise
-            # `/\evil.com` becomes protocol-relative `//evil.com`, an EXTERNAL redirect, which
+            # `/\evil.example` becomes protocol-relative `//evil.example`, an EXTERNAL redirect, which
             # would make this "safe" ground-truth trap actually vulnerable and mis-score agents.
             if (url.startswith("/") and not url.startswith("//")
                     and "\\" not in url and all(ord(c) >= 0x20 for c in url)):

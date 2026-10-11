@@ -52,7 +52,7 @@ done
 ### Cross-ref from app HTTP flow
 ```bash
 # Visit corporate-app login, follow redirects
-curl -skL -o /dev/null -w "%{redirect_url}\n" "https://app.target.com/login"
+curl -skL -o /dev/null -w "%{redirect_url}\n" "https://app.target.example/login"
 # If redirects to <something>.okta.com → confirmed Okta tenant
 ```
 
@@ -91,10 +91,10 @@ curl -sk "https://<tenant>.okta.com/api/v1/sessions/me" \
 ### Method 4 — Org-specific identifier probing
 Some Okta orgs use email-as-username; others use `firstname.lastname` or employee-id. Test pattern guesses:
 ```
-firstname.lastname@target.com
-firstname_lastname@target.com  
-flastname@target.com
-employeeID@target.com
+firstname.lastname@target.example
+firstname_lastname@target.example  
+flastname@target.example
+employeeID@target.example
 ```
 
 ### Method 5 — OIDC `/v1/authorize` with login_hint
@@ -202,12 +202,12 @@ curl -sk "https://<tenant>.okta.com/.well-known/openid-configuration" | python3 
 # Test redirect_uri injection
 for ruri in \
     "https://attacker.example.com/" \
-    "https://target.com.attacker.com/" \
-    "https://target.com@attacker.com/" \
-    "https://target.com#@attacker.com/" \
-    "https://target.com\\@attacker.com/" \
-    "//attacker.com/" \
-    "https://target.com/cb?next=https://attacker.com/"; do
+    "https://target.example.attacker.example/" \
+    "https://target.example@attacker.example/" \
+    "https://target.example#@attacker.example/" \
+    "https://target.example\\@attacker.example/" \
+    "//attacker.example/" \
+    "https://target.example/cb?next=https://attacker.example/"; do
   code=$(curl -sk -o /dev/null -w "%{http_code}" \
     "https://<tenant>.okta.com/oauth2/v1/authorize?client_id=<client>&response_type=code&scope=openid&redirect_uri=$(python3 -c "import urllib.parse;print(urllib.parse.quote('$ruri'))")")
   echo "  $ruri → $code"

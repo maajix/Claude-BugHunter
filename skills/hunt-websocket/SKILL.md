@@ -79,7 +79,7 @@ CSWSH requires THREE conditions together: (a) the handshake authenticates via an
 
 # Step 2 — Probe Origin enforcement (this is a SIGNAL, not a confirmation)
 wscat -c "wss://$TARGET/ws" \
-  --header "Origin: https://evil.com" \
+  --header "Origin: https://evil.example" \
   --header "Cookie: session=YOUR_SESSION"
 # A 101 from a foreign Origin only proves the handshake opened.
 # It does NOT confirm CSWSH — the server may still validate Origin at the
@@ -111,7 +111,7 @@ function log(s){document.getElementById("out").textContent += s + "\n";}
 ```
 
 **False-positive killers:**
-- A completed `101` from `Origin: evil.com` is NOT a finding. Many servers accept the upgrade and then send nothing, or close on the first authenticated frame.
+- A completed `101` from `Origin: evil.example` is NOT a finding. Many servers accept the upgrade and then send nothing, or close on the first authenticated frame.
 - Verify the data you receive belongs to a **different account** than the attacker, using a unique marker / distinct victim PII you planted in account B.
 - Exfil the received payload to **Burp Collaborator / an OAST listener** so receipt is recorded out-of-band — this is your impact proof for the report.
 - If a per-connection token rides the handshake (in the URL, a sub-protocol, or the first frame), CSWSH is **not** cross-site exploitable; downgrade or drop.

@@ -36,7 +36,7 @@ Under the hood, run the deterministic checker directly:
 python3 engine/scope.py api.acme.com --md ~/Targets/acme/scope.md
 
 # Or with inline patterns (repeat --in-scope / --out-of-scope per pattern)
-python3 engine/scope.py api.acme.com evil.com \
+python3 engine/scope.py api.acme.com evil.example \
   --in-scope acme.com --in-scope '*.acme.io' --out-of-scope admin.acme.com
 ```
 

@@ -48,6 +48,15 @@ PRs and issues welcome.
 - **Single responsibility**: one skill should do one thing well
 - **Cross-reference complementary skills**: mention which skills compose with this one
 - **Real examples**: prefer worked examples over abstract descriptions
+- **No ungated destructive payload.** A skill is read by an agent that may run
+  what it sees, so a payload's blast radius is the skill's blast radius. Never
+  ship `DROP TABLE`, `DELETE FROM`, `UPDATE ... SET`, `rm -rf /`, a reverse
+  shell, or a substitution that writes a file on the target. A read-only
+  differential, a benign marker (`id`, a sleep, an echoed canary) or an
+  out-of-band callback proves the same bug. If an impact demo is genuinely
+  required, label it **Stage B** and require explicit written sign-off.
+  `check_destructive_payloads.py` enforces the first half of this; the judgement
+  half is yours.
 
 ## Testing changes
 
@@ -57,6 +66,8 @@ of them run in CI:
 ```bash
 python3 scripts/test_lint_skills.py          # self-check for the linter's safety scan
 python3 scripts/lint_skills.py                # structure + secrets + identifier denylist
+python3 scripts/test_check_destructive_payloads.py  # self-check for the payload gate
+python3 scripts/check_destructive_payloads.py # no ungated destructive payloads
 python3 scripts/check_dispatch_coverage.py    # every hunt-* skill reachable from /hunt
 python3 engine/skill_map.py                   # engine routing: every hunt-* class mapped
 python3 scripts/check_doc_counts.py           # skill/command counts across the docs

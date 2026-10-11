@@ -140,7 +140,7 @@ Additional high-signal public disclosures exemplifying the patterns above; read 
 
 ### Account-merge confusion
 - **When to suspect:** Application supports both password and SSO; merging accounts is supported.
-- **Test:** Create attacker account with email `victim@target.com` via SSO (no email verification). Induce victim to sign up via password using the same email. If the system merges, attacker retains access.
+- **Test:** Create attacker account with email `victim@target.example` via SSO (no email verification). Induce victim to sign up via password using the same email. If the system merges, attacker retains access.
 - **Validation:** Cross-account access demonstrated with unique markers.
 - **Pay-grade rationale:** High to critical depending on merge semantics. Common pre-ATO chain.
 

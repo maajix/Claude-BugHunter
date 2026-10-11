@@ -1,6 +1,6 @@
 ---
 name: hunt
-description: Active vulnerability hunting. Two-track dispatcher — asks Red Team vs WAPT, hands off to hunt-dispatch skill and sibling commands. Usage: /hunt target.com | /hunt *.target.com | /hunt targets.txt [--vuln-class X] [--source-code P] [--chrome]
+description: Active vulnerability hunting. Two-track dispatcher — asks Red Team vs WAPT, hands off to hunt-dispatch skill and sibling commands. Usage: /hunt target.example | /hunt *.target.example | /hunt targets.txt [--vuln-class X] [--source-code P] [--chrome]
 ---
 
 # /hunt
@@ -19,8 +19,8 @@ session instead of leaving it implied.
 ## step 0 — parse
 
 ```
-target.com               single target
-*.target.com             wildcard — /recon <base> first, then hunt each live host
+target.example               single target
+*.target.example             wildcard — /recon <base> first, then hunt each live host
 targets.txt              multi-target — mode question once, applied per line
 --vuln-class <X>         skip mode question, load only hunt-<X>
 --source-code <p|url>    static + dynamic
