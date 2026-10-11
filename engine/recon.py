@@ -17,9 +17,14 @@ heuristic (the agent is reserved for the HUNT phase, where judgment is needed).
 
 stdlib-only fallback; uses `requests` if available (gzip/redirects handled cleanly).
 """
+import os
 import re
+import sys
 from shutil import which
 from urllib.parse import urljoin, urlparse
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from throttle import fanout, gate, wrap   # noqa: E402  (engagement rate limit + headers)
 
 _UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
@@ -31,7 +36,8 @@ try:
 
     def _get(url, timeout=20):
         try:
-            r = _SESS.get(url, timeout=timeout, allow_redirects=True)
+            r = _SESS.get(url, timeout=timeout, allow_redirects=True,
+                          headers=gate(url))
             return r.text, r.url, {k.lower(): v for k, v in r.headers.items()}
         except Exception:
             return "", url, {}
@@ -41,7 +47,9 @@ except ImportError:                          # stdlib fallback
 
     def _get(url, timeout=20):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": _UA, "Accept-Encoding": "gzip"})
+            hdrs = {"User-Agent": _UA, "Accept-Encoding": "gzip"}
+            hdrs.update(gate(url))
+            req = urllib.request.Request(url, headers=hdrs)
             r = urllib.request.urlopen(req, timeout=timeout)
             data = r.read()
             if r.headers.get("Content-Encoding") == "gzip":
@@ -338,6 +346,8 @@ def _gau_urls(scope, log):
     urls = {}
     for apex in sorted(apexes):
         try:
+            # gau queries public archives, not the target, so it spends no
+            # engagement budget and carries no engagement header.
             out = subprocess.run(["gau", apex], capture_output=True, text=True, timeout=120).stdout
         except Exception:
             out = ""
@@ -359,9 +369,14 @@ def _katana_urls(scope, log, depth=2, timeout=150):
     urls, crawled = {}, 0
     for seed in scope.seeds:
         try:
-            out = subprocess.run(["katana", "-u", seed, "-silent", "-jc", "-d", str(depth),
-                                  "-kf", "all", "-c", "10", "-timeout", "10", "-rl", "100"],
-                                 capture_output=True, text=True, timeout=timeout).stdout
+            # katana crawls the target, so its own -rl is clamped to the
+            # engagement ceiling and it holds the fan-out slot for the run,
+            # which keeps two crawls from each running at the ceiling.
+            with fanout() as fan:
+                rl = str(min(100, fan.ceiling)) if fan.ceiling else "100"
+                out = subprocess.run(["katana", "-u", seed, "-silent", "-jc", "-d", str(depth),
+                                      "-kf", "all", "-c", "10", "-timeout", "10", "-rl", rl],
+                                     capture_output=True, text=True, timeout=timeout).stdout
         except Exception:
             out = ""
         for u in out.splitlines():
@@ -378,7 +393,8 @@ def _probe(url, timeout=12):
     """GET url, return (status_code, body). Status-aware (unlike _get)."""
     import subprocess
     try:
-        out = subprocess.run(["curl", "-s", "-m", str(timeout), "-L", "-w", "\\n__ST__%{http_code}", url],
+        out = subprocess.run(wrap(["curl", "-s", "-m", str(timeout), "-L",
+                                   "-w", "\\n__ST__%{http_code}", url]),
                              capture_output=True, text=True, timeout=timeout + 5).stdout
         if "__ST__" in out:
             body, st = out.rsplit("__ST__", 1)
@@ -483,8 +499,11 @@ def auth_enforcement_sweep(spec, base, log=print, junk="zzz-pentest-nonexistent-
             if q:
                 url += ("&" if "?" in url else "?") + "&".join(q)
             data = b"{}" if m in ("post", "put", "patch") else None
+            hdrs = {"Accept": "application/json",
+                    "Content-Type": "application/json"}
+            hdrs.update(gate(url))
             req = urllib.request.Request(url, data=data, method=m.upper(),
-                                         headers={"Accept": "application/json", "Content-Type": "application/json"})
+                                         headers=hdrs)
             try:
                 code = urllib.request.urlopen(req, timeout=10).status
             except urllib.error.HTTPError as e:

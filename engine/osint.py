@@ -12,10 +12,15 @@ PD httpx isn't reliably present (the `httpx` on PATH is often the Python lib), s
 liveness/tech probe uses a robust curl-based fingerprint that always works.
 """
 import json
+import os
 import re
 import subprocess
+import sys
 from shutil import which
 from urllib.parse import urlparse
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from throttle import fanout, tool_supports, wrap   # noqa: E402
 
 
 def _run(cmd, timeout=120):
@@ -70,7 +75,10 @@ def probe(host, timeout=12):
     """Probe https then http; return target dict or None if dead."""
     for scheme in ("https", "http"):
         url = f"{scheme}://{host}/"
-        out = _run(["curl", "-s", "-m", str(timeout), "-L", "-D", "-", "-o", "/tmp/_osint_body", url], timeout + 6)
+        # Target traffic, so it goes through the engagement budget and carries
+        # the required headers. crt.sh and the passive sources above do not.
+        out = _run(wrap(["curl", "-s", "-m", str(timeout), "-L", "-D", "-",
+                         "-o", "/tmp/_osint_body", url]), timeout + 6)
         codes = re.findall(r'^HTTP/\S+\s+(\d{3})', out, re.M)
         if not codes:
             continue
@@ -115,8 +123,23 @@ def probe_hosts(hosts, log=print):
     """Liveness + tech probe. Prefers PD httpx-toolkit (batch, rich tech-detect); curl fallback."""
     pd = _pd_httpx()
     if pd:
-        out = _run_stdin([pd, "-silent", "-json", "-sc", "-title", "-td", "-server",
-                          "-timeout", "12", "-no-color"], "\n".join(hosts))
+        argv = [pd, "-silent", "-json", "-sc", "-title", "-td", "-server",
+                "-timeout", "12", "-no-color"]
+        # This probes the target, so it holds the engagement's fan-out slot
+        # and takes the ceiling on its own rate flag. The flag name is asked
+        # of the binary rather than assumed: this file cannot carry a
+        # verified flag table for a tool it was written without.
+        with fanout() as fan:
+            if fan.ceiling:
+                for flag in ("-rl", "-rate-limit"):
+                    if tool_supports(pd, flag):
+                        argv += [flag, str(fan.ceiling)]
+                        break
+                in_scope = [h for h in hosts if fan.in_scope(h)]
+                if in_scope and fan.headers and tool_supports(pd, "-H"):
+                    for k, v in fan.headers.items():
+                        argv += ["-H", f"{k}: {v}"]
+            out = _run_stdin(argv, "\n".join(hosts))
         targets = []
         for line in out.splitlines():
             try:

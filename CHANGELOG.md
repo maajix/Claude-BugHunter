@@ -7,6 +7,45 @@ versioning is loosely [SemVer](https://semver.org/) at the bundle level.
 ## [Unreleased]
 
 ### Added
+- **A request ceiling and required headers, enforced in code** (`engine/throttle.py`,
+  `hooks/throttle-guard.py`, `scripts/test_throttle_wire.py`,
+  `docs/rate-limiting.md`). An engagement can state a request-per-second ceiling
+  and a header every request to the target must carry, such as the bounty
+  username an Intigriti programme requires, and both are held by code rather
+  than asked for in a prompt. The counter lives in a state file taken under
+  `fcntl.flock`, so the agent's `curl`, a background `nuclei`, four parallel
+  `xargs` children and the engine's own recon all draw on one shared budget
+  instead of one each.
+  - **A sliding window, not a token bucket.** Refilling at 5/s with a burst of 5
+    lets a one-second window hold ten requests. The wire test measured exactly
+    that — 9 arrivals against a stated ceiling of 5 — so the limiter was changed
+    rather than the assertion relaxed. Releases are also paced evenly over a
+    window 10% longer than the stated one, because a ceiling is counted at the
+    target's end where arrival jitter adds to any window; without the pacing, 6
+    arrivals still landed in a window against a stated 5.
+  - **Headers travel inside TLS**, added with each tool's own header flag, so
+    there is no proxy and no intercepting CA. They reach in-scope hosts only: an
+    out-of-scope target passes through unbudgeted and without them, so reading an
+    NVD page neither spends the target's budget nor leaks the bounty username.
+  - **A `PreToolUse` hook** refuses an unwrapped network tool, a command that
+    unsets the proxy or engagement variables, `WebFetch` against an in-scope
+    host, and any of 46 named network tools whose flags could not be verified on
+    this machine — so an ungovernable tool is a visible refusal rather than a
+    silent overrun. It is inert unless an engagement names a ceiling or headers,
+    and fails closed inside one.
+  - **Verified at the wire, not at the counter.** `scripts/test_throttle_wire.py`
+    runs a receiver on loopback, drives 20 real `curl` processes through the
+    wrapper four at a time, and asserts from the receiver's log that no window
+    held more than the ceiling and that the header reached every in-scope
+    request and none of the out-of-scope ones.
+  - `docs/rate-limiting.md` lists all 19 ways traffic can leave and marks each:
+    7 governed, 4 refused, 2 that are not target traffic, 5 not covered, 1
+    unverified. The first count written here said nine governed; counting the
+    rows said seven, because two of them are passive third-party sources that
+    never touch the target. The earlier
+    description of this as "no request can exceed the limit" was too strong and
+    is corrected there.
+
 - **Two skills adopted from community forks (90 → 92; `hunt-*` 65 → 66)**, each read
   file-by-file and re-verified rather than merged:
   - `hunt-healthcare-fhir` (from [@prithvee07](https://github.com/prithvee07)) —

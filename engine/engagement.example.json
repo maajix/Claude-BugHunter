@@ -2,5 +2,9 @@
   "name": "demo-local",
   "in_scope": ["localhost", "127.0.0.1"],
   "out_of_scope": ["admin.localhost"],
-  "seeds": ["http://localhost:3002"]
+  "seeds": ["http://localhost:3002"],
+
+  "rate_limit": {"requests_per_second": 5},
+
+  "headers": {"X-Bug-Bounty": "your-platform-username"}
 }

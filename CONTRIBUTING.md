@@ -71,8 +71,20 @@ python3 scripts/check_destructive_payloads.py # no ungated destructive payloads
 python3 scripts/check_dispatch_coverage.py    # every hunt-* skill reachable from /hunt
 python3 engine/skill_map.py                   # engine routing: every hunt-* class mapped
 python3 scripts/check_doc_counts.py           # skill/command counts across the docs
+python3 engine/throttle.py --selftest         # self-check for the request-ceiling enforcer
+python3 scripts/test_throttle_wire.py         # the ceiling, measured at a receiver
 git add -A && python3 scripts/scan_identifiers.py   # every tracked text file
 ```
+
+The last two cover `engine/throttle.py` and `hooks/throttle-guard.py`, which
+enforce an engagement's request ceiling and its required headers in code. If you
+add a network tool to `throttle.py`'s `TOOLS` table, **verify its header and rate
+flags against the installed binary and say so in the comment** — an unverified
+flag that silently does nothing is worse than the refusal it replaces. If you add
+a new shell shape that the guard should catch, add it to the self-test's list of
+must-refuse commands: every entry in that list was a false negative at some
+point, which is why they are all kept. `docs/rate-limiting.md` carries the table
+of what is governed and what is not.
 
 Adding a skill touches more than `skills/`. `check_doc_counts.py` and
 `check_dispatch_coverage.py` tell you what you still owe; five more counts

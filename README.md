@@ -194,7 +194,16 @@ A 6-phase, non-linear workflow — **recon → map & rank → hunt → validate 
 - **Plain English** — describe what you're testing and the relevant skill loads automatically.
 - **`/hunt` scaffold + `cbh` CLI** — engagement-folder structure, state, and orchestration.
 
-→ [Usage guide & worked example](USAGE.md) · [6-phase architecture & skill-to-phase map](docs/architecture.md) · [`cbh` CLI](docs/cbh-cli.md)
+An engagement's **request ceiling** and the **header every request must carry**
+(a bounty username, say) are enforced the same way — in code, not in a prompt.
+Set them once in the engagement config and every process is held to them: the
+agent's `curl`, a background `nuclei`, four parallel `xargs` children and the
+engine's own recon all draw on one shared budget, with a `PreToolUse` hook
+refusing traffic that tries to go around it. The ceiling is measured at a
+receiver rather than trusted from the sender's counter, and the table of what is
+governed and what is not is listed by name.
+
+→ [Usage guide & worked example](USAGE.md) · [6-phase architecture & skill-to-phase map](docs/architecture.md) · [`cbh` CLI](docs/cbh-cli.md) · [Rate limiting & required headers](docs/rate-limiting.md)
 
 ---
 ## Authorization
@@ -237,6 +246,7 @@ for exactly this reason — engagement context belongs in the session explicitly
 | [`USAGE.md`](USAGE.md) | Workflow walkthrough · decision tree · worked engagement example |
 | [`docs/architecture.md`](docs/architecture.md) | 6-phase architecture · skill-to-phase mapping · engagement composition |
 | [`docs/cbh-cli.md`](docs/cbh-cli.md) | `cbh` CLI — native runner orchestrating recon + classify + triage + report |
+| [`docs/rate-limiting.md`](docs/rate-limiting.md) | Request ceiling + required headers enforced in code · what is governed and what is not |
 | [`docs/cve-coverage.md`](docs/cve-coverage.md) | CISA KEV coverage snapshot — refreshed weekly via the workflow template at `docs/automation/cve-refresh.yml.template` |
 | [`docs/credits.md`](docs/credits.md) | Full attribution: 43 original skills + 8 vendored from upstream |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | PR guidelines · skill quality standards · scope |

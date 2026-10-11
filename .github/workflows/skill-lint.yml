@@ -15,6 +15,8 @@ on:
       - "scripts/check_dispatch_coverage.py"
       - "scripts/check_destructive_payloads.py"
       - "scripts/test_check_destructive_payloads.py"
+      - "scripts/test_throttle_wire.py"
+      - "hooks/**"
       - "scripts/.identifier-denylist.sha256"
       - ".github/workflows/skill-lint.yml"
   push:
@@ -27,6 +29,8 @@ on:
       - "scripts/check_dispatch_coverage.py"
       - "scripts/check_destructive_payloads.py"
       - "scripts/test_check_destructive_payloads.py"
+      - "scripts/test_throttle_wire.py"
+      - "hooks/**"
   workflow_dispatch:
 
 permissions:
@@ -75,6 +79,18 @@ jobs:
       # unreachable before this gate existed.
       - name: Validate /hunt dispatch coverage
         run: python3 scripts/check_dispatch_coverage.py
+
+      # The request ceiling and the required headers are enforced in code, so the
+      # code has to be checked. The self-test covers the shell shapes that were
+      # false negatives while it was written: a for loop, xargs -P, bash -c, a
+      # leading path. The wire test is the stronger claim — it measures the
+      # ceiling at a receiver on loopback rather than trusting the sender's own
+      # counter, and it is what rejected a token bucket for a sliding window.
+      - name: Self-check the request-ceiling enforcer
+        run: python3 engine/throttle.py --selftest
+
+      - name: Measure the request ceiling at the wire
+        run: python3 scripts/test_throttle_wire.py
 
       - name: Summary
         if: always()

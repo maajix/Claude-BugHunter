@@ -66,6 +66,13 @@ bug-bounty programs, signed-RoE pentests, CTFs, your own lab). It ships
 validation gates that auto-trigger on ambiguity. See the
 [Security policy](https://github.com/elementalsouls/Claude-BugHunter/blob/main/SECURITY.md).
 
+An engagement's **request ceiling** and the **header every request must carry**
+are enforced in code rather than asked for in a prompt: set them once in the
+engagement config and `engine/throttle.py` holds every process to them, with a
+`PreToolUse` hook refusing traffic that tries to go around it. What is governed
+and what is not is listed by name in [Rate limiting and required
+headers](rate-limiting.md).
+
 ---
 
 ## Sponsored by

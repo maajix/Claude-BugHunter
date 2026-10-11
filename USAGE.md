@@ -145,6 +145,21 @@ Once you've practiced on Juice Shop and run through the full workflow (recon →
 
 The skills behave the same on real and practice targets. The only difference is the report you produce at the end goes to a real program, not the trash.
 
+**Before the first request against a real program**, copy its two hard numbers
+into the engagement config: the request rate it allows, and any header it
+requires on every request (Intigriti programmes often want your bounty
+username, and traffic without it can be read as unauthorised).
+
+```json
+"rate_limit": {"requests_per_second": 5},
+"headers": {"X-Bug-Bounty": "your-platform-username"}
+```
+
+These are enforced in code, not left to the agent's memory: every process draws
+on one shared budget and a hook refuses traffic that tries to go around it. Set
+them once, then forget them. `docs/rate-limiting.md` lists what is governed and
+what is not.
+
 ---
 
 ## 1. Architecture overview
