@@ -38,7 +38,12 @@ PRs and issues welcome.
 ### Skill quality standards
 
 - **Frontmatter**: `name` (lowercase-hyphen-only) + `description` (≤ 1024 chars, weaves in trigger keywords as natural prose)
-- **Body**: target ~1,500–2,000 words, max ~500 lines
+- **Body**: **max 500 lines** — this one is enforced (`lint_skills.py` warns above it).
+  Word count is not enforced and the bundle's real spread is wide: median ~2,400,
+  middle half 1,400–3,400, with reference-heavy skills far above. Write what the
+  topic needs, then move depth into `references/` once SKILL.md approaches 500 lines.
+  Measure the distribution before citing a target:
+  `for f in skills/*/SKILL.md; do wc -w "$f"; done | sort -n`
 - **Detail content**: if more is needed, use `references/` subfolder pattern (see `offensive-osint/`)
 - **Single responsibility**: one skill should do one thing well
 - **Cross-reference complementary skills**: mention which skills compose with this one
@@ -46,7 +51,26 @@ PRs and issues welcome.
 
 ## Testing changes
 
-There's no automated test suite. Manual smoke tests:
+Run the gates before opening a PR. All are stdlib-only, no pip install, and all
+of them run in CI:
+
+```bash
+python3 scripts/test_lint_skills.py          # self-check for the linter's safety scan
+python3 scripts/lint_skills.py                # structure + secrets + identifier denylist
+python3 scripts/check_dispatch_coverage.py    # every hunt-* skill reachable from /hunt
+python3 engine/skill_map.py                   # engine routing: every hunt-* class mapped
+python3 scripts/check_doc_counts.py           # skill/command counts across the docs
+git add -A && python3 scripts/scan_identifiers.py   # every tracked text file
+```
+
+Adding a skill touches more than `skills/`. `check_doc_counts.py` and
+`check_dispatch_coverage.py` tell you what you still owe; five more counts
+(`.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`,
+`docs/index.md`, `docs/multi-harness.md`, `scripts/install.ps1`) are **not**
+gated and go stale silently, so bump them by hand. Regenerate the derived files
+with `scripts/gen_skill_catalog.py` and `scripts/gen_skill_index.py`.
+
+Then smoke-test the trigger surface by hand, which no gate can check:
 
 1. Install the skill locally (copy to `~/.claude/skills/`)
 2. Open a fresh `claude` session
