@@ -69,17 +69,32 @@ CLASS_SKILL = {
     "payment-api": ["hunt-payment-api", "hunt-business-logic"],
     "xs-leaks": ["hunt-xs-leaks"],
     "exposed-service": ["hunt-exposed-services"],
+    "cms": ["hunt-cms"],
+    # exposed-panels owns the HTTP admin UI; exposed-services owns the raw port.
+    "exposed-panel": ["hunt-exposed-panels", "hunt-exposed-services"],
+    "desktop-app": ["hunt-electron"],
+    "browser-extension": ["hunt-browser-extension"],
 }
 
 # detected tech -> tech-specific skill(s)
 TECH_SKILL = {
     "next.js": ["hunt-nextjs"], "node.js": ["hunt-nodejs"], "react": ["hunt-dom"],
-    "wordpress": ["hunt-sqli", "hunt-idor"], "laravel": ["hunt-laravel"], "spring": ["hunt-springboot"],
+    # WordPress routed to generic injection skills before hunt-cms existed; the
+    # CMS skill owns the plugin/theme CVE surface that actually lands findings.
+    "wordpress": ["hunt-cms"], "laravel": ["hunt-laravel"], "spring": ["hunt-springboot"],
     "asp.net": ["hunt-aspnet"], "sharepoint": ["hunt-sharepoint"], "graphql": ["hunt-graphql"],
     "grpc": ["hunt-grpc"], "kubernetes": ["hunt-k8s"], "docker": ["hunt-k8s"],
     "websocket": ["hunt-websocket"], "socket.io": ["hunt-websocket"],
     "jenkins": ["hunt-cicd"], "teamcity": ["hunt-cicd"], "drone": ["hunt-cicd"],
     "argo": ["hunt-cicd"], "github actions": ["hunt-cicd"], "gitlab ci": ["hunt-cicd"],
+    "drupal": ["hunt-cms"], "joomla": ["hunt-cms"], "moodle": ["hunt-cms"],
+    "adobe experience manager": ["hunt-cms"], "roundcube": ["hunt-cms"],
+    "prestashop": ["hunt-cms"],
+    "tomcat": ["hunt-exposed-panels"], "jboss": ["hunt-exposed-panels"],
+    "grafana": ["hunt-exposed-panels"], "zabbix": ["hunt-exposed-panels"],
+    "jupyter": ["hunt-exposed-panels"], "artifactory": ["hunt-exposed-panels"],
+    "portainer": ["hunt-exposed-panels"], "consul": ["hunt-exposed-panels"],
+    "electron": ["hunt-electron"],
 }
 
 # curl-first starter probe per class. {u}=url with FUZZ->1, {ur}=injection prefix (before the value)
@@ -133,6 +148,10 @@ CLASS_PROBE = {
     "payment-api": "curl -s \"{u}\"   # webhook: forged signature at a canary order id; checkout: tamper amount/currency, replay capture (sandbox only)",
     "xs-leaks": "curl -sD - -o /dev/null \"{u}\"   # check COOP/COEP/CORP + Fetch-Metadata; the oracle itself needs a real browser, not curl",
     "exposed-service": "curl -sI \"{u}\"   # non-HTTP port? read-only banner/version first (nmap -sV --script=<named safe script>, never -sC/-A)",
+    "cms": "curl -s \"{u}\" | grep -oiE 'wp-(content|includes)|/sites/(all|default)|Drupal|Joomla|moodle|/etc.clientlibs'   # fingerprint first, then version-match the plugin/theme, never spray exploits",
+    "exposed-panel": "curl -skI \"{u}\"   # title/redirect/realm identifies the product; check unauth access to a read-only endpoint before any credential attempt",
+    "desktop-app": "# no URL probe: unpack the app (asar/zip) and read the BrowserWindow webPreferences for nodeIntegration/contextIsolation/sandbox",
+    "browser-extension": "# no URL probe: fetch the CRX by extension id, unpack it, then read manifest.json host_permissions and the content-script message handlers",
     "business-logic": "curl -s \"{u}\"   # replay the same action twice / skip a step / try qty 0 or negative; diff theresulting state",
 }
 

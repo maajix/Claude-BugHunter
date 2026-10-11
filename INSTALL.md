@@ -58,7 +58,7 @@ pwsh ./scripts/install.ps1
 > script aborts with a `syntax error` and cannot fix itself.
 
 This copies:
-- All 86 skills → `~/.claude/skills/` (macOS/Linux) or `%USERPROFILE%\.claude\skills\` (Windows)
+- All 90 skills → `~/.claude/skills/` (macOS/Linux) or `%USERPROFILE%\.claude\skills\` (Windows)
 - All 15 slash commands → `~/.claude/commands/`
 - The `hunt` scaffolder → `~/.claude/scripts/hunt.sh` (sourced from your `.zshrc`/`.bashrc`) on macOS/Linux, or `~\.claude\scripts\hunt.ps1` (dot-sourced from your PowerShell `$PROFILE`) on Windows
 

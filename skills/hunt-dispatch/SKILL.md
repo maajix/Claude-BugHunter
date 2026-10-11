@@ -217,6 +217,8 @@ hunt-cloud-misconfig
 hunt-sharepoint
 hunt-aspnet
 hunt-exposed-services
+hunt-exposed-panels
+hunt-cms
 ```
 
 report format: `redteam-report-template` (subject / observations / description / impact / recommendation / poc).
@@ -253,6 +255,8 @@ hunt-jwt-crypto      hunt-forgot-password hunt-shadow-api
 hunt-spa-api         hunt-fintech-graphql hunt-rag-vector
 hunt-captcha-bypass  hunt-html-injection  hunt-clickjacking
 hunt-exceptional-conditions
+hunt-cms             hunt-exposed-panels  hunt-electron
+hunt-browser-extension
 ```
 
 every installed `hunt-*` skill except `hunt-misc` (catch-all, listed above) and

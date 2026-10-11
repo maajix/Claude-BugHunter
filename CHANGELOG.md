@@ -7,6 +7,35 @@ versioning is loosely [SemVer](https://semver.org/) at the bundle level.
 ## [Unreleased]
 
 ### Added
+- **Four further new skills (86 → 90; `hunt-*` 61 → 65)**, same sourcing bar — every
+  CVE, path, port and version boundary re-verified against a primary source at
+  authoring time rather than carried over from notes:
+  - `hunt-exposed-panels` — internet-exposed **HTTP** admin panels and dashboards
+    across 5 reference families (data/notebook tools, DevOps and orchestration,
+    monitoring and dashboards, Java app servers, SaaS and proxy exposure): Tomcat,
+    JBoss, Grafana, Zabbix, Jupyter, Artifactory, Portainer, Consul, Nomad, Flink,
+    Spark, Airflow, Netdata, Prometheus. Splits cleanly from `hunt-exposed-services`,
+    which keeps the raw-port half. Triage sequence routes a fingerprint to one
+    reference; every probe is read-only by default and stops at
+    "unauthenticated access confirmed".
+  - `hunt-cms` — CMS and groupware platforms across 6 reference families (WordPress,
+    Drupal, Joomla, Moodle, Adobe Experience Manager, and a grouped file for the
+    thinner PrestaShop/Roundcube/Bolt surface), 33 verified CVEs. Fingerprint and
+    version-match before touching anything; no exploit spraying. Two advisories
+    with no locatable CVE are cited by vendor URL and labelled as such, and the
+    products with no public version-verdict API give a live-check procedure instead
+    of a guessed version.
+  - `hunt-electron` — Electron and Chromium-wrapper desktop apps treated as a web
+    surface, because an XSS inside one reaches the OS. `webPreferences` audit with
+    the per-version default table (`nodeIntegration` off since Electron 5,
+    `contextIsolation` on since 12, `enableRemoteModule` removed in 14,
+    `sandbox` on since 20), preload-bridge abuse, deep-link and protocol handlers,
+    `asar` unpacking.
+  - `hunt-browser-extension` — browser extensions: `manifest.json` permission review,
+    content-script to background message handlers, `externally_connectable`, CRX
+    fetch and unpack, web-accessible resources. Commands were run against a real
+    extension in a throwaway directory during authoring, which caught three broken
+    checks in the draft before they shipped.
 - **Three new skills (83 → 86; `hunt-*` 58 → 61)**, each grounded in primary sources
   verified at authoring time:
   - `hunt-payment-api` — payment and billing API defects in the merchant's wrapper
