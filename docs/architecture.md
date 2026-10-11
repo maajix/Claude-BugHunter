@@ -4,15 +4,15 @@ The Claude-BugHunter bundle maps to a 6-phase workflow that supports both bug hu
 
 ## Primary view — phase-by-phase architecture
 
-90 skills mapped to 6 phases, with a 65-skill `hunt-*` sub-stack, an 8-skill enterprise-platform attack layer, integration layer, and usage decision tree. This is the main reference for "which skill do I use when?".
+92 skills mapped to 6 phases, with a 66-skill `hunt-*` sub-stack, an 8-skill enterprise-platform attack layer, integration layer, and usage decision tree. This is the main reference for "which skill do I use when?".
 
 ![architecture overview](assets/architecture-overview.svg)
 
-The "Source" column in the per-phase tables below tags each skill: **`original`** = author's work in this repo, `community` = community-contributed (v3), `vendored` = from [shuvonsec/claude-bug-bounty](https://github.com/shuvonsec/claude-bug-bounty) (MIT). Of 90 skills: 62 original, 20 community (v3), 8 vendored.
+The "Source" column in the per-phase tables below tags each skill: **`original`** = author's work in this repo, `community` = community-contributed (v3), `vendored` = from [shuvonsec/claude-bug-bounty](https://github.com/shuvonsec/claude-bug-bounty) (MIT). Of 92 skills: 62 original, 22 community (v3 + community forks), 8 vendored.
 
 ## Alternate view — 3-layer capability stack
 
-The same 90 skills, regrouped by **role in an engagement** rather than by phase. Methodology + Recon (bottom) feeds the Hunt Arsenal (middle), which produces findings that flow up through Ship It (top) to a paid submission or client deliverable.
+The same 92 skills, regrouped by **role in an engagement** rather than by phase. Methodology + Recon (bottom) feeds the Hunt Arsenal (middle), which produces findings that flow up through Ship It (top) to a paid submission or client deliverable.
 
 ![capability map](assets/capability-map.svg)
 
@@ -55,12 +55,12 @@ The 6-phase workflow expanded into a pipeline showing per-phase active skills, t
 
 | Skill | Source | Purpose |
 |---|---|---|
-| **65 `hunt-*` skills** | original + community | Per vuln class / framework, curated from disclosed H1 reports + v3 community expansion — auto-trigger by topic |
+| **66 `hunt-*` skills** | original + community | Per vuln class / framework, curated from disclosed H1 reports + v3 community expansion — auto-trigger by topic |
 | `security-arsenal` | vendored | Payload library (XSS / SSRF / SQLi / SSTI / etc.) |
 | `web3-audit` | vendored | Smart-contract audit (10 bug classes, Foundry PoC) |
 | `meme-coin-audit` | vendored | Token rug-pull detection |
 
-### Per-class hunt skills (65)
+### Per-class hunt skills (66)
 
 ```
 hunt-api-misconfig                      hunt-mfa-bypass

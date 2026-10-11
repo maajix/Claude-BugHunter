@@ -74,6 +74,9 @@ CLASS_SKILL = {
     "exposed-panel": ["hunt-exposed-panels", "hunt-exposed-services"],
     "desktop-app": ["hunt-electron"],
     "browser-extension": ["hunt-browser-extension"],
+    # FHIR cross-patient access is IDOR-shaped, but reached through a search
+    # mechanism rather than a changed id, so both skills load.
+    "healthcare-fhir": ["hunt-healthcare-fhir", "hunt-idor"],
 }
 
 # detected tech -> tech-specific skill(s)
@@ -152,6 +155,7 @@ CLASS_PROBE = {
     "exposed-panel": "curl -skI \"{u}\"   # title/redirect/realm identifies the product; check unauth access to a read-only endpoint before any credential attempt",
     "desktop-app": "# no URL probe: unpack the app (asar/zip) and read the BrowserWindow webPreferences for nodeIntegration/contextIsolation/sandbox",
     "browser-extension": "# no URL probe: fetch the CRX by extension id, unpack it, then read manifest.json host_permissions and the content-script message handlers",
+    "healthcare-fhir": "curl -s \"{u}/metadata\"   # read fhirVersion + resource list, then _summary=count on a compartment you should NOT reach (moves zero records); PHI never leaves redacted",
     "business-logic": "curl -s \"{u}\"   # replay the same action twice / skip a step / try qty 0 or negative; diff theresulting state",
 }
 

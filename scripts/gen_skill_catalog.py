@@ -27,7 +27,10 @@ GROUPS = [
         "supply-chain-attack-recon", "meme-coin-audit", "web3-audit"}),
     ("Recon & OSINT", lambda n: "osint" in n or "recon" in n or n == "security-arsenal"),
     ("Methodology & mindset", lambda n: n in {
-        "bb-methodology", "bug-bounty", "bb-local-toolkit", "redteam-mindset"}),
+        "bb-methodology", "bug-bounty", "bb-local-toolkit", "redteam-mindset",
+        # Tooling, like bb-local-toolkit: turns a confirmed finding into a
+        # repeatable check rather than teaching a vuln class.
+        "nuclei-template-forge"}),
     ("Reporting & validation", lambda n: n in {
         "report-writing", "triage-validation", "bugcrowd-reporting", "evidence-hygiene",
         "redteam-report-template", "mid-engagement-ir-detection"}),

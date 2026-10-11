@@ -7,6 +7,27 @@ versioning is loosely [SemVer](https://semver.org/) at the bundle level.
 ## [Unreleased]
 
 ### Added
+- **Two skills adopted from community forks (90 → 92; `hunt-*` 65 → 66)**, each read
+  file-by-file and re-verified rather than merged:
+  - `hunt-healthcare-fhir` (from [@prithvee07](https://github.com/prithvee07)) —
+    rebuilt around **authorization**, which is where FHIR bugs actually live: a
+    token scoped to one patient reaching another's records through search
+    chaining, `_has`, `_include`, `$everything`, or a compartment the server
+    never enforces. Verified against `hl7.org/fhir` R4, SMART App Launch v1 and
+    v2, and the HL7 bulk-data IG, with the R4-vs-current-build compartment
+    deltas called out. PHI discipline is four paragraphs before the first
+    heading: proof is an identifier you are not entitled to or a status
+    differential, with bodies reduced to counts, and `_summary=count` is the
+    preferred probe precisely because it proves the bug while moving zero
+    records. No step writes.
+  - `nuclei-template-forge` (from [@W1nt3rDay](https://github.com/W1nt3rDay)) —
+    turns a finding confirmed once by hand into a repeatable estate-wide check.
+    Re-authored against Nuclei Engine v3.8.0: the adopted draft named no
+    severity values, matcher types or extractor types, gave rate limits as bare
+    placeholders, and omitted that `matchers-condition` and `condition` both
+    default to `or`. The template in Step 3 was validated by execution
+    (`nuclei -validate`, v3.8.0, exit 0), and the Step 4 failure output is real
+    measured error text.
 - **Four further new skills (86 → 90; `hunt-*` 61 → 65)**, same sourcing bar — every
   CVE, path, port and version boundary re-verified against a primary source at
   authoring time rather than carried over from notes:

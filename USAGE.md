@@ -1,6 +1,6 @@
 # Claude-BugHunter — Usage Guide
 
-A practical guide to using the 90-skill Claude-BugHunter bundle for bug hunting (bounty programs, authorized pentesting, CTFs, vuln research) **and external red-team engagements** against enterprise targets. This document covers what's in the bundle, how it composes, and how to use it on a real engagement from intake through paid bounty (or final client deliverable).
+A practical guide to using the 92-skill Claude-BugHunter bundle for bug hunting (bounty programs, authorized pentesting, CTFs, vuln research) **and external red-team engagements** against enterprise targets. This document covers what's in the bundle, how it composes, and how to use it on a real engagement from intake through paid bounty (or final client deliverable).
 
 > Built and validated through authorized red-team and bug-bounty engagements — exposed four bug-bounty capability gaps and five additional gaps around platform attack chains, mid-engagement IR detection, and client-facing reporting. The final stack documented here addresses both modes.
 
@@ -12,7 +12,7 @@ This section is for people who have **never used the bundle before, never used C
 
 ### What is this bundle, in plain English?
 
-It's a collection of 90 markdown files (called **skills**) that turn Claude Code into a methodical bug-hunting assistant.
+It's a collection of 92 markdown files (called **skills**) that turn Claude Code into a methodical bug-hunting assistant.
 
 Without the bundle, asking Claude *"is this XSS?"* gets you a generic answer. With the bundle installed, the same question loads the `hunt-xss` skill — which contains specific detection patterns from 681+ disclosed reports, the exact payloads that have worked, and a validation gate that prevents you from filing a false-positive bug report.
 
@@ -31,7 +31,7 @@ You don't "learn" the bundle. You install it once, then describe what you're tes
 - ❌ You don't need to know how to write exploits. The skills include working payloads.
 - ❌ You don't need to know Burp Suite. It's optional. Skills work with curl + browser.
 - ❌ You don't need a bug bounty account yet. You can practice on OWASP Juice Shop first.
-- ❌ You don't need to read all 90 skills. They auto-load when relevant.
+- ❌ You don't need to read all 92 skills. They auto-load when relevant.
 - ❌ You don't need Python beyond `python --version` working (run `python3 --version` on macOS/Linux).
 
 ### Your first 30 minutes
@@ -45,7 +45,7 @@ mkdir -p ~/security-research && cd ~/security-research
 git clone https://github.com/elementalsouls/Claude-BugHunter.git
 cd Claude-BugHunter
 
-# 2. Install (copies 90 skills + 15 commands into Claude Code)
+# 2. Install (copies 92 skills + 15 commands into Claude Code)
 bash scripts/install.sh
 
 # 3. Reload your shell so the 'hunt' command becomes available
@@ -63,7 +63,7 @@ cd "$HOME\security-research"
 git clone https://github.com/elementalsouls/Claude-BugHunter.git
 cd Claude-BugHunter
 
-# 2. Install (copies 90 skills + 15 commands into Claude Code)
+# 2. Install (copies 92 skills + 15 commands into Claude Code)
 pwsh ./scripts/install.ps1
 
 # 3. Reload your profile so the 'hunt' command becomes available
@@ -159,7 +159,7 @@ The stack maps to a 6-phase bug-bounty workflow. Each phase has its own skill se
 |---|---|---|
 | **1. Scope** | Reading program rules, deciding what's in/out, scaffolding the engagement folder | `bug-bounty`, `bb-methodology`, `osint-methodology` + `hunt <target>` shell command |
 | **2. Recon** | Asset discovery, subdomain enum, endpoint mapping, secret hunting | `offensive-osint`, `web2-recon`, `bb-local-toolkit` |
-| **3. Hunt** | Active testing for bugs in specific vuln classes | 65 `hunt-*` skills + 7 enterprise-platform skills (M365/Okta/cloud-IAM/vCenter/VPN/SharePoint/APK) + `security-arsenal` |
+| **3. Hunt** | Active testing for bugs in specific vuln classes | 66 `hunt-*` skills + 7 enterprise-platform skills (M365/Okta/cloud-IAM/vCenter/VPN/SharePoint/APK) + `security-arsenal` |
 | **4. Validate** | Decide whether a lead is actually a reportable bug | `triage-validation` (7-Question Gate) via `/triage` or `/validate` |
 | **5. Capture** | PoC screenshots, HAR files, evidence redaction | `evidence-hygiene` |
 | **6. Report** | Draft and submit | `report-writing`, `bugcrowd-reporting` |
@@ -168,7 +168,7 @@ See [docs/architecture.md](docs/architecture.md) for a more detailed breakdown.
 
 ---
 
-## 2. Skill inventory (90 skills total)
+## 2. Skill inventory (92 skills total)
 
 ### Workflow skills — the spine of any engagement
 
@@ -186,7 +186,7 @@ See [docs/architecture.md](docs/architecture.md) for a more detailed breakdown.
 | `web2-recon` | Subdomain enumeration, host discovery, URL crawling | "find all subdomains of X" |
 | `bb-local-toolkit` | Router for local cloned bug-bounty repos | "which tool for X", refers to local stack |
 
-### Hunt — 65 per-class web skills
+### Hunt — 66 per-class web skills
 
 Each focuses on one vulnerability class with detection patterns, payloads, bypass tables, and chain opportunities drawn from disclosed bug-bounty reports.
 
@@ -227,6 +227,8 @@ Each focuses on one vulnerability class with detection patterns, payloads, bypas
 | `hunt-cms` | CMS and groupware platforms (WordPress, Drupal, Joomla, Moodle, Adobe Experience Manager, Roundcube, PrestaShop, Bolt) — plugin/theme CVE matching, unauth endpoints, version fingerprinting |
 | `hunt-electron` | Electron and Chromium-wrapper desktop apps as a web surface — `webPreferences` audit (`nodeIntegration`, `contextIsolation`, `sandbox`), preload bridge abuse, XSS escalating to OS command execution, deep-link and protocol handlers, `asar` unpacking |
 | `hunt-browser-extension` | Browser extensions (Chrome/Edge/Firefox) — `manifest.json` permission review, content-script to background message handlers, `externally_connectable`, CRX fetch and unpack, web-accessible resources |
+| `hunt-healthcare-fhir` | FHIR and healthcare APIs, built around **authorization**: a token scoped to one patient reaching another's records via search chaining, `_has`, `_include`, `$everything`, or a compartment the server does not enforce. SMART on FHIR scope semantics (v1 and v2), bulk-data `$export`, `Subscription`. PHI never leaves redacted |
+| `nuclei-template-forge` | Writing and validating Nuclei templates so a finding confirmed once by hand becomes a repeatable check across your own estate. Schema, matcher and extractor types, the `or`-by-default trap, rate-limit ceilings for production |
 
 Plus `hunt-dispatch` — the meta-router that the `/hunt` slash command uses to pick Red Team vs WAPT mode and load the right skill set.
 
@@ -313,6 +315,8 @@ Required for external red-team work where targets are full enterprise estates ra
 | "Target runs WordPress / Drupal / Joomla / Moodle / AEM / Roundcube" | `hunt-cms` |
 | "Testing a desktop app built on Electron / a Chromium wrapper" | `hunt-electron` |
 | "Testing a browser extension" | `hunt-browser-extension` |
+| "Target is a FHIR / healthcare API, or an EHR patient portal" | `hunt-healthcare-fhir` (sandbox or synthetic data first; production needs written authorization naming the data) |
+| "I confirmed this bug once and want it checked across the whole estate" | `nuclei-template-forge` |
 | "Smart-contract audit for [protocol]" | `web3-audit` (or `meme-coin-audit` for tokens) |
 | "I think I found a bug — should I report it?" | Run `/triage` (decides PASS / KILL / DOWNGRADE / CHAIN-REQUIRED) |
 | "About to take a screenshot of my PoC" | Read `evidence-hygiene` first (cookie + PII redaction) |
@@ -412,7 +416,7 @@ Cross-reference this UUID in any chained submissions you file later.
 If another pentester wants to replicate this stack, the install steps are in [INSTALL.md](INSTALL.md). The short version:
 
 1. Clone this repo
-2. Run the installer — `bash scripts/install.sh` (macOS/Linux) or `pwsh ./scripts/install.ps1` (Windows) — installs all 90 skills, 15 commands, and the `hunt` scaffold in one step (use `--all` / `-All` or `--antigravity` / `-AntiGravity` for other harnesses like Google AntiGravity, Codex, or Hermes)
+2. Run the installer — `bash scripts/install.sh` (macOS/Linux) or `pwsh ./scripts/install.ps1` (Windows) — installs all 92 skills, 15 commands, and the `hunt` scaffold in one step (use `--all` / `-All` or `--antigravity` / `-AntiGravity` for other harnesses like Google AntiGravity, Codex, or Hermes)
 3. Set up Burp MCP (BApp Store extension + `claude mcp add burp ...`)
 4. (Optional) Refresh upstream snapshots via `./scripts/install-community-skills.sh` (macOS/Linux) or `pwsh ./scripts/install-community-skills.ps1` (Windows)
 5. (Optional) Set up the skill regenerator with Anthropic + H1 API keys

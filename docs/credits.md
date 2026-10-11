@@ -14,7 +14,7 @@ This is a **bundle**: skills and commands are vendored directly into `skills/` a
 | Community-contributed skills (v3) | 20 | community PRs (e.g. #7) |
 | Vendored foundation skills | 8 | shuvonsec/claude-bug-bounty (MIT) |
 | Vendored slash commands | 12 | shuvonsec/claude-bug-bounty (MIT) |
-| **Total** | 90 skills + 15 commands | |
+| **Total** | 92 skills + 15 commands | |
 
 ---
 
@@ -79,7 +79,7 @@ Built from authorized red-team engagements (enterprise targets including on-prem
 ### Tooling and docs
 
 - **`hunt <target>` command** — Engagement-folder scaffolding: creates `~/Targets/<name>/` with `CLAUDE.md`, `scope.md`, `findings/`, `evidence/`, `submissions.txt`, `notes.md`, and a sensible `.gitignore` for engagement artifacts. Ships as `scripts/hunt.sh` (bash) and `scripts/hunt.ps1` (PowerShell).
-- **Bundle packaging** — Single-step installer that copies all 90 skills, 15 commands, and the hunt scaffold into `~/.claude/`: `scripts/install.sh` (macOS/Linux) and `scripts/install.ps1` (Windows/PowerShell).
+- **Bundle packaging** — Single-step installer that copies all 92 skills, 15 commands, and the hunt scaffold into `~/.claude/`: `scripts/install.sh` (macOS/Linux) and `scripts/install.ps1` (Windows/PowerShell).
 - **Autopilot ledger (`engine/memory.py`) + the `/remember`, `/memory-gc`, `/pickup` commands** — Original design and implementation (cross-engagement capture + skip-decision for the engine hunt loop). Not derived from any external memory implementation.
 - **`assets/banner-v2.svg`** — Hand-coded SVG banner.
 - **Documentation** — `README.md`, `INSTALL.md`, `USAGE.md`, `CONTRIBUTING.md`, `docs/architecture.md`, this credits file.
@@ -155,6 +155,29 @@ This principle informed the `offensive-osint` v3 refactor (lean SKILL.md + `refe
   - `hunt-llm-ai` — provider/model response-header fingerprinting, multi-tenant context-bleed IDOR
   - `hunt-websocket` — signed-message replay, out-of-order state-machine abuse
   - `supply-chain-attack-recon` — GitHub Actions context injection, `zizmor`, Actions run-log secret extraction, polyfill.io detection
+
+- **[@W1nt3rDay](https://github.com/W1nt3rDay)** — `nuclei-template-forge`. The
+  source-to-draft-to-validate-to-curate arc, the known-vulnerable/known-patched
+  gate, the false-positive/false-negative quadrant, and the "two independent
+  anchors" matcher rule are theirs. Re-authored here against Nuclei Engine
+  v3.8.0: the adopted draft named no severity values, matcher types or extractor
+  types, gave rate limits as bare placeholders, and omitted that
+  `matchers-condition` and `condition` both default to `or`, which is the single
+  most load-bearing fact in template authoring. Its reference to a
+  `scripts/nuclei-passive.py` helper was dropped rather than reimplemented,
+  because no such script exists in this repo.
+
+- **[@prithvee07](https://github.com/prithvee07)** — `hunt-healthcare-fhir`. The
+  compartment-as-access-unit framing and the surface inventory are theirs. The
+  body was rebuilt around authorization and re-verified against `hl7.org/fhir`
+  R4, SMART App Launch v1 and v2, and the HL7 bulk-data IG, with the R4-vs-current
+  compartment deltas called out. Several leads in the draft were dropped as
+  unverifiable, including `ValueSet/$expand` as an SSRF entry point, which the R4
+  spec actively contradicts.
+
+Both were adopted file-by-file after reading, never by merging a fork, and every
+load-bearing fact was re-checked against a primary source rather than carried
+over.
 
 ### Other community resources
 

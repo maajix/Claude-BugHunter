@@ -256,7 +256,7 @@ hunt-spa-api         hunt-fintech-graphql hunt-rag-vector
 hunt-captcha-bypass  hunt-html-injection  hunt-clickjacking
 hunt-exceptional-conditions
 hunt-cms             hunt-exposed-panels  hunt-electron
-hunt-browser-extension
+hunt-browser-extension  hunt-healthcare-fhir
 ```
 
 every installed `hunt-*` skill except `hunt-misc` (catch-all, listed above) and
