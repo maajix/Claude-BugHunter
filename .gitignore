@@ -75,3 +75,14 @@ research/reports/raw/
 research/reports/drafts/
 research/reports/gaps.md
 research/reports/processed.json
+
+# engine/throttle.py state. Written next to whichever engagement.json is active,
+# so these are matched at any depth: the request window, the fan-out slot and
+# the audit trail are all per-engagement and machine-specific.
+.throttle-state.json
+.throttle-fanout.lock
+throttle-audit.jsonl
+
+# A real engagement config carries a client's scope and your bounty username.
+# engine/engagement.example.json is the tracked template.
+engagement.json
