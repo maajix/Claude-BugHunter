@@ -10,7 +10,7 @@
 #   - scripts\hunt.ps1 -> ~\.claude\scripts\hunt.ps1 + dot-sourced from
 #                         the PowerShell profile ($PROFILE) automatically
 #
-# MULTI-HARNESS FLAGS (skills only — the 92 SKILL.md files. Slash commands,
+# MULTI-HARNESS FLAGS (skills only — the 109 SKILL.md files. Slash commands,
 # the plugin marketplace, and the /hunt engine are Claude-Code-specific and do
 # NOT port; other harnesses get the knowledge, not the orchestration):
 #   -Agents        force-copy skills -> ~\.agents\skills\  (Codex; OpenCode reads ~\.claude)

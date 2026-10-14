@@ -1,6 +1,6 @@
 # Claude-BugHunter — Usage Guide
 
-A practical guide to using the 92-skill Claude-BugHunter bundle for bug hunting (bounty programs, authorized pentesting, CTFs, vuln research) **and external red-team engagements** against enterprise targets. This document covers what's in the bundle, how it composes, and how to use it on a real engagement from intake through paid bounty (or final client deliverable).
+A practical guide to using the 109-skill Claude-BugHunter bundle for bug hunting (bounty programs, authorized pentesting, CTFs, vuln research) **and external red-team engagements** against enterprise targets. This document covers what's in the bundle, how it composes, and how to use it on a real engagement from intake through paid bounty (or final client deliverable).
 
 > Built and validated through authorized red-team and bug-bounty engagements — exposed four bug-bounty capability gaps and five additional gaps around platform attack chains, mid-engagement IR detection, and client-facing reporting. The final stack documented here addresses both modes.
 
@@ -12,7 +12,7 @@ This section is for people who have **never used the bundle before, never used C
 
 ### What is this bundle, in plain English?
 
-It's a collection of 92 markdown files (called **skills**) that turn Claude Code into a methodical bug-hunting assistant.
+It's a collection of 109 markdown files (called **skills**) that turn Claude Code into a methodical bug-hunting assistant.
 
 Without the bundle, asking Claude *"is this XSS?"* gets you a generic answer. With the bundle installed, the same question loads the `hunt-xss` skill — which contains specific detection patterns from 681+ disclosed reports, the exact payloads that have worked, and a validation gate that prevents you from filing a false-positive bug report.
 
@@ -31,7 +31,7 @@ You don't "learn" the bundle. You install it once, then describe what you're tes
 - ❌ You don't need to know how to write exploits. The skills include working payloads.
 - ❌ You don't need to know Burp Suite. It's optional. Skills work with curl + browser.
 - ❌ You don't need a bug bounty account yet. You can practice on OWASP Juice Shop first.
-- ❌ You don't need to read all 92 skills. They auto-load when relevant.
+- ❌ You don't need to read all 109 skills. They auto-load when relevant.
 - ❌ You don't need Python beyond `python --version` working (run `python3 --version` on macOS/Linux).
 
 ### Your first 30 minutes
@@ -45,7 +45,7 @@ mkdir -p ~/security-research && cd ~/security-research
 git clone https://github.com/elementalsouls/Claude-BugHunter.git
 cd Claude-BugHunter
 
-# 2. Install (copies 92 skills + 15 commands into Claude Code)
+# 2. Install (copies 109 skills + 15 commands into Claude Code)
 bash scripts/install.sh
 
 # 3. Reload your shell so the 'hunt' command becomes available
@@ -63,7 +63,7 @@ cd "$HOME\security-research"
 git clone https://github.com/elementalsouls/Claude-BugHunter.git
 cd Claude-BugHunter
 
-# 2. Install (copies 92 skills + 15 commands into Claude Code)
+# 2. Install (copies 109 skills + 15 commands into Claude Code)
 pwsh ./scripts/install.ps1
 
 # 3. Reload your profile so the 'hunt' command becomes available
@@ -174,7 +174,7 @@ The stack maps to a 6-phase bug-bounty workflow. Each phase has its own skill se
 |---|---|---|
 | **1. Scope** | Reading program rules, deciding what's in/out, scaffolding the engagement folder | `bug-bounty`, `bb-methodology`, `osint-methodology` + `hunt <target>` shell command |
 | **2. Recon** | Asset discovery, subdomain enum, endpoint mapping, secret hunting | `offensive-osint`, `web2-recon`, `bb-local-toolkit` |
-| **3. Hunt** | Active testing for bugs in specific vuln classes | 66 `hunt-*` skills + 7 enterprise-platform skills (M365/Okta/cloud-IAM/vCenter/VPN/SharePoint/APK) + `security-arsenal` |
+| **3. Hunt** | Active testing for bugs in specific vuln classes | 67 `hunt-*` skills + 7 enterprise-platform skills (M365/Okta/cloud-IAM/vCenter/VPN/SharePoint/APK) + 8 `infra-*` external-infrastructure skills + `security-arsenal` |
 | **4. Validate** | Decide whether a lead is actually a reportable bug | `triage-validation` (7-Question Gate) via `/triage` or `/validate` |
 | **5. Capture** | PoC screenshots, HAR files, evidence redaction | `evidence-hygiene` |
 | **6. Report** | Draft and submit | `report-writing`, `bugcrowd-reporting` |
@@ -183,7 +183,7 @@ See [docs/architecture.md](docs/architecture.md) for a more detailed breakdown.
 
 ---
 
-## 2. Skill inventory (92 skills total)
+## 2. Skill inventory (109 skills total)
 
 ### Workflow skills — the spine of any engagement
 
@@ -201,7 +201,7 @@ See [docs/architecture.md](docs/architecture.md) for a more detailed breakdown.
 | `web2-recon` | Subdomain enumeration, host discovery, URL crawling | "find all subdomains of X" |
 | `bb-local-toolkit` | Router for local cloned bug-bounty repos | "which tool for X", refers to local stack |
 
-### Hunt — 66 per-class web skills
+### Hunt — 67 per-class web skills
 
 Each focuses on one vulnerability class with detection patterns, payloads, bypass tables, and chain opportunities drawn from disclosed bug-bounty reports.
 
@@ -228,6 +228,7 @@ Each focuses on one vulnerability class with detection patterns, payloads, bypas
 | `hunt-auth-bypass` | Broken auth / access control |
 | `hunt-api-misconfig` | Mass assignment, JWT attacks, prototype pollution, CORS |
 | `hunt-cloud-misconfig` | AWS/GCP/Azure/K8s misconfigurations |
+| `hunt-cloud-backends` | Firebase, Supabase, Cognito/Amplify, Appwrite, PocketBase, Hasura, Auth0 tenant misconfigurations found from client-side config |
 | `hunt-subdomain` | Subdomain takeover (27+ provider fingerprints) |
 | `hunt-llm-ai` | Prompt injection, ASCII smuggling, agentic AI bugs |
 | `hunt-aspnet` | ASP.NET ViewState deserialization, machineKey, WebForms, request-validator bypass |
@@ -262,6 +263,29 @@ Required for external red-team work where targets are full enterprise estates ra
 | `enterprise-vpn-attack` | SSL VPN appliances — Cisco ASA, Fortinet, Citrix NetScaler, PAN GlobalProtect, Pulse/Ivanti, SonicWall, F5 |
 | `apk-redteam-pipeline` | Android APK acquisition → jadx → secret grep → Frida instrumentation |
 | `supply-chain-attack-recon` | Dep-confusion, GH Actions injection, SBOM mining, container registry exposure |
+
+### External infrastructure — 16 skills (ports and services)
+
+For external infrastructure pentests at the port/service layer. `infra-external-methodology` owns discovery strategy and the master port-to-skill routing table; the per-service skills stop at "exposure plus unauthenticated enumeration plus version gate", never at post-exploitation. Non-HTTP services not listed here (databases, brokers, SNMP/IPMI, printers, ICS) stay with `hunt-exposed-services`.
+
+| Skill | Purpose |
+|---|---|
+| `infra-external-methodology` | Orchestrator — RoE, per-IP ownership, nmap/UDP passes, rate posture, port-to-skill routing across the whole bundle |
+| `infra-ssh` | SSH 22 — OpenSSH/Erlang-OTP/libssh/Dropbear version gates, ssh-audit posture, auth methods, appliance defaults (one gated attempt) |
+| `infra-ftp` | FTP/FTPS 21/990 — anonymous access, MLSD perm facts, STARTTLS, ProFTPD/vsftpd/Serv-U/CrushFTP/Wing FTP CVE matrix |
+| `infra-mail` | SMTP/IMAP/POP3 — open relay matrix, VRFY/EXPN, STARTTLS downgrade, SMTP smuggling, MTA-STS/TLS-RPT/DANE, Exim/Postfix/Dovecot/Zimbra CVEs |
+| `infra-dns` | DNS servers 53 — open resolver, cache snooping, version.bind, dynamic update, NSEC/DNSSEC, BIND/PowerDNS/Unbound/Windows DNS CVEs (AXFR stays in `hunt-tls-network`) |
+| `infra-windows-perimeter` | SMB/NetBIOS/MSRPC/RDP/Kerberos/CLDAP/MSSQL exposed externally — null session, signing, NLA, KEV version gates; hard stop before any AD attack |
+| `infra-voip-sip` | SIP/RTP/STUN/TURN, PBX and SBC — OPTIONS fingerprint, FreePBX/Asterisk/Cisco UCM/Mitel KEV gates, toll-fraud and TURN-relay findings (Stage B) |
+| `infra-vpn-ike` | IKE/IPsec, L2TP, PPTP, OpenVPN, WireGuard, SSTP, SoftEther — ike-scan fingerprint, aggressive-mode PSK exposure, strongSwan/Libreswan/OpenVPN CVEs (SSL VPN portals stay in `enterprise-vpn-attack`) |
+| `infra-network-devices` | Router, switch, firewall and CPE management planes — MikroTik Winbox/API, Ubiquiti discovery, TR-069, Cisco/Juniper/Fortinet/Palo Alto admin, SOHO KEV vendors, RADIUS/TACACS+/BGP/UPnP fingerprint rows |
+| `infra-rmm-remote-support` | RMM and remote-support servers — ScreenConnect, SimpleHelp, BeyondTrust, N-central, Kaseya, ManageEngine, Citrix ICA/CGP, Guacamole, NoMachine, SPICE; CVE matrix with KEV dates |
+| `infra-backup-nas` | Backup servers, NAS, object storage, file sync — Veeam, Commvault, NetBackup, Bacula, Acronis, Nakivo, QNAP, Synology, TrueNAS, MinIO, Nextcloud/ownCloud, Syncthing |
+| `infra-enterprise-appservers` | SAP NetWeaver ports, Oracle WebLogic/EBS/PeopleSoft, WebSphere, JBoss/WildFly, GlassFish, ColdFusion, Liferay, Pega, Atlassian Data Center — version gates and read-only checks |
+| `infra-data-platforms` | Hadoop/YARN/Spark/Hive/HBase/Livy/Flink, Kafka, ZooKeeper, ActiveMQ, Solr, ClickHouse, Neo4j, DB2, Firebird, SAP ASE/HANA, CockroachDB, ArangoDB, Hazelcast — unauthenticated API surface |
+| `infra-ai-ml-services` | Ollama, vLLM, TGI, LiteLLM, Ray, TorchServe, Triton, MLflow, Kubeflow, Gradio, ComfyUI, Open WebUI, Langflow, Flowise, Dify, n8n, exposed MCP servers — model/tool listings, unclaimed admin, KEV gates |
+| `infra-devops-platforms` | Vault, Consul, Nomad, Eureka, Jenkins agent/CLI, TeamCity, GitLab, Gerrit, git daemon, Nexus, Artifactory, Harbor, Docker Registry, Verdaccio, SonarQube, Argo, Rundeck, Portainer |
+| `infra-monitoring-logging` | Zabbix, NRPE/NSClient++, Icinga, Checkmk, PRTG, SolarWinds, Cacti, Prometheus and exporters, Graphite, StatsD, Loki, Jaeger, OTel Collector, Graylog/GELF, Logstash, Fluentd/Fluent Bit, Netdata |
 
 ### Red-team tradecraft — 2 skills
 
@@ -431,7 +455,7 @@ Cross-reference this UUID in any chained submissions you file later.
 If another pentester wants to replicate this stack, the install steps are in [INSTALL.md](INSTALL.md). The short version:
 
 1. Clone this repo
-2. Run the installer — `bash scripts/install.sh` (macOS/Linux) or `pwsh ./scripts/install.ps1` (Windows) — installs all 92 skills, 15 commands, and the `hunt` scaffold in one step (use `--all` / `-All` or `--antigravity` / `-AntiGravity` for other harnesses like Google AntiGravity, Codex, or Hermes)
+2. Run the installer — `bash scripts/install.sh` (macOS/Linux) or `pwsh ./scripts/install.ps1` (Windows) — installs all 109 skills, 15 commands, and the `hunt` scaffold in one step (use `--all` / `-All` or `--antigravity` / `-AntiGravity` for other harnesses like Google AntiGravity, Codex, or Hermes)
 3. Set up Burp MCP (BApp Store extension + `claude mcp add burp ...`)
 4. (Optional) Refresh upstream snapshots via `./scripts/install-community-skills.sh` (macOS/Linux) or `pwsh ./scripts/install-community-skills.ps1` (Windows)
 5. (Optional) Set up the skill regenerator with Anthropic + H1 API keys

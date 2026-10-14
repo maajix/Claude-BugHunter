@@ -48,7 +48,18 @@ openssl s_client -connect $TARGET:443 -cipher DES-CBC3-SHA 2>/dev/null | grep -i
 # Protocol downgrade surface — TLS 1.0/1.1 still negotiable?
 openssl s_client -connect $TARGET:443 -tls1   2>/dev/null | grep -E "Protocol|Cipher"
 openssl s_client -connect $TARGET:443 -tls1_1 2>/dev/null | grep -E "Protocol|Cipher"
+
+# ALPN / HTTP/2 surface (hunt-http-smuggling and hunt-grpc read this)
+echo | openssl s_client -connect $TARGET:443 -servername $TARGET -alpn h2,http/1.1 2>/dev/null | grep -i 'alpn'
+#   "ALPN protocol: h2" = the edge offers HTTP/2; "No ALPN negotiated" = HTTP/1.1 as advertised.
+# Cleartext h2c with prior knowledge — curl's --http2-prior-knowledge only applies to http:// URLs
+curl -s --http2-prior-knowledge "http://$TARGET:8080/" -o /dev/null -w '%{http_version}\n'
+#   "2" = an h2c listener on that port (often an internal gRPC / Envoy port).
+# Hidden h2 (speaks HTTP/2 without offering it in ALPN): Burp HTTP Request Smuggler's
+#   "HTTP/2-hidden probe" forces h2 and compares with the normal response.
 ```
+
+**ALPN results are recon, not findings.** They decide which smuggling variants apply (an h2 edge in front of an HTTP/1.1 origin is a downgrade hop) and whether an internal h2c/gRPC port is exposed; report only what a downstream skill proves.
 
 **Accuracy / triage notes — do not over-claim TLS bugs:**
 
@@ -88,6 +99,8 @@ curl -s "https://hstspreload.org/api/v2/status?domain=$TARGET" | python3 -m json
 ---
 
 ## Phase 3 — DNS Zone Transfer (AXFR)
+
+> AXFR stays here. Everything else about an exposed DNS *server* (open resolver, cache snooping, version.bind, dynamic updates, BIND/PowerDNS/Unbound version gates) is owned by `infra-dns`.
 
 ```bash
 # Find nameservers

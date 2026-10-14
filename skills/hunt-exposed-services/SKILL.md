@@ -44,9 +44,24 @@ straight past them:
 
 ### Not covered here, on purpose
 
-SMB/NetBIOS (139/445), MSRPC (135), MSSQL (1433), FTP (21), RDP (3389) and
-Kerberos (88) are treated as internal-network services by this bundle and are
-excluded by `SECURITY.md`. Appliance management planes already have owners:
+The `infra-*` skills own the services below; route there instead of improvising
+here: SMB/NetBIOS (137-139/445), MSRPC (135), RDP (3389), Kerberos (88), MSSQL
+(1433/1434) and CLDAP in `infra-windows-perimeter` (exposure plus unauthenticated
+enumeration only; internal AD attacks stay excluded by `SECURITY.md`); SSH (22)
+in `infra-ssh`; FTP/FTPS (21/990) in `infra-ftp`; SMTP/IMAP/POP3 (25/465/587,
+110/995, 143/993) in `infra-mail`; DNS servers (53) in `infra-dns`; SIP/RTP and
+PBX stacks (5060/5061) in `infra-voip-sip`; IKE/IPsec, L2TP, PPTP, OpenVPN and
+WireGuard in `infra-vpn-ike`; router, firewall and CPE management planes plus
+RADIUS/TACACS+/BGP/UPnP in `infra-network-devices`; RMM, ICA and remote-support
+servers in `infra-rmm-remote-support`; backup servers, NAS, object storage and
+file sync in `infra-backup-nas`; SAP, WebLogic, WebSphere, JBoss, ColdFusion and
+Atlassian in `infra-enterprise-appservers`; Hadoop, Spark, Kafka, ZooKeeper,
+ActiveMQ, Solr, ClickHouse and the databases not in `references/databases.md`
+in `infra-data-platforms`; LLM and ML serving, MLOps and MCP servers in
+`infra-ai-ml-services`; Vault, Consul, Nomad, CI agents, registries and
+source-control daemons in `infra-devops-platforms`; monitoring agents, metrics
+and log ingest in `infra-monitoring-logging`. `infra-external-methodology` holds the master
+port-to-skill routing table. Appliance management planes already have owners:
 SSL VPN and remote-access gateways in `enterprise-vpn-attack`, vCenter and
 Workspace ONE in `vmware-vcenter-attack`, Kubernetes API/kubelet/etcd and
 Docker in `hunt-k8s`, cloud-managed service exposure in `hunt-cloud-misconfig`.
@@ -382,6 +397,14 @@ NVD, vendor advisories and project documentation.
   different root cause, different fix, different report.
 - `hunt-nosqli` — injection into a datastore the application already reaches.
   This skill is about reaching the datastore yourself.
+- `infra-external-methodology` — the external infrastructure pentest
+  orchestrator: discovery strategy and the master port-to-skill routing table.
+  `infra-ssh`, `infra-ftp`, `infra-mail`, `infra-dns`, `infra-windows-perimeter`,
+  `infra-voip-sip`, `infra-vpn-ike`, `infra-network-devices`,
+  `infra-rmm-remote-support`, `infra-backup-nas`, `infra-enterprise-appservers`,
+  `infra-data-platforms`, `infra-ai-ml-services`, `infra-devops-platforms`,
+  `infra-monitoring-logging` own the services this skill deliberately
+  does not cover.
 - `hunt-k8s` — Kubernetes API, kubelet, etcd, Docker socket.
 - `hunt-tls-network` — TLS and certificate findings on any exposed port.
 - `enterprise-vpn-attack`, `vmware-vcenter-attack` — SSL VPN gateways and

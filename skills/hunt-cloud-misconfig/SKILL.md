@@ -18,16 +18,45 @@ for name in target target-backup target-assets target-prod target-staging; do
   curl -s -o /dev/null -w "$name: %{http_code}\n" "https://$name.s3.amazonaws.com/"
 done
 
+# GCS listing (200 + items = allUsers has storage.objects.list)
+curl -s "https://storage.googleapis.com/storage/v1/b/TARGET-BUCKET/o?maxResults=10"
+
+# Azure Blob container listing (200 + <EnumerationResults> = container-level anonymous access;
+# 401/404/409 = not listable, though "Blob"-level access still serves known blob names)
+curl -s "https://ACCOUNT.blob.core.windows.net/CONTAINER?restype=container&comp=list&maxresults=10"
+
 # Firebase open rules
 curl -s "https://TARGET-APP.firebaseio.com/.json"   # read
 curl -s -X PUT "https://TARGET-APP.firebaseio.com/test.json" -d '"pwned"'  # write
 ```
+
+**Defaults moved, so a public bucket is now an opt-out.** Since April 2023 new S3 buckets get Block Public Access on and ACLs disabled by default (AWS What's New, 2023-04-28). ARM storage accounts disallow anonymous blob access by default (`AllowBlobPublicAccess`, Microsoft Learn). A bucket public via ACL is either older than that or had the protections turned off on purpose: report the bucket/account setting as the root cause, not just the object.
 
 ### EC2 Metadata (via SSRF)
 ```bash
 http://169.254.169.254/latest/meta-data/iam/security-credentials/  # role name
 http://169.254.169.254/latest/meta-data/iam/security-credentials/ROLE-NAME  # keys
 ```
+
+IMDSv2 needs a `PUT /latest/api/token` first, so a GET-only SSRF gets nothing back from an instance with `HttpTokens=required`. Owners can set it as the account-level default per region (`aws ec2 modify-instance-metadata-defaults --http-tokens required`, check with `aws ec2 get-instance-metadata-defaults`): cite it in the remediation when IMDSv1 worked.
+
+### Serverless / managed-service exposure (read-only probes)
+```bash
+# Lambda function URL (find *.lambda-url.<region>.on.aws in JS bundles / CT logs)
+curl -si "https://URL-ID.lambda-url.REGION.on.aws/" | head -20
+# 403 Forbidden = AWS_IAM auth or no public resource policy; app response = AuthType NONE + public policy
+
+# Cloud Run (*.run.app): 403 = invoker IAM check enforced;
+# app response = allUsers has roles/run.invoker or the service runs with --no-invoker-iam-check
+curl -si "https://SERVICE-HOST.run.app/" | head -20
+
+# Public RDS snapshots: any AWS creds of your own, per region, filtered on the target's account ID
+aws rds describe-db-snapshots --snapshot-type public --region us-east-1 \
+  --query "DBSnapshots[?contains(DBSnapshotArn, ':TARGET_ACCOUNT_ID:')].[DBSnapshotArn,Engine,SnapshotCreateTime]"
+aws rds describe-db-cluster-snapshots --snapshot-type public --region us-east-1 \
+  --query "DBClusterSnapshots[?contains(DBClusterSnapshotArn, ':TARGET_ACCOUNT_ID:')].DBClusterSnapshotArn"
+```
+Public function URLs and Cloud Run services are often intentional (webhooks, public APIs): report only when the unauthenticated response does something sensitive. A public snapshot ARN under the target's account ID is the proof; do not restore it into your account unless the program explicitly allows it (that copies their data).
 
 ### Exposed Admin Panels
 ```
@@ -48,7 +77,8 @@ Probe RabbitMQ management (`http://TARGET:15672/`, API `:15672/api/overview`) an
 For testing cloud-misconfig findings against a local AWS sim before/instead of hitting real cloud:
 
 ```bash
-# LocalStack 3.0 community (pin the version — 4.x requires a Pro license)
+# LocalStack 3.0 community image, pinned. Tags up to 4.14 (2026-02-26) were free community builds too;
+# since 2026.03.0 there is one image that needs an auth token (free Hobby plan = non-commercial use only)
 docker run -d --name lab-localstack -p 14566:4566 localstack/localstack:3.0
 
 # awscli ≥ 2.30 + LocalStack 3.0 incompatibility workaround (x-amz-trailer header):
@@ -184,9 +214,23 @@ No CVE assigned specifically to AWS RUM as of 2026-05. The attack class is docum
 
 ---
 
+## References Index
+
+| File | Use when |
+|---|---|
+| `references/storage-by-provider.md` | Anonymous object-storage checks and name patterns for S3, GCS, Azure Blob, DigitalOcean Spaces, Cloudflare R2, OCI, Alibaba OSS, Hetzner, Backblaze B2, Wasabi, Linode, Scaleway; enumeration tooling with flags checked in 2026 |
+| `references/metadata-endpoints.md` | Instance metadata URL, header and token per provider (AWS, Azure, GCP, DigitalOcean, Hetzner, OCI, Alibaba, Vultr, Linode, Scaleway, OpenStack, Equinix) plus ECS / Fargate / Cloud Run / Kubernetes task metadata, as SSRF targets |
+| `references/serverless-and-paas.md` | Lambda function URLs, API Gateway stages, Cloud Run / Cloud Functions, Azure Functions / App Service / Static Web Apps, Cloudflare Workers / Pages, Vercel, Netlify, Render, Fly.io, Heroku: hostnames, dangling status, source-map and auth checks |
+| `references/managed-services-exposure.md` | Public RDS / EBS snapshots and AMIs, public managed databases, public container registries, SNS / SQS / Pub/Sub, PaaS front doors and load balancers |
+
+Terraform state, CloudFormation and CI federation leaks live in `cloud-iam-deep` `references/iac-state-and-ci-tokens.md`; Firebase, Supabase, Cognito and other client-embedded backends live in `hunt-cloud-backends`.
+
+---
+
 ## Related Skills & Chains
 
 - **`hunt-subdomain`** — Stale CNAMEs pointing to deleted buckets are a takeover gold mine. Chain primitive: Cloud misconfig (S3 public/deleted) + `hunt-subdomain` → unclaimed CNAME points to bucket → `assets.target.example` takeover.
+- **`hunt-cloud-backends`** — Firebase / Supabase / Cognito / Appwrite config found in a bundle: rules, RLS and open-signup checks are owned there.
 - **`cloud-iam-deep`** — A leaked SA JSON / AWS key in a public bucket is only half the bug. Chain primitive: Public S3 + leaked AWS key in `.env` → `cloud-iam-deep` enumeration → cross-service `iam:PassRole` escalation.
 - **`hunt-ssrf`** — Metadata service is reachable only from inside the VPC; SSRF is the bridge. Chain primitive: SSRF + cloud misconfig (IMDSv1 still enabled) → instance role keys → S3/RDS data read.
 - **`supply-chain-attack-recon`** — Exposed CI/CD endpoints and SBOMs reveal internal package names. Chain primitive: Exposed Jenkins/GitLab + internal package name leak → npm/PyPI dependency-confusion publish → CI build pwn.

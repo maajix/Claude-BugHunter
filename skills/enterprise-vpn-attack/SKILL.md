@@ -17,7 +17,7 @@ Trigger when recon surfaces:
 DO NOT use for:
 - Internal lateral-movement post-foothold (out of scope per user's boundary)
 - VPN client-side bugs (different attack class)
-- IPsec / L2TP / OpenVPN (different protocols, not SSL VPN web stack)
+- IPsec / IKE / L2TP / PPTP / OpenVPN / WireGuard (different protocols, not SSL VPN web stack) — owned by `infra-vpn-ike`
 
 ---
 
@@ -105,6 +105,8 @@ curl -skI 'https://target/my.policy' | head -10
 | **CVE-2020-3452** | ASA, FTD before specific patch levels | Path traversal — file read | `GET /+CSCOE+/files/file_name.html?Filename=Microsoft.Manifest+/+CSCOT+/lua/test.lua` and variations |
 | **CVE-2023-20269** | ASA, FTD specific | Auth bypass on SSL VPN | Brute-force a group + valid creds combo against `/+webvpn+/index.html` |
 | **CVE-2024-20481** | RAVPN | DoS via crafted handshake | **SKIP in red team — disruptive** |
+| **CVE-2025-20333** + **CVE-2025-20362** (ArcaneDoor follow-on, Sep 2025) | ASA/FTD with SSL VPN web services. First fixed (covers both): ASA 9.12.4.72, 9.14.4.28, 9.16.4.85, 9.18.4.67, 9.20.4.10, 9.22.2.14, 9.23.1.19; FTD 7.0.8.1, 7.2.10.2, 7.4.2.4, 7.6.2.1, 7.7.10.1 | 20362 unauth access to restricted VPN web-server URLs + 20333 authenticated root RCE (9.9) = pre-auth root chain; CISA ED 25-03, KEV 2025-09-25 ([Horizon3](https://horizon3.ai/attack-research/vulnerabilities/cve-2025-20362-cve-2025-20333-cve-2025-20363/)) | Version match only — **SKIP in red team**; a Nov 2025 variant reloads unpatched devices |
+| **CVE-2026-20349** | ASA/FTD Remote Access SSL VPN (fixed builds: verify in cisco-sa-asaftd-vpn-dos-dzv4mQFF) | Unauth crafted HTTP → device reload; KEV 2026-08-11 | **SKIP in red team — disruptive** |
 
 ```bash
 # Cisco CVE-2020-3452 — file read
@@ -128,6 +130,9 @@ curl -sk 'https://target/+CSCOT+/translation-table?type=mst&textdomain=/%2bCSCOE
 | **CVE-2023-27997** (XORtigate) | FortiOS various | Heap overflow — pre-auth RCE | Public PoCs exist; nuclei template available |
 | **CVE-2024-21762** | FortiOS 6.x-7.x | OOB write — pre-auth RCE | Public PoC; nuclei template `CVE-2024-21762` |
 | **CVE-2024-55591** | FortiOS 7.0-7.4 | Auth bypass on FortiOS Node.js websocket admin interface | `GET /endpoint` on admin-interface port |
+| **CVE-2025-24472** | FortiOS 7.0.0-7.0.16 (fixed 7.0.17); FortiProxy 7.0 < 7.0.20, 7.2 < 7.2.13 | Super-admin via CSF proxy requests; needs Security Fabric enabled and upstream/downstream serial numbers (FG-IR-24-535); KEV 2025-03-18, ransomware use | Version + Fabric-enabled match only |
+| **CVE-2025-59718** | FortiOS 7.0 < 7.0.18, 7.2 < 7.2.12, 7.4 < 7.4.9, 7.6 < 7.6.4 (also FortiProxy, FortiSwitchManager) | FortiCloud SSO admin-login bypass via crafted SAML response (FG-IR-25-647); KEV 2025-12-16 | Version match + is FortiCloud SSO login offered on the admin UI? |
+| **CVE-2026-24858** | FortiOS 7.0 ≤ 7.0.18, 7.2 ≤ 7.2.12 (fix: verify), 7.4 < 7.4.11, 7.6 < 7.6.6; also FortiProxy/FortiManager/FortiAnalyzer/FortiWeb | Any FortiCloud account with a registered device can log into other customers' devices that have FortiCloud SSO enabled (FG-IR-26-060); KEV 2026-01-27 | Version match only — never use your own FortiCloud account against the target |
 
 ```bash
 # Fortinet CVE-2018-13379 — most reliably-fingerprintable file read
@@ -224,6 +229,12 @@ diff /tmp/cb2_base.xml /tmp/cb2_test.xml
 | CVE | Affects | Type | Test |
 |---|---|---|---|
 | **CVE-2024-3400** | PAN-OS 10.2-11.1 with GP enabled | Command injection — pre-auth RCE | `POST /ssl-vpn/login.esp` with crafted Cookie header containing `SESSID=../../../var/log/pan/test.txt` |
+| **CVE-2024-0012** + **CVE-2024-9474** | PAN-OS 10.2 < 10.2.12-h2, 11.0 < 11.0.6-h1, 11.1 < 11.1.5-h1, 11.2 < 11.2.4-h1 (9474 also 10.1 < 10.1.14-h6; older hotfix trains listed in the advisories) | Management web interface auth bypass → admin, chained with admin → root privilege escalation; KEV 2024-11-18, ransomware use | Stage A — is the management interface reachable from outside? Version match only |
+| **CVE-2025-0108** | PAN-OS 10.1 < 10.1.14-h9, 10.2 < 10.2.13-h3, 11.1 < 11.1.6-h1, 11.2 < 11.2.4-h4 (older hotfix trains listed in the advisory) | Management web interface auth bypass that invokes PHP scripts (no RCE on its own); KEV 2025-02-18 | Same management-exposure check; version match only |
+| **CVE-2026-0257** | PAN-OS 10.2 / 11.1 / 11.2 / 12.1 with GlobalProtect portal or gateway (fixed builds: verify in the advisory) | GlobalProtect auth bypass → unauthorized VPN connection; KEV 2026-05-29, ransomware use | Version match only |
+| **CVE-2026-0300** | PAN-OS 10.2 < 10.2.18-h6, 11.1 < 11.1.15, 11.2 < 11.2.12, 12.1 < 12.1.7 (PA-/VM-Series) | Pre-auth buffer overflow in the User-ID Authentication Portal (Captive Portal) → root RCE; KEV 2026-05-06 | Version + portal exposure only — **SKIP in red team, crash risk** |
+
+CVE-2024-0012, CVE-2024-9474 and CVE-2025-0108 live on the **management web interface**, not the GlobalProtect portal. A GP-only exposure is not affected; a management interface answering from the internet is a finding on its own. Fixed versions above come from Palo Alto's advisory JSON (`security.paloaltonetworks.com/json/<CVE>`).
 
 ```bash
 # CVE-2024-3400.
@@ -268,6 +279,8 @@ and must never be run as a discovery step.
 | **CVE-2021-22893** | Pulse Connect Secure 9.x | Pre-auth RCE | Complex multi-step; test with nuclei |
 | **CVE-2024-21887** | Ivanti Connect Secure 9.1-22.6 | Command injection on web component | `POST /api/v1/totp/user-backup-code/` with crafted body |
 | **CVE-2023-46805** | Ivanti Connect Secure 9.1-22.6 | Auth bypass | Combined with 21887 for full chain |
+| **CVE-2025-0282** | Connect Secure < 22.7R2.5; Policy Secure < 22.7R1.2; Neurons for ZTA gateways < 22.7R2.3 | Pre-auth stack overflow → RCE; KEV 2025-01-08, ransomware use | Version match only — **SKIP in red team, crash risk** |
+| **CVE-2025-22457** | Connect Secure < 22.7R2.6; Policy Secure < 22.7R1.4; ZTA Gateways < 22.8R2.2 | Pre-auth stack overflow → RCE; KEV 2025-04-04, ransomware use | Version match only — **SKIP in red team, crash risk** |
 
 ```bash
 # CVE-2019-11510 — Pulse file read
@@ -280,6 +293,10 @@ curl -sk --path-as-is 'https://target/dana-na/../dana/html5acc/guacamole/../../.
 |---|---|---|---|
 | **CVE-2021-20016** | SMA 100 series specific firmware | SQL injection — pre-auth | nuclei template available |
 | **CVE-2024-40766** | SonicOS specific | Access-control flaw | Specific firmware versions |
+| **CVE-2024-53704** | SonicOS 7.1.1-7040 to 7.1.1-7058, 7.1.2-7019, 8.0.0-8035; fixed 7.1.3-7015 (8.0.x fixed build: verify in SNWLID-2025-0003) | SSLVPN authentication bypass → hijack of active SSL VPN sessions; KEV 2025-02-18, ransomware use ([Bishop Fox](https://bishopfox.com/blog/sonicwall-cve-2024-53704-ssl-vpn-session-hijacking)) | Version match only — **SKIP in red team: the proof is taking over a real user's session** |
+| **CVE-2025-23006** | SMA1000 AMC/CMC ≤ 12.4.3-02804; fixed 12.4.3-02854 (SNWLID-2025-0002) | Pre-auth deserialization → OS command exec; KEV 2025-01-24, ransomware use | Stage A — is the AMC/CMC reachable from outside? Version match only |
+| **CVE-2025-32819** | SMA100 (200/210/400/410/500v) < 10.2.1.15-81sv (SNWLID-2025-0011) | Authenticated SSLVPN-user arbitrary file delete → reboot to factory defaults | **SKIP in red team — destructive** |
+| **CVE-2026-15409** | SMA1000 12.4.3 / 12.5.0 builds listed in SNWLID-2026-0008 (fixed build: verify) | Pre-auth SSRF in the Work Place interface (CVSS 10.0); KEV 2026-07-14, ransomware use | Version match only |
 
 ### F5 Big-IP / APM
 

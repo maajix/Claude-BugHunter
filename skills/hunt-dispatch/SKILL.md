@@ -130,6 +130,7 @@ X-Application-Context | Whitelabel | /actuator → hunt-springboot
 .github/workflows | Jenkins | GitLab CI     →  hunt-cicd
 .js.map | swagger.json | /.env              →  hunt-source-leak
 HSTS missing | SPF | DMARC | AXFR           →  hunt-tls-network
+open non-HTTP port | nmap | 22 | 25 | 53 | 445 | 3389 | 5060 | 500/udp → infra-external-methodology (routes to infra-* and hunt-exposed-services)
 ```
 
 ### conflict resolution & load budget
@@ -147,7 +148,8 @@ tier 1  identity / SSO fabric    okta-attack, m365-entra-attack
         (own the auth boundary — highest blast radius if compromised)
 tier 2  perimeter appliances     enterprise-vpn-attack, vmware-vcenter-attack
         (pre-auth RCE / direct internal foothold)
-tier 3  cloud / IAM              cloud-iam-deep, hunt-cloud-misconfig
+tier 3  cloud / IAM              cloud-iam-deep, hunt-cloud-misconfig,
+                                 hunt-cloud-backends
         (credential → lateral movement)
 tier 4  app framework / stack    hunt-nextjs, hunt-nodejs, hunt-laravel,
         hunt-springboot, hunt-aspnet, hunt-sharepoint
@@ -214,6 +216,7 @@ hunt-mfa-bypass
 hunt-file-upload
 hunt-http-smuggling
 hunt-cloud-misconfig
+hunt-cloud-backends
 hunt-sharepoint
 hunt-aspnet
 hunt-exposed-services
@@ -253,6 +256,7 @@ hunt-source-leak     hunt-tls-network     hunt-payment-api
 hunt-xs-leaks        hunt-exposed-services
 hunt-jwt-crypto      hunt-forgot-password hunt-shadow-api
 hunt-spa-api         hunt-fintech-graphql hunt-rag-vector
+hunt-cloud-backends
 hunt-captcha-bypass  hunt-html-injection  hunt-clickjacking
 hunt-exceptional-conditions
 hunt-cms             hunt-exposed-panels  hunt-electron
@@ -317,7 +321,7 @@ loaded for red team: {N} skills
   deferred:   {platform skills past the 8-cap, or omit line if none}
   auth:       hunt-ato, hunt-auth-bypass, hunt-saml, hunt-oauth, hunt-mfa-bypass
   inj:        hunt-rce, hunt-sqli, hunt-ssrf, hunt-file-upload
-  infra:      hunt-http-smuggling, hunt-cloud-misconfig
+  infra:      hunt-http-smuggling, hunt-cloud-misconfig, hunt-cloud-backends
   stack:      hunt-sharepoint, hunt-aspnet
   ir:         mid-engagement-ir-detection
 ```
@@ -333,7 +337,7 @@ loaded for wapt ({blackbox|greybox}): {N} skills
   logic:      hunt-business-logic, hunt-race-condition
   infra:      hunt-http-smuggling, hunt-cache-poison
   recon:      hunt-subdomain
-  cloud:      hunt-cloud-misconfig
+  cloud:      hunt-cloud-misconfig, hunt-cloud-backends
   ai:         hunt-llm-ai
   stack:      hunt-aspnet, hunt-sharepoint, hunt-ntlm-info
   misc:       hunt-misc, hunt-csrf

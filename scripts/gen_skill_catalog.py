@@ -25,6 +25,7 @@ GROUPS = [
         "m365-entra-attack", "okta-attack", "cloud-iam-deep", "vmware-vcenter-attack",
         "enterprise-vpn-attack", "apk-redteam-pipeline", "ios-redteam-pipeline",
         "supply-chain-attack-recon", "meme-coin-audit", "web3-audit"}),
+    ("External infrastructure — ports and services", lambda n: n.startswith("infra-")),
     ("Recon & OSINT", lambda n: "osint" in n or "recon" in n or n == "security-arsenal"),
     ("Methodology & mindset", lambda n: n in {
         "bb-methodology", "bug-bounty", "bb-local-toolkit", "redteam-mindset",

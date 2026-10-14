@@ -64,6 +64,7 @@ CLASS_SKILL = {
     "html-injection": ["hunt-html-injection", "hunt-xss"],
     "exceptional-conditions": ["hunt-exceptional-conditions", "hunt-source-leak"],
     "cicd": ["hunt-cicd"], "k8s": ["hunt-k8s"], "cloud-misconfig": ["hunt-cloud-misconfig"],
+    "cloud-backends": ["hunt-cloud-backends"],
     "ldap": ["hunt-ldap"], "ntlm-info": ["hunt-ntlm-info"], "tls-network": ["hunt-tls-network"],
     "subdomain-takeover": ["hunt-subdomain"],
     "payment-api": ["hunt-payment-api", "hunt-business-logic"],
@@ -98,6 +99,8 @@ TECH_SKILL = {
     "jupyter": ["hunt-exposed-panels"], "artifactory": ["hunt-exposed-panels"],
     "portainer": ["hunt-exposed-panels"], "consul": ["hunt-exposed-panels"],
     "electron": ["hunt-electron"],
+    "firebase": ["hunt-cloud-backends"], "supabase": ["hunt-cloud-backends"],
+    "cognito": ["hunt-cloud-backends"], "hasura": ["hunt-cloud-backends"],
 }
 
 # curl-first starter probe per class. {u}=url with FUZZ->1, {ur}=injection prefix (before the value)
@@ -135,6 +138,7 @@ CLASS_PROBE = {
     "cicd": "curl -s \"{u}\"   # exposed CI dashboard / workflow-injection surface (pull_request_target, self-hosted runner)",
     "k8s": "curl -s \"{u}\"   # API anonymous access, kubelet /run, etcd unauth",
     "cloud-misconfig": "curl -s \"{u}\"   # anonymous read on S3/GCS/Blob; PutObjectAcl public-write",
+    "cloud-backends": "curl -s \"{u}\"   # Firebase/Supabase/Cognito config in bundle -> open rules, RLS gap, open signup",
     "ldap": "curl -s \"{ur}*)(objectClass=*\"   # LDAP search-filter injection in auth/search",
     "ntlm-info": "curl -sI \"{u}\"   # WWW-Authenticate: NTLM -> leak domain/forest/computer name",
     "tls-network": "curl -sI \"{u}\"   # HSTS / weak cipher / SPF-DKIM-DMARC / DNS AXFR",

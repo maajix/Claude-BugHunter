@@ -7,6 +7,33 @@ versioning is loosely [SemVer](https://semver.org/) at the bundle level.
 ## [Unreleased]
 
 ### Added
+- **External infrastructure layer, 16 `infra-*` skills.** `infra-external-methodology`
+  owns discovery and the port-to-skill routing table; per-service skills for SSH,
+  FTP, mail, DNS, the Windows perimeter, VoIP/SIP, IKE and tunnel VPNs, network
+  device management planes, RMM and remote support, backup and NAS, enterprise
+  application servers (SAP, WebLogic, WebSphere, JBoss, ColdFusion, Atlassian),
+  data platforms (Hadoop, Kafka, ZooKeeper, Solr, ClickHouse), AI/ML serving and
+  agent builders (Ollama, Ray, Triton, MLflow, Langflow, MCP servers), DevOps
+  control planes (Vault, Consul, Nomad, registries) and monitoring/logging
+  ingest. Stage A is read-only; every write, login, job or tool call is Stage B
+  with sign-off. CVE matrices carry CISA KEV status as of catalog 2026.10.13.
+- **`hunt-cloud-backends`**: Firebase, Supabase, Cognito/Amplify, Appwrite,
+  PocketBase, Hasura and Auth0 tenants tested from client-side config.
+- **`hunt-cloud-misconfig` references** for storage by provider, instance
+  metadata endpoints of every major and second-tier provider, serverless/PaaS
+  and managed-service exposure; **`cloud-iam-deep` references** for second-tier
+  provider tokens (DigitalOcean, Hetzner, OVH, Linode, Vultr, Scaleway, Alibaba,
+  OCI, IBM, Cloudflare, Backblaze) and IaC/CI federation leaks.
+
+### Changed
+- **2025/2026 methodology refresh across the hunt and platform skills**: nuclei
+  template paths, subfinder provider config, OWASP Agentic Top 10 (Dec 2025),
+  subdomain-takeover provider status, Frida and Android 14+ CA paths, Burp
+  single-packet attack wording, React2Shell and Livewire gates, SAML parser
+  differentials, platform CVSS 4.0 policy dates, Redis probes reduced to `PING`.
+- Plugin version 2.3.0; skill count 109 (67 `hunt-*`).
+
+### Added (earlier, unreleased)
 - **A request ceiling and required headers, enforced in code** (`engine/throttle.py`,
   `hooks/throttle-guard.py`, `scripts/test_throttle_wire.py`,
   `docs/rate-limiting.md`). An engagement can state a request-per-second ceiling

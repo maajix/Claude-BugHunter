@@ -248,6 +248,7 @@ def classify(item):
         (("/jenkins", "/teamcity", "/drone", "/argo", "/.gitlab-ci", "/.github/workflows"), "cicd"),
         (("kubernetes", "/apis/", "/api/v1/namespaces", "kubelet"), "k8s"),
         (("s3.amazonaws", "storage.googleapis", "blob.core.windows", "cloudfront.net"), "cloud-misconfig"),
+        (("firebaseio.com", "firebaseapp.com", "supabase.co", "amazoncognito.com", "hasura.app"), "cloud-backends"),
         (("/forgot-password", "/forgot", "/reset-password", "/password-reset", "/recover"), "forgot-password"),
         (("captcha", "recaptcha"), "captcha-bypass"),
         (("jwt",), "jwt-crypto"),

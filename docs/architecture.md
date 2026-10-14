@@ -4,15 +4,15 @@ The Claude-BugHunter bundle maps to a 6-phase workflow that supports both bug hu
 
 ## Primary view — phase-by-phase architecture
 
-92 skills mapped to 6 phases, with a 66-skill `hunt-*` sub-stack, an 8-skill enterprise-platform attack layer, integration layer, and usage decision tree. This is the main reference for "which skill do I use when?".
+109 skills mapped to 6 phases, with a 67-skill `hunt-*` sub-stack, an 8-skill enterprise-platform attack layer, a 16-skill external-infrastructure layer, integration layer, and usage decision tree. This is the main reference for "which skill do I use when?".
 
 ![architecture overview](assets/architecture-overview.svg)
 
-The "Source" column in the per-phase tables below tags each skill: **`original`** = author's work in this repo, `community` = community-contributed (v3), `vendored` = from [shuvonsec/claude-bug-bounty](https://github.com/shuvonsec/claude-bug-bounty) (MIT). Of 92 skills: 62 original, 22 community (v3 + community forks), 8 vendored.
+The "Source" column in the per-phase tables below tags each skill: **`original`** = author's work in this repo, `community` = community-contributed (v3), `vendored` = from [shuvonsec/claude-bug-bounty](https://github.com/shuvonsec/claude-bug-bounty) (MIT). Of 109 skills: 79 original, 22 community (v3 + community forks), 8 vendored.
 
 ## Alternate view — 3-layer capability stack
 
-The same 92 skills, regrouped by **role in an engagement** rather than by phase. Methodology + Recon (bottom) feeds the Hunt Arsenal (middle), which produces findings that flow up through Ship It (top) to a paid submission or client deliverable.
+The same 109 skills, regrouped by **role in an engagement** rather than by phase. Methodology + Recon (bottom) feeds the Hunt Arsenal (middle), which produces findings that flow up through Ship It (top) to a paid submission or client deliverable.
 
 ![capability map](assets/capability-map.svg)
 
@@ -55,12 +55,12 @@ The 6-phase workflow expanded into a pipeline showing per-phase active skills, t
 
 | Skill | Source | Purpose |
 |---|---|---|
-| **66 `hunt-*` skills** | original + community | Per vuln class / framework, curated from disclosed H1 reports + v3 community expansion — auto-trigger by topic |
+| **67 `hunt-*` skills** | original + community | Per vuln class / framework, curated from disclosed H1 reports + v3 community expansion — auto-trigger by topic |
 | `security-arsenal` | vendored | Payload library (XSS / SSRF / SQLi / SSTI / etc.) |
 | `web3-audit` | vendored | Smart-contract audit (10 bug classes, Foundry PoC) |
 | `meme-coin-audit` | vendored | Token rug-pull detection |
 
-### Per-class hunt skills (66)
+### Per-class hunt skills (67)
 
 ```
 hunt-api-misconfig                      hunt-mfa-bypass
@@ -94,6 +94,7 @@ hunt-shadow-api                         hunt-exceptional-conditions
 hunt-spa-api                            hunt-captcha-bypass
 hunt-rag-vector                         hunt-clickjacking
 hunt-html-injection                     hunt-fintech-graphql
+hunt-cloud-backends
 ```
 
 Plus alternates: `hunt-cache-poison`, `hunt-race-condition`, `hunt-subdomain`. Plus the meta-router `hunt-dispatch` (used internally by the `/hunt` slash command — not user-invoked).
@@ -116,6 +117,29 @@ External red-team engagements against enterprise estates need attack chains for 
 | **`apk-redteam-pipeline`** | original | Android APK red-team pipeline — acquisition → jadx → secret grep → Frida instrumentation |
 | **`ios-redteam-pipeline`** | original | iOS red-team pipeline — IPA acquisition, decryption, class-dump, keychain/ATS/pinning analysis, Frida/objection instrumentation |
 | **`supply-chain-attack-recon`** | original | Dep-confusion, GH Actions injection, SBOM mining, container registry exposure (recon only, no publish-step) |
+
+### External infrastructure (Phase 3 expansion — 16 skills)
+
+External infrastructure pentests work at the port and service layer, not the web stack. `infra-external-methodology` is the entry point; it owns discovery strategy and the master port-to-skill routing table. Every per-service skill ends at exposure plus unauthenticated enumeration plus version gate, inside the `SECURITY.md` boundary.
+
+| Skill | Source | Purpose |
+|---|---|---|
+| **`infra-external-methodology`** | original | Orchestrator — RoE, IP ownership, nmap/UDP strategy, rate posture, port-to-skill routing across all owners |
+| **`infra-ssh`** | original | SSH exposure — OpenSSH/Erlang-OTP/libssh/Dropbear CVE gates, ssh-audit posture, auth methods, appliance defaults |
+| **`infra-ftp`** | original | FTP/FTPS — anonymous access and writability (MLSD facts), STARTTLS, server CVE matrix with KEV dates |
+| **`infra-mail`** | original | SMTP/IMAP/POP3 — open relay, user enumeration, STARTTLS downgrade, SMTP smuggling, MTA-STS/TLS-RPT/DANE, MTA CVE matrix |
+| **`infra-dns`** | original | DNS server exposure — open resolver, cache snooping, version, dynamic update, DNSSEC/NSEC, BIND/PowerDNS/Unbound/Windows DNS CVEs |
+| **`infra-windows-perimeter`** | original | SMB/NetBIOS/MSRPC/RDP/Kerberos/CLDAP/MSSQL on the internet — read-only enumeration and KEV gates, no AD attacks |
+| **`infra-voip-sip`** | original | SIP/RTP/STUN/TURN and PBX/SBC stacks — fingerprint, KEV gates, toll-fraud and relay findings defined with Stage B proof |
+| **`infra-vpn-ike`** | original | IKE/IPsec, L2TP, PPTP, OpenVPN, WireGuard, SSTP, SoftEther — ike-scan fingerprint, aggressive-mode PSK exposure, VPN daemon CVE matrix |
+| **`infra-network-devices`** | original | Router/switch/firewall/CPE management planes — MikroTik, Ubiquiti, TR-069, Cisco/Juniper/Fortinet/Palo Alto admin, SOHO KEV vendors, AAA and routing-protocol fingerprint rows |
+| **`infra-rmm-remote-support`** | original | RMM and remote-support servers — ScreenConnect, SimpleHelp, BeyondTrust, N-central, Kaseya, Citrix ICA/CGP, Guacamole, NoMachine; KEV-dated CVE matrix |
+| **`infra-backup-nas`** | original | Backup, NAS, object storage, file sync — Veeam, Commvault, NetBackup, Acronis, Nakivo, QNAP, Synology, TrueNAS, MinIO, Nextcloud, Syncthing |
+| **`infra-enterprise-appservers`** | original | SAP NetWeaver, Oracle WebLogic/EBS/PeopleSoft, WebSphere, JBoss/WildFly, GlassFish, ColdFusion, Liferay, Pega, Atlassian DC — version gates, read-only checks |
+| **`infra-data-platforms`** | original | Hadoop/Spark/Hive/HBase/Flink, Kafka, ZooKeeper, ActiveMQ, Solr, ClickHouse and databases without another owner — unauthenticated API surface |
+| **`infra-ai-ml-services`** | original | LLM inference servers, Ray, TorchServe, Triton, MLflow, Kubeflow, AI web UIs, Langflow/Flowise/Dify/n8n, exposed MCP servers — listings, unclaimed admin, KEV gates |
+| **`infra-devops-platforms`** | original | Vault, Consul, Nomad, Jenkins agent/CLI, TeamCity, Gerrit, git daemon, artifact and container registries, SonarQube, Argo, Rundeck, Portainer |
+| **`infra-monitoring-logging`** | original | Monitoring agents and ingest protocols — Zabbix, NRPE, Icinga, Checkmk, PRTG, Prometheus/exporters, Graphite, Loki, Jaeger, OTel, Graylog, Logstash, Fluentd, Netdata |
 
 ### Red-team tradecraft (cross-phase — 2 skills)
 

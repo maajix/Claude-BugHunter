@@ -80,9 +80,10 @@ behind this section continues into reverse shells and pivoting, which this
 bundle excludes. Stop at "admin session on the monitoring plane, N hosts
 visible".
 
-Zabbix agent (10050) and trapper (10051) are raw TCP, not HTTP. They are not
-covered by this skill and are not currently covered by `hunt-exposed-services`
-either. Report the exposure generically and note the gap.
+Zabbix agent (10050) and trapper (10051) are raw TCP, not HTTP. They are
+owned by `infra-monitoring-logging` (`references/agent-protocols.md`), which
+also carries the KEV-listed frontend rows CVE-2021-39226 (Grafana) and
+CVE-2022-23134 (Zabbix) as version checks.
 
 ---
 
@@ -150,6 +151,29 @@ is explicit about, both of which you must check before claiming it:
 Because it needs an account and a non-default binary, treat a version match as a
 version finding. Executing it is Stage B with the RCE canary protocol from
 SKILL.md Step 6, and only with a supplied account.
+
+### CVE-2025-4123 ("Grafana Ghost") and CVE-2025-6023 — open redirect to XSS
+
+| CVE | What it is | Affected | Fixed in |
+|---|---|---|---|
+| CVE-2025-4123 | Client path traversal plus open redirect loads an attacker-hosted frontend plugin, giving XSS and account takeover. No editor permission needed; works for an anonymous visitor if anonymous access is on. With the **Image Renderer** plugin installed the same redirect becomes a full-read SSRF. | All supported versions as of May 2025, back to at least Grafana 8 | 12.0.0+security-01, 11.6.1+security-01, 11.5.4+security-01, 11.4.4+security-01, 11.3.6+security-01, 11.2.9+security-01, 10.4.18+security-01 ([vendor](https://grafana.com/blog/2025/05/21/grafana-security-release-high-severity-security-fix-for-cve-2025-4123)) |
+| CVE-2025-6023 | A second open redirect, chained with path traversal to XSS. The victim needs Viewer, or nothing if anonymous access is enabled. | 11.5.0 and later | 12.0.2+security-01, 11.6.3+security-01, 11.5.6+security-01, 11.4.6+security-01, 11.3.8+security-01 ([vendor](https://grafana.com/blog/grafana-security-release-medium-and-high-severity-fixes-for-cve-2025-6197-and-cve-2025-6023)) |
+
+OX Security, who named CVE-2025-4123 "The Grafana Ghost", reported 36% of
+public-facing instances still vulnerable after the patch shipped. Both CVEs
+need a victim to follow a crafted link, so the Stage A evidence is the version
+from `/api/health` plus the two preconditions below, which raise severity:
+
+```bash
+# Stage A — read-only. Anonymous access on? 200 + JSON array = yes, 401 = no.
+curl -s -m 15 -o /dev/null -w '%{http_code}\n' "https://${TARGET}/api/search?limit=1"
+# Default CSP blocks the CVE-2025-4123 XSS (connect-src). No header = not mitigated.
+curl -s -m 15 -D - -o /dev/null "https://${TARGET}/login" | grep -i '^content-security-policy'
+```
+
+Building the redirect and plugin payload is Stage B, against a tester-owned
+account only. Do not send a crafted link to a real user, and do not point the
+renderer SSRF at internal hosts without written sign-off.
 
 ### Default credentials and lockout
 
@@ -247,6 +271,8 @@ service topology is a disclosure finding.
 - `hunt-exposed-services` — Kibana 5601, Elasticsearch 9200, `splunkd` 8089,
   Hadoop 9870/8088, InfluxDB 8086.
 - `hunt-csrf` — Grafana CVE-2022-21703.
+- `hunt-open-redirect`, `hunt-xss` — redirect and XSS mechanics behind Grafana
+  CVE-2025-4123 and CVE-2025-6023.
 - `hunt-sqli` — the injection mechanics behind the two Zabbix SQLi CVEs, once
   you have an account.
 - `hunt-lfi` — traversal mechanics and post-read file targets behind
