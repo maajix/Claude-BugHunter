@@ -1,8 +1,9 @@
 ---
 name: infra-data-platforms
 description: "Triage internet-exposed big-data, streaming, search and database services no other skill owns: Hadoop HDFS, YARN and JobHistory beyond the baseline probes, Spark standalone, Hive, HBase, Oozie, Hue, Livy, Zeppelin, Storm, Trino and Presto, Druid, NiFi, Solr, ClickHouse, Kafka, Kafka Connect, Schema Registry, ZooKeeper four-letter words, Pulsar, ActiveMQ Classic and Artemis, Neo4j, Db2, Firebird, SAP ASE, SAP HANA, CockroachDB, ArangoDB, RethinkDB, Vertica, Hazelcast and Ignite. The finding is unauthenticated metadata access, a client-supplied identity the server trusts, or a version in a known-exploited range (ActiveMQ CVE-2023-46604 and CVE-2026-34197, Solr CVE-2019-17558, Airflow CVE-2020-13927). Stage A is read-only: version endpoints, names and counts. Job submission, topic or table creation, reading messages, impersonated users and default credentials are Stage B behind written sign-off. Use when a scan shows one of these ports, banners or consoles on an in-scope host."
-sources: cisa_kev, cve_program_records, nvd, vendor_advisories, apache_security_pages, github_security_advisories, project_documentation, project_source, nmap_nse_source
-report_count: 0
+metadata:
+  sources: cisa_kev, cve_program_records, nvd, vendor_advisories, apache_security_pages, github_security_advisories, project_documentation, project_source, nmap_nse_source
+  report_count: 0
 ---
 
 ## When to use
@@ -52,6 +53,18 @@ report it from the read that shows the submission endpoint is open, and stop.
 | Log4Shell (CVE-2021-44228, KEV) out-of-band testing on any of these JVMs | `hunt-rce` under its own rules; here it is a version gate only |
 | Credential guessing of any kind | `hunt-brute-force` |
 | SAP NetWeaver, SAP Host Agent, `sapstartsrv`, Apache Superset, Kylin, RocketMQ, HugeGraph | No owner in the bundle. Report the exposure generically; do not improvise probes |
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/hadoop-and-spark.md` | HDFS 50070/50075/8020/9864, NodeManager 8042, JobHistory 19888, simple-auth identity trap, `dr.who`, open YARN submission, Spark standalone 7077/6066/8080/8081, Hive, HBase, Oozie, Hadoop and Spark CVE matrix | exposed hadoop, yarn rce, webhdfs user.name, spark master 7077, spark rest 6066, hiveserver2 exposed, hbase master ui, oozie exposed |
+| `references/notebooks-and-pipelines.md` | Zeppelin, Livy 8998, Hue, Storm, NiFi 8080/8443, Flink and Airflow KEV deltas | exposed zeppelin, livy sessions open, hue first login, storm ui exposed, nifi no auth, airflow experimental api, flink web submit |
+| `references/query-search-olap.md` | Trino/Presto 8080, Druid 8081/8888, Solr 8983, ClickHouse 8123/9000/9004 | trino no auth, presto exposed, druid allowall, druid rce version, solr admin exposed, solr velocity, clickhouse default user no password |
+| `references/streaming-and-brokers.md` | Kafka 9092, Connect 8083, Schema Registry 8081, ZooKeeper 2181 and AdminServer, Pulsar 6650/8080, ActiveMQ Classic 61616/8161, Artemis | exposed kafka, kafka connect rce, zookeeper four letter words, zookeeper srvr, pulsar admin exposed, activemq openwire cve-2023-46604, activemq jolokia, artemis console |
+| `references/databases-and-data-grids.md` | Neo4j, Db2, Firebird, SAP ASE, SAP HANA, CockroachDB, ArangoDB, RethinkDB, Vertica, Hazelcast, Ignite | neo4j exposed, neo4j default password, db2 50000, firebird masterkey, sybase ase exposed, sap hana port 30015, cockroachdb insecure, arangodb exposed, rethinkdb web ui, hazelcast 5701, ignite rest |
 
 ---
 
@@ -348,15 +361,7 @@ Stage B, add the sign-off record and the single line that proves the result.
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/hadoop-and-spark.md` | HDFS 50070/50075/8020/9864, NodeManager 8042, JobHistory 19888, simple-auth identity trap, `dr.who`, open YARN submission, Spark standalone 7077/6066/8080/8081, Hive, HBase, Oozie, Hadoop and Spark CVE matrix | exposed hadoop, yarn rce, webhdfs user.name, spark master 7077, spark rest 6066, hiveserver2 exposed, hbase master ui, oozie exposed |
-| `references/notebooks-and-pipelines.md` | Zeppelin, Livy 8998, Hue, Storm, NiFi 8080/8443, Flink and Airflow KEV deltas | exposed zeppelin, livy sessions open, hue first login, storm ui exposed, nifi no auth, airflow experimental api, flink web submit |
-| `references/query-search-olap.md` | Trino/Presto 8080, Druid 8081/8888, Solr 8983, ClickHouse 8123/9000/9004 | trino no auth, presto exposed, druid allowall, druid rce version, solr admin exposed, solr velocity, clickhouse default user no password |
-| `references/streaming-and-brokers.md` | Kafka 9092, Connect 8083, Schema Registry 8081, ZooKeeper 2181 and AdminServer, Pulsar 6650/8080, ActiveMQ Classic 61616/8161, Artemis | exposed kafka, kafka connect rce, zookeeper four letter words, zookeeper srvr, pulsar admin exposed, activemq openwire cve-2023-46604, activemq jolokia, artemis console |
-| `references/databases-and-data-grids.md` | Neo4j, Db2, Firebird, SAP ASE, SAP HANA, CockroachDB, ArangoDB, RethinkDB, Vertica, Hazelcast, Ignite | neo4j exposed, neo4j default password, db2 50000, firebird masterkey, sybase ase exposed, sap hana port 30015, cockroachdb insecure, arangodb exposed, rethinkdb web ui, hazelcast 5701, ignite rest |
+## Sources
 
 Primary sources (fetched 2026-10-13): CISA KEV feed, catalog 2026.10.13
 (<https://www.cisa.gov/known-exploited-vulnerabilities-catalog>); CVE Program

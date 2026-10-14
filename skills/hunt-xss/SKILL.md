@@ -1,8 +1,9 @@
 ---
 name: hunt-xss
 description: "Hunting skill for xss vulnerabilities. Built from 174 public bug bounty reports. Use when hunting xss on any target. For markup injection that reflects raw HTML but does NOT execute JavaScript (no `<script>`/event-handler execution), see hunt-html-injection — escalate here once script execution is possible. Also covers Shadow DOM and declarative shadow roots as a sink context, SOME (Same Origin Method Execution) callback abuse, XSSI (cross-site script inclusion), WebAssembly linear-memory XSS, and CSP bypass depth: strict-dynamic and script gadgets, nonce reuse and nonce theft, base-uri omission, JSONP on allowlisted origins, and Chrome disk-cache/bfcache nonce reuse."
-sources: github, hackerone_public, mdn_web_docs, w3c_csp3_spec, chrome_developers, chromium_source, github_security_advisories, public_research, hacktricks_coverage_checklist
-report_count: 174
+metadata:
+  sources: github, hackerone_public, mdn_web_docs, w3c_csp3_spec, chrome_developers, chromium_source, github_security_advisories, public_research, hacktricks_coverage_checklist
+  report_count: 174
 ---
 
 ## Autonomous Testing Priority
@@ -39,6 +40,16 @@ Your payload must appear in the response body with angle brackets UNESCAPED. `<s
 - **Blocked:** response is an error, or the reflected value is absent entirely
 
 **For stored XSS:** inject into a field that other pages display (comments, usernames, ticket titles). Then fetch the rendering page and check for unescaped payload. The payload executes when any user views that page — higher severity than reflected.
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `shadow-dom-and-modern-sinks.md` | Shadow DOM as a sink context: open versus closed roots, declarative shadow DOM browser support, why `innerHTML` is safe against it while `setHTMLUnsafe`/`parseHTMLUnsafe` are not, live-DOM sanitizer returns (`IN_PLACE`/`RETURN_DOM`), DOMPurify's documented closed-root limit, `attachShadow` hooking, the `slotchange` gadget; WASM linear-memory template overwrite and why source-to-sink analysis misses it, with read-only memory-recon helpers; the markdown-renderer delta (sanitize-then-render ordering, mXSS in the final DOM, `<base>` rewriting, CVE-2025-54075) | shadow DOM, shadow root, closed shadow root, declarative shadow DOM, shadowrootmode, setHTMLUnsafe, parseHTMLUnsafe, web component XSS, DOMPurify RETURN_DOM, slotchange, WebAssembly XSS, WASM linear memory, HEAPU8, Emscripten, template overwrite, markdown renderer XSS, mXSS |
+| `callback-and-script-inclusion.md` | SOME (Same Origin Method Execution): the five-step opener chain, callback character restrictions, what COOP does to it, and a non-state-changing proof bar; XSSI: the 2015 dynamic-JavaScript measurement, the two gates (`SameSite`, Chrome CORB rules quoted exactly), live shapes (JS-typed per-user responses, JSONP, MIME confusion without `nosniff`), the dead pre-ES5 shapes, a two-tester-account probe; ownership table against `hunt-xs-leaks`, `hunt-cors` and `hunt-session` | SOME, same origin method execution, callback parameter, JSONP reflection, window.opener, COOP, XSSI, cross-site script inclusion, dynamic JavaScript leak, CORB, nosniff, content sniffing leak, JSON security prefix |
+| `csp-bypass-depth.md` | `'strict-dynamic'` (host allowlist ignored, parser-inserted versus `createElement`, script gadgets, CSP1/2/3 compatibility trap) and Trusted Types as the kill; nonce reuse and nonce theft (nonce hiding, `<meta>` CSP leak, cached nonces, reflected nonces); `base-uri` omission with no `default-src` fallback; JSONP on allowlisted origins; Chrome disk-cache/bfcache-to-XSS including the `Cache-Control: no-store` bfcache change that invalidates older PoCs | strict-dynamic, script gadget, code reuse attack, CSP bypass, nonce reuse, nonce theft, nonce hiding, meta CSP, base-uri, base tag injection, JSONP allowlist, require-trusted-types-for, trusted types, bfcache, disk cache, notRestoredReasons, browser cache to XSS |
 
 ---
 
@@ -484,13 +495,3 @@ Extends the OOB gate and Gate 0 above, and governs every payload in this skill, 
 - **`hunt-browser-extension`:** owns XSS inside an extension context (extension pages, content scripts, the enforced MV3 CSP). A payload that only executes in the extension's own origin belongs there.
 - **`hunt-electron`:** owns XSS-to-OS escalation in desktop apps. Once script execution in an Electron renderer is confirmed, the escalation to `require('child_process')` or a preload bridge is that skill's.
 - **`hunt-html-injection`:** owns raw-HTML injection that does not execute script, including an inert `<template>` echoed back with nothing firing.
-
----
-
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `shadow-dom-and-modern-sinks.md` | Shadow DOM as a sink context: open versus closed roots, declarative shadow DOM browser support, why `innerHTML` is safe against it while `setHTMLUnsafe`/`parseHTMLUnsafe` are not, live-DOM sanitizer returns (`IN_PLACE`/`RETURN_DOM`), DOMPurify's documented closed-root limit, `attachShadow` hooking, the `slotchange` gadget; WASM linear-memory template overwrite and why source-to-sink analysis misses it, with read-only memory-recon helpers; the markdown-renderer delta (sanitize-then-render ordering, mXSS in the final DOM, `<base>` rewriting, CVE-2025-54075) | shadow DOM, shadow root, closed shadow root, declarative shadow DOM, shadowrootmode, setHTMLUnsafe, parseHTMLUnsafe, web component XSS, DOMPurify RETURN_DOM, slotchange, WebAssembly XSS, WASM linear memory, HEAPU8, Emscripten, template overwrite, markdown renderer XSS, mXSS |
-| `callback-and-script-inclusion.md` | SOME (Same Origin Method Execution): the five-step opener chain, callback character restrictions, what COOP does to it, and a non-state-changing proof bar; XSSI: the 2015 dynamic-JavaScript measurement, the two gates (`SameSite`, Chrome CORB rules quoted exactly), live shapes (JS-typed per-user responses, JSONP, MIME confusion without `nosniff`), the dead pre-ES5 shapes, a two-tester-account probe; ownership table against `hunt-xs-leaks`, `hunt-cors` and `hunt-session` | SOME, same origin method execution, callback parameter, JSONP reflection, window.opener, COOP, XSSI, cross-site script inclusion, dynamic JavaScript leak, CORB, nosniff, content sniffing leak, JSON security prefix |
-| `csp-bypass-depth.md` | `'strict-dynamic'` (host allowlist ignored, parser-inserted versus `createElement`, script gadgets, CSP1/2/3 compatibility trap) and Trusted Types as the kill; nonce reuse and nonce theft (nonce hiding, `<meta>` CSP leak, cached nonces, reflected nonces); `base-uri` omission with no `default-src` fallback; JSONP on allowlisted origins; Chrome disk-cache/bfcache-to-XSS including the `Cache-Control: no-store` bfcache change that invalidates older PoCs | strict-dynamic, script gadget, code reuse attack, CSP bypass, nonce reuse, nonce theft, nonce hiding, meta CSP, base-uri, base tag injection, JSONP allowlist, require-trusted-types-for, trusted types, bfcache, disk cache, notRestoredReasons, browser cache to XSS |

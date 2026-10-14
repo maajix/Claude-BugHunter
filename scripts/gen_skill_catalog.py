@@ -28,9 +28,9 @@ GROUPS = [
     ("External infrastructure — ports and services", lambda n: n.startswith("infra-")),
     ("Recon & OSINT", lambda n: "osint" in n or "recon" in n or n == "security-arsenal"),
     ("Methodology & mindset", lambda n: n in {
-        "bb-methodology", "bug-bounty", "bb-local-toolkit", "redteam-mindset",
-        # Tooling, like bb-local-toolkit: turns a confirmed finding into a
-        # repeatable check rather than teaching a vuln class.
+        "bb-methodology", "bug-bounty", "redteam-mindset",
+        # Tooling: turns a confirmed finding into a repeatable check rather than
+        # teaching a vuln class.
         "nuclei-template-forge"}),
     ("Reporting & validation", lambda n: n in {
         "report-writing", "triage-validation", "bugcrowd-reporting", "evidence-hygiene",
@@ -49,7 +49,7 @@ def parse_frontmatter(path):
     for i in range(1, len(lines)):
         if lines[i].strip() == "---":
             break
-        m = re.match(r"^(name|description|report_count):\s*(.*)$", lines[i])
+        m = re.match(r"^\s*(name|description|report_count):\s*(.*)$", lines[i])
         if m:
             k, v = m.group(1), m.group(2).strip()
             if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":

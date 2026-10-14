@@ -1,8 +1,9 @@
 ---
 name: hunt-nextjs
 description: Hunt Next.js specific vulnerabilities — React2Shell RSC Flight deserialization RCE (CVE-2025-55182), Server Actions arbitrary function execution, Middleware auth bypass via static asset paths, ISR cache poisoning, Image Optimization SSRF (/_next/image), RSC payload leakage, getServerSideProps injection, source map exposure, debug endpoint leakage, 2025-2026 security-release version gates. Use when target runs Next.js 13/14/15/16 or any React SSR framework.
-sources: "cve_database (CVE-2024-34351 / GHSA-fr5h-rqp8-mj6g, CVE-2025-55182 / GHSA-9qr9-h5gf-34mp), Next.js advisories and security releases (Dec 2025, Aug 2026, Sep 2026), GTIG + Datadog Security Labs React2Shell write-ups"
-report_count: 0
+metadata:
+  sources: "cve_database (CVE-2024-34351 / GHSA-fr5h-rqp8-mj6g, CVE-2025-55182 / GHSA-9qr9-h5gf-34mp), Next.js advisories and security releases (Dec 2025, Aug 2026, Sep 2026), GTIG + Datadog Security Labs React2Shell write-ups"
+  report_count: 0
 ---
 
 # HUNT-NEXTJS — Next.js / SSR Framework Vulnerabilities

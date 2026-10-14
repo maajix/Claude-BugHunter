@@ -1,8 +1,9 @@
 ---
 name: hunt-payment-api
 description: "Hunt vulnerabilities in payment and billing APIs, where the defect lives in the merchant's wrapper code and in what it accepts back from the PSP rather than in the provider's own API. Covers webhook and IPN verification (no signature, empty-key HMAC, algorithm fail-open, raw body versus re-serialized body, replay with no event-id dedup, authentic event with a swapped order reference, status versus payment_status confusion), acceptance of provider-returned authentication state (3-D Secure transStatus U or N treated as Y, dropped CAVV, client-settable SCA exemption and off-session flags), minor-unit and zero-decimal currency confusion at the PSP seam, authorize/capture/void/refund orderings the happy path never visits, fulfilment on a non-terminal async rail state, idempotency-key contract breaks, payout destination binding and ledger asymmetry. Use when a target exposes checkout, payment-intent, invoice, subscription, refund, payout, webhook or IPN endpoints. Everything that moves money is sandbox-only."
-sources: okf_payment_api_notes, github_security_advisories, stripe_docs, adyen_docs, razorpay_docs, paypal_docs, emv_3ds_220_spec_mirror, emvco_3ds_2311_announcement, owasp_asvs_5
-report_count: 9
+metadata:
+  sources: okf_payment_api_notes, github_security_advisories, stripe_docs, adyen_docs, razorpay_docs, paypal_docs, emv_3ds_220_spec_mirror, emvco_3ds_2311_announcement, owasp_asvs_5
+  report_count: 9
 ---
 
 ## Crown Jewel Targets

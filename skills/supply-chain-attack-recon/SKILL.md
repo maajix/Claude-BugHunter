@@ -1,8 +1,9 @@
 ---
 name: supply-chain-attack-recon
 description: External recon for software supply-chain attack surface — package-namespace squatting candidates, dependency-confusion vulnerabilities, GitHub Actions injection openings, container image registry exposure, SBOM mining, internal-package-name leakage, and CI/CD configuration exposure. Reconnaissance and identification ONLY — actual package publishing / typosquat attacks are EXTERNAL-OFFENSIVE and require explicit written sign-off because they can affect the entire npm/PyPI ecosystem. Use when the target has a public GitHub org, when their build artifacts/SBOMs are reachable, when their docker images are on Docker Hub/GHCR, or when you find internal package names in their JS bundles.
-sources: alex-birsan-dependency-confusion, supply-chain-research, github-actions-security, cisa-advisories, mandiant-tag, github-security-blog, snyk-research
-report_count: 12
+metadata:
+  sources: alex-birsan-dependency-confusion, supply-chain-research, github-actions-security, cisa-advisories, mandiant-tag, github-security-blog, snyk-research
+  report_count: 12
 ---
 
 ## When to use
@@ -177,7 +178,7 @@ for candidate in ...; do
 done
 ```
 
-**⚠ EXTERNAL-OFFENSIVE NOTE:** publishing a typosquat package to a public registry is an attack on the wider ecosystem. NEVER do this without explicit, written, scope-clarified sign-off. It can affect users outside your engagement and may be illegal.
+**⚠ EXTERNAL-OFFENSIVE NOTE:** publishing a typosquat package to a public registry is an attack on the wider ecosystem. Do not do this without explicit, written, scope-clarified sign-off. It can affect users outside your engagement and may be illegal.
 
 ---
 
@@ -593,7 +594,7 @@ Twelve well-documented public cases, mapped to the recon surface above. Each ent
   - Snyk colourama / pytagora analysis: https://snyk.io/blog/malicious-packages-found-to-be-typo-squatting-in-pypi/
   - Phylum 2024 typosquat report: https://blog.phylum.io/the-state-of-the-software-supply-chain/
   - Sonatype 2024 State of the Software Supply Chain (>700K malicious packages found): https://www.sonatype.com/state-of-the-software-supply-chain/
-- **Recon takeaway:** Step 5 of the skill (typosquat candidate generation) maps directly here. For external recon, you LIST candidate typosquat names — you NEVER publish unless explicitly authorized. The deliverable is "these 17 typosquat variants of your top deps are currently unclaimed; recommendation: register them defensively."
+- **Recon takeaway:** Step 5 of the skill (typosquat candidate generation) maps directly here. For external recon, you LIST candidate typosquat names — you never publish unless explicitly authorized. The deliverable is "these 17 typosquat variants of your top deps are currently unclaimed; recommendation: register them defensively."
 
 ### 11. Alex Birsan dependency-confusion disclosure (Feb 2021)
 

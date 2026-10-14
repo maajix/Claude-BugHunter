@@ -1,8 +1,9 @@
 ---
 name: cloud-iam-deep
 description: External cloud IAM post-credential analysis. Recon yields a credential (key, JSON, token) and you need to prove it is live with one read-only identity call, learn what it grants, and map escalation without executing it. AWS (sts get-caller-identity, STS/AssumeRole chaining, 24+ IAM privesc patterns, IMDSv1/v2 via SSRF, Cognito Identity Pool unauthenticated role), Azure (az login, RBAC, Managed Identity tokens), GCP (service account JSON, impersonation chains), K8s ServiceAccount token privileges once held (exposure is owned by hunt-k8s). Also second-tier clouds (DigitalOcean dop_v1, Hetzner, OVHcloud, Linode, Vultr, Scaleway SCW, Alibaba LTAI, Oracle OCI, IBM Cloud, Cloudflare cfut_/cfat_ tokens, Backblaze B2) and IaC/CI federation (Terraform Cloud atlasv1 tokens, Pulumi pul- tokens, GitHub OIDC sub-claim trusts in AWS roles, GCP Workload Identity Federation, Azure federated credentials). Use when a cloud key, token or SA JSON surfaces from a repo, JS bundle, APK, CI log, tfstate or SSRF chain.
-sources: aws-iam-docs, azure-rbac-docs, gcp-iam-docs, provider-api-docs, gitleaks-rules, github-secret-scanning-docs, hackingthe.cloud, pacu, peirates, prowler, rhinosecuritylabs_research, hackerone_public
-report_count: 6
+metadata:
+  sources: aws-iam-docs, azure-rbac-docs, gcp-iam-docs, provider-api-docs, gitleaks-rules, github-secret-scanning-docs, hackingthe.cloud, pacu, peirates, prowler, rhinosecuritylabs_research, hackerone_public
+  report_count: 6
 ---
 
 ## When to use
@@ -22,6 +23,18 @@ Do NOT use for:
 - Web2 vulns that happen to be on AWS — use the relevant `hunt-*` skill
 - Firebase / Supabase backend rules and Cognito User Pool flows: `hunt-cloud-backends`
 - Finding the credential in the first place: `hunt-source-leak`, `hunt-cicd`, `hunt-cloud-misconfig`, `apk-redteam-pipeline`
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/aws.md` | AWS privesc table, STS / cross-account chaining (Stage B gate), IMDSv1/v2 with 2023-2026 defaults, Cognito Identity Pool unauth chain | iam privesc, passrole, assume role, confused deputy, imdsv2, httptokens, cognito identity pool |
+| `references/azure.md` | Managed Identity token endpoints (VM IMDS, App Service), Metadata Security Protocol, Azure privesc table | managed identity, msi token, identity_endpoint, imds azure, runcommand, roleassignments write |
+| `references/gcp.md` | GCP privesc table with secure-by-default notes, metadata-server token path | serviceaccountkeys create, actas, getaccesstoken, metadata-flavor, cloud build sa |
+| `references/second-tier-providers.md` | DigitalOcean, Hetzner Cloud, OVHcloud, Linode/Akamai, Vultr, Scaleway, Alibaba Cloud, Oracle OCI, IBM Cloud, Cloudflare, Backblaze B2 | dop_v1, hcloud_token, ovh consumer key, linode token, vultr api key, scw access key, ltai, oci config, ibm api key, cfut_, cfat_, b2 application key |
+| `references/iac-state-and-ci-tokens.md` | HCP Terraform / TFE and Pulumi tokens, GitHub/GitLab/HCP Terraform OIDC trusts in AWS, GCP WIF, Azure federated credentials | atlasv1, tf_token, pul-, oidc sub claim, token.actions.githubusercontent.com, workload identity federation, federated credential |
 
 ---
 
@@ -340,18 +353,6 @@ Cloud activity is trivially auditable; the client WILL find it post-engagement. 
 ## AWS Cognito Identity Pool — Unauthenticated-Role Attack Chain (2024-2026 surface)
 
 Moved verbatim to `references/aws.md` (discovery regexes, `GetId` → `GetCredentialsForIdentity` → `sts get-caller-identity`, permission enumeration, severity rubric, disclosed cases, reporting tip). The 60-second test is unchanged: if `GetId → GetCredentialsForIdentity → sts get-caller-identity` succeeds anonymously, you have a finding. Cognito User Pool and other BaaS backends: `hunt-cloud-backends`.
-
----
-
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/aws.md` | AWS privesc table, STS / cross-account chaining (Stage B gate), IMDSv1/v2 with 2023-2026 defaults, Cognito Identity Pool unauth chain | iam privesc, passrole, assume role, confused deputy, imdsv2, httptokens, cognito identity pool |
-| `references/azure.md` | Managed Identity token endpoints (VM IMDS, App Service), Metadata Security Protocol, Azure privesc table | managed identity, msi token, identity_endpoint, imds azure, runcommand, roleassignments write |
-| `references/gcp.md` | GCP privesc table with secure-by-default notes, metadata-server token path | serviceaccountkeys create, actas, getaccesstoken, metadata-flavor, cloud build sa |
-| `references/second-tier-providers.md` | DigitalOcean, Hetzner Cloud, OVHcloud, Linode/Akamai, Vultr, Scaleway, Alibaba Cloud, Oracle OCI, IBM Cloud, Cloudflare, Backblaze B2 | dop_v1, hcloud_token, ovh consumer key, linode token, vultr api key, scw access key, ltai, oci config, ibm api key, cfut_, cfat_, b2 application key |
-| `references/iac-state-and-ci-tokens.md` | HCP Terraform / TFE and Pulumi tokens, GitHub/GitLab/HCP Terraform OIDC trusts in AWS, GCP WIF, Azure federated credentials | atlasv1, tf_token, pul-, oidc sub claim, token.actions.githubusercontent.com, workload identity federation, federated credential |
 
 ---
 

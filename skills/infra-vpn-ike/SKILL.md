@@ -1,8 +1,9 @@
 ---
 name: infra-vpn-ike
 description: "Triage internet-exposed non-SSL VPN and tunnel endpoints: IKE/IPsec on port 500/udp and NAT-T 4500/udp, L2TP 1701/udp, PPTP 1723/tcp with GRE, OpenVPN 1194 and OpenVPN on 443, WireGuard 51820/udp, SSTP, SoftEther, Tailscale DERP, Headscale and ZeroTier 9993. Covers ike-scan main-mode fingerprinting, vendor ID payloads, backoff fingerprinting, transform enumeration, IKEv1 aggressive mode with a pre-shared key (PSK) returning a crackable hash, weak transforms (DES, 3DES, MD5, DH group 1 and 2) graded against RFC 8247, IKEv2 probing, PPTP and L2TP-without-IPsec exposure, OpenVPN without tls-auth or tls-crypt, and version gates for strongSwan, Libreswan, OpenVPN, SoftEther and the IKE side of Cisco ASA/FTD, FortiOS and PAN-OS. Stage A read-only by default; group-name enumeration, PSK cracking, XAUTH or EAP attempts, DoS-class checks and tunnel establishment are Stage B with written sign-off. Use when a scan shows 500, 4500, 1701, 1723 or 1194 open on an in-scope host, or ike-scan output needs grading."
-sources: nvd, vendor_advisories, rfc, project_documentation, tool_source_code, public_research
-report_count: 0
+metadata:
+  sources: nvd, vendor_advisories, rfc, project_documentation, tool_source_code, public_research
+  report_count: 0
 ---
 
 ## When to use
@@ -51,6 +52,16 @@ tunnel into the client network is an internal-network position, which
   is `hunt-brute-force`'s territory and Stage B here.
 - **Leaked VPN configs and keys** found in repos or bundles belong to
   `hunt-source-leak`. This skill only grades what the leak exposes.
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/ike-transforms.md` | IKEv1 attribute values for `--trans`, the bounded transform list, RFC 8247 and RFC 9395 grading, IKEv2 default proposal and notify codes, vendor ID and backoff notes | ike transform enumeration, weak ike ciphers, dh group 2, des md5 ike, rfc 8247, no-proposal-chosen, invalid ke payload |
+| `references/other-tunnels.md` | SSTP fingerprint, SoftEther, Tailscale DERP and Headscale, ZeroTier management API | sstp vpn, softether exposed, tailscale derp, headscale exposed, zerotier 9993 |
+| `references/vpn-cve-matrix.md` | strongSwan, Libreswan, OpenVPN, SoftEther, Cisco ASA/FTD IKEv2, FortiOS IKE, PAN-OS IKEv2 CVEs 2024-2026, with pre-auth, confirmability and stage, plus placement of non-IKE CVEs | strongswan cve, libreswan cve, openvpn cve, softether cve, cisco ikev2 dos, fortios ike, pan-os ikev2, check point 24919 placement |
 
 ---
 
@@ -463,13 +474,7 @@ a stored secret. No cracked key in clear, no tunnel traffic, no client lists.
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/ike-transforms.md` | IKEv1 attribute values for `--trans`, the bounded transform list, RFC 8247 and RFC 9395 grading, IKEv2 default proposal and notify codes, vendor ID and backoff notes | ike transform enumeration, weak ike ciphers, dh group 2, des md5 ike, rfc 8247, no-proposal-chosen, invalid ke payload |
-| `references/other-tunnels.md` | SSTP fingerprint, SoftEther, Tailscale DERP and Headscale, ZeroTier management API | sstp vpn, softether exposed, tailscale derp, headscale exposed, zerotier 9993 |
-| `references/vpn-cve-matrix.md` | strongSwan, Libreswan, OpenVPN, SoftEther, Cisco ASA/FTD IKEv2, FortiOS IKE, PAN-OS IKEv2 CVEs 2024-2026, with pre-auth, confirmability and stage, plus placement of non-IKE CVEs | strongswan cve, libreswan cve, openvpn cve, softether cve, cisco ikev2 dos, fortios ike, pan-os ikev2, check point 24919 placement |
+## Sources
 
 External sources used:
 

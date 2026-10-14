@@ -2,7 +2,8 @@ name: doc-count-check
 
 # Keeps skill/command counts in docs honest against what's actually on disk.
 # Catches stale numbers (e.g. "71 SKILL.md files" after the bundle grew to 82)
-# before they merge. No external dependencies — stdlib Python only.
+# before they merge, and fails when the generated docs/skills.md or
+# cbh/data/skill_index.json lag behind skills/. No external dependencies.
 
 on:
   pull_request:
@@ -17,6 +18,9 @@ on:
       - "docs/credits.md"
       - "docs/architecture.md"
       - "scripts/check_doc_counts.py"
+      - "scripts/gen_skill_catalog.py"
+      - "scripts/gen_skill_index.py"
+      - "cbh/data/skill_index.json"
       - ".github/workflows/doc-count-check.yml"
   push:
     branches: [main]
@@ -24,6 +28,8 @@ on:
       - "skills/**"
       - "commands/**"
       - "scripts/check_doc_counts.py"
+      - "scripts/gen_skill_catalog.py"
+      - "scripts/gen_skill_index.py"
   workflow_dispatch:
 
 permissions:
@@ -42,3 +48,11 @@ jobs:
 
       - name: Verify skill/command counts in docs match disk
         run: python3 scripts/check_doc_counts.py
+
+      - name: Regenerate the skill catalog and index
+        run: |
+          python3 scripts/gen_skill_catalog.py
+          python3 scripts/gen_skill_index.py
+
+      - name: Fail if docs/skills.md or cbh/data/skill_index.json is stale
+        run: git diff --exit-code -- docs/skills.md cbh/data/skill_index.json

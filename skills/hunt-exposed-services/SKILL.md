@@ -1,8 +1,9 @@
 ---
 name: hunt-exposed-services
 description: "Triage internet-exposed non-HTTP services and management interfaces: a port answering from the public internet that belonged behind a firewall or VPN. Covers Redis 6379, MongoDB 27017, Elasticsearch 9200, Kibana 5601, CouchDB 5984, InfluxDB 8086, memcached 11211, PostgreSQL 5432, MySQL 3306, Oracle TNS 1521, HSQLDB 9001, RabbitMQ 15672, AMQP 5672, MQTT 1883/8883, NATS 4222, IBM MQ 1414, EPMD 4369, Java RMI 1099, JDWP, AJP 8009, FastCGI 9000, ADB 5555, distcc 3632, X11 6000, VNC 5900, SNMP 161/udp, IPMI BMC 623/udp, WinRM and OMI 5985/5986, LDAP 389/636, Telnet 23, rlogin/rsh 512-514, TFTP 69/udp, rsync 873, NFS 2049, iSCSI 3260, GlusterFS 24007, IPP 631, PJL 9100, RTSP 554/8554, Modbus 502, BACnet 47808/udp, EtherNet/IP 44818, OPC UA 4840, Cisco Smart Install 4786, SAProuter 3299, NDMP 10000. Stage A read-only detection by default, state-changing probes gated on written sign-off. Use when a port scan shows a non-HTTP port open on an in-scope external host."
-sources: hacktricks_coverage_checklist, nvd, vendor_advisories, cisa_kev, project_documentation, rfc, authorized-engagement
-report_count: 0
+metadata:
+  sources: hacktricks_coverage_checklist, nvd, vendor_advisories, cisa_kev, project_documentation, rfc, authorized-engagement
+  report_count: 0
 ---
 
 ## When to use
@@ -65,6 +66,20 @@ port-to-skill routing table. Appliance management planes already have owners:
 SSL VPN and remote-access gateways in `enterprise-vpn-attack`, vCenter and
 Workspace ONE in `vmware-vcenter-attack`, Kubernetes API/kubelet/etcd and
 Docker in `hunt-k8s`, cloud-managed service exposure in `hunt-cloud-misconfig`.
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `databases.md` | Redis 6379, MongoDB 27017, Elasticsearch 9200, Kibana 5601, CouchDB 5984, InfluxDB 8086, memcached 11211, Cassandra 9042, PostgreSQL 5432, MySQL 3306, Oracle TNS 1521, HSQLDB 9001, splunkd 8089, Hadoop 9870 and 8088 | exposed redis, open mongodb, elasticsearch no auth, couchdb admin party, influxdb auth bypass, memcached dump, oracle tns listener, exposed postgres, hadoop yarn exposed |
+| `message-brokers.md` | AMQP 5672, RabbitMQ management 15672, MQTT 1883/8883, NATS 4222/8222, IBM MQ 1414, Erlang EPMD 4369 | exposed mqtt broker, mosquitto anonymous, rabbitmq guest guest, nats no auth, amqp exposed, ibm mq channel, epmd erlang cookie |
+| `remote-debug.md` | Java RMI 1099, JDWP, AJP 8009 Ghostcat, FastCGI 9000, X11 6000-6005, distcc 3632, ADB 5555, gdbserver | exposed jdwp, java debug wire protocol, android debug bridge internet, adb 5555, ghostcat ajp, java rmi registry, distcc exposed, x11 no access control, fastcgi exposed |
+| `management-interfaces.md` | IPMI/BMC 623/udp, SNMP 161/162, WinRM and OMI 5985/5986, VNC 5900-5906, LDAP 389/636/3268, Check Point FW-1 264, Cisco Smart Install 4786, Cisco SD-WAN 12346/udp, SAProuter 3299, Veeam B&R 9401, NDMP 10000 | exposed ipmi, bmc internet facing, cipher zero, rakp hash, snmp public community, exposed winrm, omigod, vnc no password, anonymous ldap bind, cisco smart install, saprouter exposed, veeam backup exposed, ndmp 10000 |
+| `industrial-and-iot.md` | Modbus 502, BACnet/IP 47808/udp, EtherNet/IP 44818, OPC UA 4840, DNP3 20000, RTSP 554/8554, PPPP/CS2 cameras 32100/udp | exposed plc, modbus internet, bacnet exposed, ethernet ip 44818, opc ua anonymous, scada exposed, ics exposure, exposed rtsp camera, ip camera internet, pppp p2p camera |
+| `printers-and-storage.md` | IPP/CUPS 631, raw PJL 9100, LPD 515, TFTP 69/udp, rsync 873, NFS 2049, rpcbind 111, iSCSI 3260, GlusterFS 24007, SVN 3690, AFP 548 | exposed printer, cups exposed, jetdirect 9100, open tftp, rsync module anonymous, nfs export world readable, iscsi target exposed, glusterfs exposed, svnserve exposed |
+| `legacy-and-infoleak.md` | Telnet 23, rexec/rlogin/rsh 512-514, finger 79, ident 113, rusersd 1026, echo 7, NTP 123/udp, SOCKS 1080, Squid 3128, SIP 5060, mDNS 5353/udp, WS-Discovery 3702/udp | exposed telnet, rsh rlogin exposed, finger service, ntp monlist amplification, open proxy, open socks proxy, squid open proxy, exposed sip, mdns leak, ws-discovery exposed |
 
 ---
 
@@ -363,17 +378,7 @@ Clear every line before filing. Each one has produced a withdrawn report.
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `databases.md` | Redis 6379, MongoDB 27017, Elasticsearch 9200, Kibana 5601, CouchDB 5984, InfluxDB 8086, memcached 11211, Cassandra 9042, PostgreSQL 5432, MySQL 3306, Oracle TNS 1521, HSQLDB 9001, splunkd 8089, Hadoop 9870 and 8088 | exposed redis, open mongodb, elasticsearch no auth, couchdb admin party, influxdb auth bypass, memcached dump, oracle tns listener, exposed postgres, hadoop yarn exposed |
-| `message-brokers.md` | AMQP 5672, RabbitMQ management 15672, MQTT 1883/8883, NATS 4222/8222, IBM MQ 1414, Erlang EPMD 4369 | exposed mqtt broker, mosquitto anonymous, rabbitmq guest guest, nats no auth, amqp exposed, ibm mq channel, epmd erlang cookie |
-| `remote-debug.md` | Java RMI 1099, JDWP, AJP 8009 Ghostcat, FastCGI 9000, X11 6000-6005, distcc 3632, ADB 5555, gdbserver | exposed jdwp, java debug wire protocol, android debug bridge internet, adb 5555, ghostcat ajp, java rmi registry, distcc exposed, x11 no access control, fastcgi exposed |
-| `management-interfaces.md` | IPMI/BMC 623/udp, SNMP 161/162, WinRM and OMI 5985/5986, VNC 5900-5906, LDAP 389/636/3268, Check Point FW-1 264, Cisco Smart Install 4786, Cisco SD-WAN 12346/udp, SAProuter 3299, Veeam B&R 9401, NDMP 10000 | exposed ipmi, bmc internet facing, cipher zero, rakp hash, snmp public community, exposed winrm, omigod, vnc no password, anonymous ldap bind, cisco smart install, saprouter exposed, veeam backup exposed, ndmp 10000 |
-| `industrial-and-iot.md` | Modbus 502, BACnet/IP 47808/udp, EtherNet/IP 44818, OPC UA 4840, DNP3 20000, RTSP 554/8554, PPPP/CS2 cameras 32100/udp | exposed plc, modbus internet, bacnet exposed, ethernet ip 44818, opc ua anonymous, scada exposed, ics exposure, exposed rtsp camera, ip camera internet, pppp p2p camera |
-| `printers-and-storage.md` | IPP/CUPS 631, raw PJL 9100, LPD 515, TFTP 69/udp, rsync 873, NFS 2049, rpcbind 111, iSCSI 3260, GlusterFS 24007, SVN 3690, AFP 548 | exposed printer, cups exposed, jetdirect 9100, open tftp, rsync module anonymous, nfs export world readable, iscsi target exposed, glusterfs exposed, svnserve exposed |
-| `legacy-and-infoleak.md` | Telnet 23, rexec/rlogin/rsh 512-514, finger 79, ident 113, rusersd 1026, echo 7, NTP 123/udp, SOCKS 1080, Squid 3128, SIP 5060, mDNS 5353/udp, WS-Discovery 3702/udp | exposed telnet, rsh rlogin exposed, finger service, ntp monlist amplification, open proxy, open socks proxy, squid open proxy, exposed sip, mdns leak, ws-discovery exposed |
+## Sources
 
 Attribution: the service and port coverage list was checked against the
 HackTricks network-services-pentesting section

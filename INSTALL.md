@@ -58,9 +58,11 @@ pwsh ./scripts/install.ps1
 > script aborts with a `syntax error` and cannot fix itself.
 
 This copies:
-- All 112 skills → `~/.claude/skills/` (macOS/Linux) or `%USERPROFILE%\.claude\skills\` (Windows)
+- All 111 skills → `~/.claude/skills/` (macOS/Linux) or `%USERPROFILE%\.claude\skills\` (Windows)
 - All 15 slash commands → `~/.claude/commands/`
 - The `hunt` scaffolder → `~/.claude/scripts/hunt.sh` (sourced from your `.zshrc`/`.bashrc`) on macOS/Linux, or `~\.claude\scripts\hunt.ps1` (dot-sourced from your PowerShell `$PROFILE`) on Windows
+
+The request-ceiling guard (`hooks/throttle-guard.py`) is not part of the copy install: the plugin install wires it through `hooks/hooks.json`, a copy install adds the `PreToolUse` block to `~/.claude/settings.json` as shown in [docs/rate-limiting.md](docs/rate-limiting.md#where-the-guard-runs).
 
 Existing skills with the same name are backed up to `~/.claude/install-backups/<timestamp>/` — **outside** the skills/commands directories, so backups never load as duplicate skills. Re-runs are non-destructive.
 

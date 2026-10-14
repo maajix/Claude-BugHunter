@@ -1,8 +1,9 @@
 ---
 name: hunt-mobile-ios
 description: "MASVS v2 and MASTG aligned iOS app pentest for an authorized tester holding the IPA and a test device (jailbroken, developer-signed build on a stock device, or Corellium). Organised by control group. STORAGE: NSUserDefaults, plists, Core Data, SQLite, Realm, Keychain accessibility classes, NSFileProtection, backups, pasteboard, app-switcher snapshots, os_log, NSURLCache and WKWebView caches. PLATFORM: URL schemes, Universal Links and AASA, extensions, widgets, App Clips, WKWebView JavaScript bridges, custom keyboards, App Intents, Handoff, CloudKit. AUTH: LAContext bypass versus Keychain-bound biometrics, token storage, ASWebAuthenticationSession redirect capture, passkeys. NETWORK: ATS exceptions, pinning in URLSession, Alamofire and TrustKit, proxy-unaware apps. RESILIENCE: jailbreak, Frida and debugger detection and how programs grade them. Each control has a procedure, evidence and a Bugcrowd VRT grade. Use when an iOS app is in scope and ios-redteam-pipeline has produced a decrypted IPA."
-sources: owasp_masvs, owasp_mastg, apple_developer_docs, bugcrowd_vrt, hackerone_docs, project_documentation, public_research
-report_count: 0
+metadata:
+  sources: owasp_masvs, owasp_mastg, apple_developer_docs, bugcrowd_vrt, hackerone_docs, project_documentation, public_research
+  report_count: 0
 ---
 
 ## When to use
@@ -61,6 +62,19 @@ or getting code onto a device you do not own. `SECURITY.md` applies.
 | Server TLS configuration and certificates | `hunt-tls-network` |
 | Secret regex catalogues | `hunt-source-leak`, `offensive-osint/references/secret-patterns.md` |
 | Takeover of a domain listed in `applinks:` or used as a redirect URI | `hunt-subdomain` |
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/storage.md` | Container pull, canary grep, UserDefaults, plists, Core Data, SQLite WAL, Realm, Keychain classes and access control, NSFileProtection, backups, pasteboard, snapshots, logs, keyboard cache, caches, crypto keys, iOS 17 to 27 notes | keychain dump, data protection, nsfileprotection, ios backup, pasteboard, app switcher screenshot, os_log, cache.db |
+| `references/platform.md` | URL schemes, Universal Links and AASA, extensions, App Groups, widgets, App Clips, WKWebView and UIWebView, JS bridges, file loading, keyboards, App Intents, Handoff, iCloud and CloudKit | deep link, url scheme, universal link, aasa, wkwebview, messagehandlers, app extension, cloudkit |
+| `references/auth-and-session.md` | LAContext versus kSecAccessControl, token storage, session revocation, ASWebAuthenticationSession, custom-scheme redirect capture, PKCE, passkeys, request signing | face id bypass, biometrics_bypass, lacontext, aswebauthenticationsession, redirect capture, passkey |
+| `references/network.md` | Burp CA on iOS 17+, proxy-unaware apps, certificate-validation test, ATS exception grading, pinning detection in URLSession, Alamofire, TrustKit | burp ios, ats exception, certificate pinning, ssl kill switch, proxy unaware, quic |
+| `references/resilience.md` | Jailbreak, Frida, debugger and virtual-device detection, anti-tamper, App Attest, symbols, obfuscation, exploit mitigations, program grading | jailbreak detection, frida detection, anti-debug, app attest, obfuscation, binary hardening |
+| `references/tooling.md` | Versions checked 2026-10-14, Frida 16 vs 17, objection 1.12.5 syntax, ipsw, class-dump, jailbreak matrix, TrollStore, sideloading and signing limits, MobSF, Corellium, pymobiledevice3 | frida version, objection start, palera1n, dopamine, trollstore, sideloadly, corellium, mobsf |
 
 ---
 
@@ -408,16 +422,7 @@ meant for others. Cite the Stage B sign-off for any backend write.
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/storage.md` | Container pull, canary grep, UserDefaults, plists, Core Data, SQLite WAL, Realm, Keychain classes and access control, NSFileProtection, backups, pasteboard, snapshots, logs, keyboard cache, caches, crypto keys, iOS 17 to 27 notes | keychain dump, data protection, nsfileprotection, ios backup, pasteboard, app switcher screenshot, os_log, cache.db |
-| `references/platform.md` | URL schemes, Universal Links and AASA, extensions, App Groups, widgets, App Clips, WKWebView and UIWebView, JS bridges, file loading, keyboards, App Intents, Handoff, iCloud and CloudKit | deep link, url scheme, universal link, aasa, wkwebview, messagehandlers, app extension, cloudkit |
-| `references/auth-and-session.md` | LAContext versus kSecAccessControl, token storage, session revocation, ASWebAuthenticationSession, custom-scheme redirect capture, PKCE, passkeys, request signing | face id bypass, biometrics_bypass, lacontext, aswebauthenticationsession, redirect capture, passkey |
-| `references/network.md` | Burp CA on iOS 17+, proxy-unaware apps, certificate-validation test, ATS exception grading, pinning detection in URLSession, Alamofire, TrustKit | burp ios, ats exception, certificate pinning, ssl kill switch, proxy unaware, quic |
-| `references/resilience.md` | Jailbreak, Frida, debugger and virtual-device detection, anti-tamper, App Attest, symbols, obfuscation, exploit mitigations, program grading | jailbreak detection, frida detection, anti-debug, app attest, obfuscation, binary hardening |
-| `references/tooling.md` | Versions checked 2026-10-14, Frida 16 vs 17, objection 1.12.5 syntax, ipsw, class-dump, jailbreak matrix, TrollStore, sideloading and signing limits, MobSF, Corellium, pymobiledevice3 | frida version, objection start, palera1n, dopamine, trollstore, sideloadly, corellium, mobsf |
+## Sources
 
 External sources (checked October 2026): OWASP MASVS <https://mas.owasp.org/MASVS/>,
 MASTG tests <https://github.com/OWASP/mastg/tree/master/tests-beta/ios>,

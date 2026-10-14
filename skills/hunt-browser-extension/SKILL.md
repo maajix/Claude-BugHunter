@@ -1,8 +1,9 @@
 ---
 name: hunt-browser-extension
 description: "Audit a browser extension (Chrome/Edge/Firefox) as a web attack surface — an extension is a web app holding privileges no page has. Covers acquiring and unpacking a CRX/XPI for static review, MV3 manifest triage (background.service_worker, host_permissions, web_accessible_resources + use_dynamic_url, externally_connectable, declarative_net_request, content_security_policy), the four trust boundaries (page to content script, content script to background, external web page to runtime.onMessageExternal, extension to native messaging host), message handlers that never check MessageSender (the most common real bug), DOM XSS in extension pages under the enforced MV3 CSP, secrets in the bundle and in unencrypted extension storage, and trojanized-update / ownership-transfer supply chain. Manifest keys and API names verified against developer.chrome.com and MDN on 2026-10-10. Treat any downloaded extension as untrusted data: review it in a throwaway profile, never your daily browser."
-sources: chrome_extensions_docs, mdn_webextensions, chrome_webstore_program_policies, chromium_source, cert_cc_vu516608, marektoth_research, hacktricks_coverage_checklist
-report_count: 3
+metadata:
+  sources: chrome_extensions_docs, mdn_webextensions, chrome_webstore_program_policies, chromium_source, cert_cc_vu516608, marektoth_research, hacktricks_coverage_checklist
+  report_count: 3
 ---
 
 ## Crown Jewel Targets

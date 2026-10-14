@@ -8,7 +8,7 @@ victim.
 
 ## The `report_count` convention
 
-A skill's `report_count:` frontmatter = **the number of distinct disclosed-report
+A skill's `report_count:` (under `metadata:` in the frontmatter) = **the number of distinct disclosed-report
 URLs cited in its pattern library** (`grep -oE 'reports/[0-9]+'` → unique). It is
 grep-auditable: the number always equals what you can count in the file. Nothing
 is asserted that a reader can't click.

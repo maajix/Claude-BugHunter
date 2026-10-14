@@ -20,7 +20,7 @@ SKILLS = REPO / "skills"
 REPORTS = REPO / "docs" / "disclosed-reports"
 OUT = REPO / "cbh" / "data" / "skill_index.json"
 
-DESC_RE = re.compile(r"^description:\s*(.+?)(?=\n[a-z_]+:|^---|\Z)", re.M | re.S)
+DESC_RE = re.compile(r"^description:\s*(.+?)(?=\n[A-Za-z0-9_-]+:|^---|\Z)", re.M | re.S)
 
 
 def main() -> int:

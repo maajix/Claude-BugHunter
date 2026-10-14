@@ -10,7 +10,7 @@
 #   - scripts\hunt.ps1 -> ~\.claude\scripts\hunt.ps1 + dot-sourced from
 #                         the PowerShell profile ($PROFILE) automatically
 #
-# MULTI-HARNESS FLAGS (skills only — the 112 SKILL.md files. Slash commands,
+# MULTI-HARNESS FLAGS (skills only — the 111 SKILL.md files. Slash commands,
 # the plugin marketplace, and the /hunt engine are Claude-Code-specific and do
 # NOT port; other harnesses get the knowledge, not the orchestration):
 #   -Agents        force-copy skills -> ~\.agents\skills\  (Codex; OpenCode reads ~\.claude)
@@ -24,7 +24,7 @@
 #   -BurpMcp       wire your existing Burp MCP server into the selected harnesses'
 #                  configs (opt-in; backs up each config first; uses python)
 #   -NormalizeFrontmatter
-#                  strip non-standard keys (sources/report_count) from the NON-Claude
+#                  strip the metadata: block (sources/report_count/version/triggers) from the NON-Claude
 #                  copies — only needed if a harness rejects unknown frontmatter keys
 #   -NoProfile     don't modify any PowerShell profile; just print the dot-source line
 #   -Uninstall     remove this bundle's footprint via the install manifest; skills a
@@ -336,8 +336,13 @@ for name in sorted(os.listdir(root)):
         continue
     lines = open(p, encoding='utf-8').read().split('\n')
     out, changed = [], False
+    state, in_meta = 0, False  # state 0 = before the frontmatter, 1 = inside it, 2 = body
     for i, line in enumerate(lines):
-        m = re.match(r'^description:\s*(.*)$', line) if i < 12 else None
+        if state < 2 and line.strip() == '---':
+            state += 1
+            out.append(line)
+            continue
+        m = re.match(r'^description:\s*(.*)$', line) if state == 1 else None
         if m:
             val = m.group(1)
             quoted = len(val) >= 2 and val[0] == val[-1] and val[0] in '"'"'"'"'
@@ -347,9 +352,10 @@ for name in sorted(os.listdir(root)):
                 line = 'description: "' + cut + '..."'
                 changed = True
                 print('    truncated ' + name + ' description ' + str(len(inner)) + '->' + str(len(cut)+1) + ' (Codex 1024 limit)')
-        if strip_extra and i < 12 and re.match(r'^(sources|report_count):\s', line):
-            changed = True
+        if strip_extra and state == 1 and (line.startswith('metadata:') or (in_meta and line[:1] in ' \t')):
+            in_meta = changed = True
             continue
+        in_meta = False
         out.append(line)
     if changed:
         open(p, 'w', encoding='utf-8').write('\n'.join(out))

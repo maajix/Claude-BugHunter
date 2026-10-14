@@ -1,8 +1,9 @@
 ---
 name: infra-mail
 description: "Test internet-exposed mail services at the protocol layer: SMTP port 25, submission 587, SMTPS 465, IMAP 143/993, POP3 110/995 and ManageSieve 4190, and the server software behind them (Postfix, Exim, Sendmail, Microsoft Exchange transport, Zimbra MTA, Dovecot, Courier, Cyrus, hMailServer, MailEnable, Kerio, IceWarp). Covers open relay with the correct direction matrix, user enumeration via VRFY, EXPN and RCPT TO, STARTTLS not offered, cleartext AUTH PLAIN/LOGIN, STARTTLS command injection, SMTP smuggling (CVE-2023-51764/51765/51766 and the 2026 follow-ups), banner and EHLO version gates against KEV CVEs, NTLM leaks via AUTH NTLM, and MTA-STS, TLS-RPT and DANE transport policy. Stage A is read-only: banner, EHLO, one VRFY pair, DNS. Anything that sends a message, enumerates at scale, uses a credential or risks a crash is Stage B behind written sign-off. Use when a scan shows a mail port open on an in-scope host, or an MX record points at client-owned infrastructure."
-sources: rfc, nvd, cisa_kev, vendor_advisories, cert_cc, sec_consult_research, usenix_research, project_documentation, nmap_nse_source
-report_count: 0
+metadata:
+  sources: rfc, nvd, cisa_kev, vendor_advisories, cert_cc, sec_consult_research, usenix_research, project_documentation, nmap_nse_source
+  report_count: 0
 ---
 
 ## When to use
@@ -47,6 +48,16 @@ described, evidence captured**. Concretely:
 | Password spraying IMAP, POP3 or SMTP AUTH | `hunt-brute-force` |
 | SMTP header injection from a web form | `hunt-misc` |
 | Mail-borne attachment or calendar exploits (Zimbra amavis cpio CVE-2022-41352, ICS XSS CVE-2025-27915) | Nobody. Sending a weaponised message to a real user is not a protocol test and is not done. Version-gate only. |
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/open-relay-matrix.md` | Direction matrix, nmap's 16 encodings, submission and authenticated relay, confirmation and grading | open relay, relay test, smtp-open-relay, relay access denied, percent hack, source route |
+| `references/mta-cve-matrix.md` | Postfix, Exim, Sendmail, OpenSMTPD, Exchange transport, Zimbra MTA, Dovecot and the smaller Windows servers; KEV flags; version observability | exim cve, postfix cve, sendmail smuggling, zimbra postjournal, dovecot dos, exchange smtp cve, kev mail server |
+| `references/transport-security.md` | STARTTLS absent, cleartext AUTH, STARTTLS command injection, MTA-STS, TLS-RPT, DANE | starttls, cleartext auth, mta-sts, tls-rpt, dane tlsa, smtp tls policy |
 
 ---
 
@@ -459,13 +470,7 @@ with its `Received:` chain and token, the sign-off reference, AUTH lines redacte
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/open-relay-matrix.md` | Direction matrix, nmap's 16 encodings, submission and authenticated relay, confirmation and grading | open relay, relay test, smtp-open-relay, relay access denied, percent hack, source route |
-| `references/mta-cve-matrix.md` | Postfix, Exim, Sendmail, OpenSMTPD, Exchange transport, Zimbra MTA, Dovecot and the smaller Windows servers; KEV flags; version observability | exim cve, postfix cve, sendmail smuggling, zimbra postjournal, dovecot dos, exchange smtp cve, kev mail server |
-| `references/transport-security.md` | STARTTLS absent, cleartext AUTH, STARTTLS command injection, MTA-STS, TLS-RPT, DANE | starttls, cleartext auth, mta-sts, tls-rpt, dane tlsa, smtp tls policy |
+## Sources
 
 External sources (checked October 2026): SEC Consult smuggling
 <https://sec-consult.com/blog/detail/smtp-smuggling-spoofing-e-mails-worldwide/>,

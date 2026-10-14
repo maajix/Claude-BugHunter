@@ -1,8 +1,9 @@
 ---
 name: infra-monitoring-logging
 description: "Triage internet-exposed monitoring, metrics, logging and tracing services and their agent and ingest protocols: Zabbix agent/agent 2 (10050) and trapper (10051), NRPE 5666, NSClient++ 8443/12489, Icinga 2 API 5665, Checkmk agent 6556, Prometheus exporters (node 9100, blackbox, snmp), Alertmanager 9093, Pushgateway 9091, Graphite 2003/2004, StatsD 8125/8126, Loki 3100, Jaeger 16686, OpenTelemetry Collector 4317/4318, Graylog 9000 and GELF 12201, Logstash 5044/9600, Fluentd 24224/24220, Fluent Bit 2020, Elastic APM 8200, Sentry self-hosted, Netdata API 19999, syslog and SNMP trap receivers, plus NMS consoles (PRTG, SolarWinds Orion and Web Help Desk, Nagios XI, Cacti, LibreNMS, Observium) with a KEV-tagged CVE matrix. The finding is what unauthenticated access leaks (internal hostnames and IPs, credentials in labels and configs, an agent that answers anyone) or a KEV version gate. Stage A only reads; writing metrics or logs, triggering checks and remote commands need Stage B sign-off."
-sources: nvd, cisa_kev, cve_org, vendor_advisories, github_security_advisories, project_documentation, project_source_code, bugcrowd_vrt
-report_count: 0
+metadata:
+  sources: nvd, cisa_kev, cve_org, vendor_advisories, github_security_advisories, project_documentation, project_source_code, bugcrowd_vrt
+  report_count: 0
 ---
 
 ## When to use
@@ -53,6 +54,17 @@ Write it up and stop. Stage B (Step 6) allows one signed-off proof per finding.
 - Exploiting SSRF found through blackbox or snmp exporters beyond one canary:
   `hunt-ssrf`. Sentry integration SSRF: `hunt-misc`. syslog-ng config injection:
   `hunt-rce`.
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/agent-protocols.md` | Zabbix ZBXD framing, passive and active checks, trapper, `zabbix.stats`, AllowKey/DenyKey and autoregistration; NRPE `_NRPE_CHECK`; NSClient++ defaults; Icinga 2 API and certificates; Checkmk agent 6556, agent receiver, mknotifyd; SNMP trap receivers; agent-side CVE rows | zabbix agent 10050 exposed, zabbix trapper 10051, zabbix_get agent.version, system.run allowkey, nrpe 5666 open, check_nrpe version, nsclient 8443, icinga 5665 api, checkmk 6556 agent output, cve-2024-49369 |
+| `references/metrics-and-tracing.md` | node, blackbox and snmp exporters; Alertmanager; Pushgateway; Graphite/Carbon; StatsD admin; Loki; Jaeger; OpenTelemetry Collector (OTLP, zpages, health); Netdata API; CVE rows | node_exporter 9100 exposed, blackbox probe ssrf, alertmanager api v2 status, pushgateway exposed, graphite 2003, statsd 8126 admin, loki 3100 no auth, x-scope-orgid, jaeger 16686 services, otlp 4318 exposed, zpages, netdata api info |
+| `references/log-ingest.md` | Graylog API and GELF; Logstash 5044/9600; Fluentd forward, monitor agent, debug agent, RPC; Fluent Bit HTTP server; Elastic APM 8200; Sentry self-hosted; Splunk HEC fingerprint; syslog fingerprint rows; CVE rows | graylog 9000 api, gelf 12201, logstash 9600 api, fluentd 24220 monitor agent, fluentd 24224 forward, fluent bit 2020, cve-2024-4323, apm server 8200 secret token, sentry self-hosted version, syslog 514 exposed, splunk hec 8088 |
+| `references/cve-matrix.md` | All in-scope KEV rows; NMS console fingerprints and shipped credentials; CVE tables for SolarWinds Orion and Web Help Desk, PRTG, Nagios XI/Core, Cacti, LibreNMS, Observium, Icinga Web 2; Grafana and Prometheus rows panels lacks; products with no CVE found | solarwinds web help desk cve, orion cve-2020-10148, prtg cve-2018-19410, nagios xi kev, cacti cve-2022-46169, librenms auth bypass, observium cve, icinga web 2 file read, grafana cve-2021-39226 kev |
 
 ---
 
@@ -361,14 +373,7 @@ leaked credential the same day.
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/agent-protocols.md` | Zabbix ZBXD framing, passive and active checks, trapper, `zabbix.stats`, AllowKey/DenyKey and autoregistration; NRPE `_NRPE_CHECK`; NSClient++ defaults; Icinga 2 API and certificates; Checkmk agent 6556, agent receiver, mknotifyd; SNMP trap receivers; agent-side CVE rows | zabbix agent 10050 exposed, zabbix trapper 10051, zabbix_get agent.version, system.run allowkey, nrpe 5666 open, check_nrpe version, nsclient 8443, icinga 5665 api, checkmk 6556 agent output, cve-2024-49369 |
-| `references/metrics-and-tracing.md` | node, blackbox and snmp exporters; Alertmanager; Pushgateway; Graphite/Carbon; StatsD admin; Loki; Jaeger; OpenTelemetry Collector (OTLP, zpages, health); Netdata API; CVE rows | node_exporter 9100 exposed, blackbox probe ssrf, alertmanager api v2 status, pushgateway exposed, graphite 2003, statsd 8126 admin, loki 3100 no auth, x-scope-orgid, jaeger 16686 services, otlp 4318 exposed, zpages, netdata api info |
-| `references/log-ingest.md` | Graylog API and GELF; Logstash 5044/9600; Fluentd forward, monitor agent, debug agent, RPC; Fluent Bit HTTP server; Elastic APM 8200; Sentry self-hosted; Splunk HEC fingerprint; syslog fingerprint rows; CVE rows | graylog 9000 api, gelf 12201, logstash 9600 api, fluentd 24220 monitor agent, fluentd 24224 forward, fluent bit 2020, cve-2024-4323, apm server 8200 secret token, sentry self-hosted version, syslog 514 exposed, splunk hec 8088 |
-| `references/cve-matrix.md` | All in-scope KEV rows; NMS console fingerprints and shipped credentials; CVE tables for SolarWinds Orion and Web Help Desk, PRTG, Nagios XI/Core, Cacti, LibreNMS, Observium, Icinga Web 2; Grafana and Prometheus rows panels lacks; products with no CVE found | solarwinds web help desk cve, orion cve-2020-10148, prtg cve-2018-19410, nagios xi kev, cacti cve-2022-46169, librenms auth bypass, observium cve, icinga web 2 file read, grafana cve-2021-39226 kev |
+## Sources
 
 Primary sources (fetched 2026-10-13):
 

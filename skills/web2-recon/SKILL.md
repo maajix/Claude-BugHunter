@@ -1,7 +1,8 @@
 ---
 name: web2-recon
 description: Web2 recon pipeline — subdomain enumeration (subfinder, Chaos API, assetfinder), live host discovery (dnsx, httpx), URL crawling (katana, waybackurls, gau), directory fuzzing (ffuf), JS analysis (LinkFinder, SecretFinder), continuous monitoring (new subdomain alerts, JS change detection, GitHub commit watch). Use when starting recon on any web2 target or when asked about asset discovery, subdomain enum, or attack surface mapping.
-sources: community, public_research
+metadata:
+  sources: community, public_research
 ---
 
 # WEB2 RECON PIPELINE

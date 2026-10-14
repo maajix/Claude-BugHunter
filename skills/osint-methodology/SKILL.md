@@ -1,66 +1,67 @@
 ---
 name: osint-methodology
-description: "Comprehensive OSINT methodology for external red-team operations and authorized attack-surface assessments. Covers the 5-stage recon pipeline (seed discovery, asset expansion, enrichment, exposure analysis, reporting), asset-graph discipline with 29 asset types, severity rubric (CRITICAL/HIGH/MEDIUM/LOW/INFO), confidence upgrade workflows, time budgeting, asset-level triage rules, scale-based tactics, identity-fabric mapping (Entra/Okta/ADFS/Google/SAML/M365 Teams+SharePoint+OAuth), API and auth-map methodology, JavaScript deep analysis, mobile attack surface, cloud attack surface, breach×identity correlation, detectability tagging, detection-aware probing (back-off, persona rotation), read-only validator discipline, WAF/CDN bypass + origin discovery, vulnerability prioritization (CVE/EPSS/KEV), phishing infrastructure planning + pretext development, bug bounty submission templates, client deliverable templates with risk translation, threat-actor investigation (incl. RU/CN pivots), cryptocurrency tracing, image/video forensics, chronolocation. Use when planning or executing reconnaissance against authorized targets, mapping an organization's external attack surface, investigating a person/entity, tracing crypto flows, geolocating media, or performing attribution work."
-sources: community, public_research
-version: 2.3
-triggers:
-  - external recon
-  - external red team
-  - red team external
-  - attack surface management
-  - attack surface mapping
-  - ASM
-  - perimeter recon
-  - target reconnaissance
-  - bug bounty recon
-  - asset discovery
-  - footprint
-  - attack path
-  - identity fabric
-  - SSO discovery
-  - IdP fingerprinting
-  - tenant fingerprinting
-  - M365 enumeration
-  - Microsoft 365 recon
-  - API discovery
-  - GraphQL introspection
-  - mobile recon
-  - APK analysis
-  - cloud bucket enumeration
-  - bucket enum
-  - breach correlation
-  - secret leak hunt
-  - origin discovery
-  - CDN bypass
-  - WAF bypass
-  - vulnerability prioritization
-  - CVE prioritization
-  - EPSS
-  - CISA KEV
-  - phishing infrastructure
-  - pretext development
-  - bug bounty submission
-  - responsible disclosure
-  - client report
-  - exec summary
-  - risk translation
-  - confidence upgrade
-  - time budget
-  - engagement profile
-  - asset triage
-  - detection-aware probing
-  - back-off strategy
-  - persona rotation
-  - OSINT methodology
-  - open source intelligence
-  - target profiling
-  - data correlation
-  - OSINT workflow
-  - intelligence collection
-  - OSINT campaign
-  - recon methodology
-  - threat actor investigation
-  - attribution
+description: "Comprehensive OSINT methodology for external red-team operations and authorized attack-surface assessments. Covers the 5-stage recon pipeline (seed discovery, asset expansion, enrichment, exposure analysis, reporting), asset-graph discipline with 29 asset types, severity rubric, time budgeting, triage rules, identity-fabric mapping (Entra/Okta/ADFS/Google/SAML/M365), API and auth-map methodology, JavaScript deep analysis, mobile and cloud attack surface, breach-identity correlation, detection-aware probing, read-only validator discipline, WAF/CDN bypass and origin discovery, vulnerability prioritization (CVE/EPSS/KEV), phishing infrastructure planning, bug bounty and client templates, threat-actor investigation, cryptocurrency tracing, image/video forensics, chronolocation. Use when planning or executing reconnaissance against authorized targets, mapping an organization's external attack surface, investigating a person or entity, tracing crypto flows, geolocating media, or performing attribution work."
+metadata:
+  sources: community, public_research
+  version: 2.3
+  triggers:
+    - external recon
+    - external red team
+    - red team external
+    - attack surface management
+    - attack surface mapping
+    - ASM
+    - perimeter recon
+    - target reconnaissance
+    - bug bounty recon
+    - asset discovery
+    - footprint
+    - attack path
+    - identity fabric
+    - SSO discovery
+    - IdP fingerprinting
+    - tenant fingerprinting
+    - M365 enumeration
+    - Microsoft 365 recon
+    - API discovery
+    - GraphQL introspection
+    - mobile recon
+    - APK analysis
+    - cloud bucket enumeration
+    - bucket enum
+    - breach correlation
+    - secret leak hunt
+    - origin discovery
+    - CDN bypass
+    - WAF bypass
+    - vulnerability prioritization
+    - CVE prioritization
+    - EPSS
+    - CISA KEV
+    - phishing infrastructure
+    - pretext development
+    - bug bounty submission
+    - responsible disclosure
+    - client report
+    - exec summary
+    - risk translation
+    - confidence upgrade
+    - time budget
+    - engagement profile
+    - asset triage
+    - detection-aware probing
+    - back-off strategy
+    - persona rotation
+    - OSINT methodology
+    - open source intelligence
+    - target profiling
+    - data correlation
+    - OSINT workflow
+    - intelligence collection
+    - OSINT campaign
+    - recon methodology
+    - threat actor investigation
+    - attribution
 ---
 
 # OSINT Methodology — External Red-Team Edition
@@ -1109,7 +1110,7 @@ This is the highest-ROI single technique for external red teams. Execute it on e
 
 ### 22.3 SSO_EXPOSURE correlation
 
-After Stage 3 has run identity-fabric mapping AND breach lookups have completed: for every discovered IdP tenant, intersect with breach corpus on the tenant's domain. Non-empty intersection → `SSO_EXPOSURE` finding, severity **CRITICAL**. Evidence: tenant ID + product + employee count + per-account source attribution.
+After Stage 3 has run identity-fabric mapping and breach lookups have completed: for every discovered IdP tenant, intersect with breach corpus on the tenant's domain. Non-empty intersection → `SSO_EXPOSURE` finding, severity **CRITICAL**. Evidence: tenant ID + product + employee count + per-account source attribution.
 
 ### 22.4 Operational handling of stealer logs
 

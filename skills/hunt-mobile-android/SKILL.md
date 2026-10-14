@@ -1,8 +1,9 @@
 ---
 name: hunt-mobile-android
 description: "Android app pentest methodology aligned to OWASP MASVS v2.1.0 and MASTG v2.0.0, for an authorized tester with the APK and a test device. Structured by MASVS groups: STORAGE (SharedPreferences, SQLite/Room/Realm, external storage, allowBackup and Auto Backup, logcat, FLAG_SECURE, clipboard, Keystore attestation); PLATFORM (exported components, intent redirection, PendingIntent mutability, content-provider path traversal and SQL injection, WebView addJavascriptInterface, deep links and App Links, tapjacking, task hijacking/StrandHogg); AUTH (BiometricPrompt without CryptoObject, local-auth bypass with Frida, token storage, OAuth custom-scheme capture); NETWORK (Network Security Config, cleartext, certificate pinning and bypass); CODE and RESILIENCE (root/Frida detection, obfuscation). Covers Android 15/16/17 changes and Bugcrowd VRT severity. Use when an Android app is in scope and the APK is in hand; starts where apk-redteam-pipeline ends. iOS and Flutter belong to hunt-mobile-ios and hunt-mobile-frameworks."
-sources: owasp_masvs, owasp_mastg, android_developers_docs, android_source_docs, bugcrowd_vrt, hackerone_docs, tool_documentation, public_research
-report_count: 0
+metadata:
+  sources: owasp_masvs, owasp_mastg, android_developers_docs, android_source_docs, bugcrowd_vrt, hackerone_docs, tool_documentation, public_research
+  report_count: 0
 ---
 
 ## When to use
@@ -60,6 +61,19 @@ impact described, evidence captured**:
 | gRPC and WebSocket backends | `hunt-grpc`, `hunt-websocket` |
 | Web clickjacking (frames, X-Frame-Options) | `hunt-clickjacking` |
 | Cloud keys found in the APK | `cloud-iam-deep` |
+---
+
+## References index
+
+| File | Covers | Trigger phrases |
+|---|---|---|
+| `references/storage.md` | sandbox, SharedPreferences/DataStore, SQLite/Room/Realm, external storage, backups (allowBackup, adb backup, Auto Backup, bmgr), logcat, FLAG_SECURE, clipboard, Keystore and attestation, Android 15/16/17 storage changes | shared_prefs, allowBackup, dataExtractionRules, logcat, FLAG_SECURE, clipboard, keystore, key attestation |
+| `references/ipc-and-platform.md` | exported components, intent redirection, PendingIntent, implicit intents, content provider traversal and SQLi, WebView bridges/file access/URL loading, deep links and App Links, tapjacking, task hijacking, drozer/am | exported activity, intent redirection, content provider, addJavascriptInterface, deep link, assetlinks, tapjacking, strandhogg |
+| `references/auth-and-session.md` | BiometricPrompt and CryptoObject, local-auth bypass, token storage, session handling on device, OAuth redirect capture, autofill | biometricprompt, cryptoobject, fingerprint bypass, token storage, custom scheme, pkce, autofill |
+| `references/network.md` | Network Security Config, cleartext, pinning and bypass, proxy-unaware apps, WebSocket/gRPC transport | network security config, cleartext, certificate pinning, objection sslpinning, apk-mitm, flutter proxy |
+| `references/resilience.md` | root/Frida/debugger/emulator detection, anti-tamper, obfuscation, debuggable, Play Integrity | rootbeer, play integrity, frida detection, obfuscation, anti-tamper, debuggable |
+| `references/tooling.md` | jadx, apktool, Frida 16/17, objection, MobSF, drozer, emulator images, Burp CA on Android 14+, rooting | jadx, apktool, frida 17, objection, mobsf, drozer, writable-system, conscrypt apex, magisk |
+
 ---
 
 ## Rate and safety posture
@@ -203,17 +217,6 @@ the latest Android release. Public program policies commonly add:
 | Bugs needing a malicious app on the victim's device | Many programs reject this threat model; others accept it when the app needs zero permissions. Read the policy first |
 | Bugs only on Android versions the program does not support | Reproduce on the minimum supported version the policy names |
 
-
-## References index
-
-| File | Covers | Trigger phrases |
-|---|---|---|
-| `references/storage.md` | sandbox, SharedPreferences/DataStore, SQLite/Room/Realm, external storage, backups (allowBackup, adb backup, Auto Backup, bmgr), logcat, FLAG_SECURE, clipboard, Keystore and attestation, Android 15/16/17 storage changes | shared_prefs, allowBackup, dataExtractionRules, logcat, FLAG_SECURE, clipboard, keystore, key attestation |
-| `references/ipc-and-platform.md` | exported components, intent redirection, PendingIntent, implicit intents, content provider traversal and SQLi, WebView bridges/file access/URL loading, deep links and App Links, tapjacking, task hijacking, drozer/am | exported activity, intent redirection, content provider, addJavascriptInterface, deep link, assetlinks, tapjacking, strandhogg |
-| `references/auth-and-session.md` | BiometricPrompt and CryptoObject, local-auth bypass, token storage, session handling on device, OAuth redirect capture, autofill | biometricprompt, cryptoobject, fingerprint bypass, token storage, custom scheme, pkce, autofill |
-| `references/network.md` | Network Security Config, cleartext, pinning and bypass, proxy-unaware apps, WebSocket/gRPC transport | network security config, cleartext, certificate pinning, objection sslpinning, apk-mitm, flutter proxy |
-| `references/resilience.md` | root/Frida/debugger/emulator detection, anti-tamper, obfuscation, debuggable, Play Integrity | rootbeer, play integrity, frida detection, obfuscation, anti-tamper, debuggable |
-| `references/tooling.md` | jadx, apktool, Frida 16/17, objection, MobSF, drozer, emulator images, Burp CA on Android 14+, rooting | jadx, apktool, frida 17, objection, mobsf, drozer, writable-system, conscrypt apex, magisk |
 
 ## Sources
 

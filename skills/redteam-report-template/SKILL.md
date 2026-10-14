@@ -1,8 +1,9 @@
 ---
 name: redteam-report-template
 description: Client-facing red-team deliverable format — codifies the Subject / Observations / Description / Impact / Recommendation / PoC structure used for external red-team engagements (not bug-bounty platform reports). Different audience, different tone, different cadence. Built from an authorized engagement deliverable where 14 findings were packaged into a 52KB MD + 2.2MB DOCX with 16 embedded screenshots. Use when the engagement is "external red team for an enterprise client" (not H1/Bugcrowd/Intigriti), when generating the final report, when the client has specified a custom report format, or when packaging findings into DOCX/PDF.
-sources: authorized-engagement-deliverable, enterprise-redteam-report-conventions
-report_count: 1
+metadata:
+  sources: authorized-engagement-deliverable, enterprise-redteam-report-conventions
+  report_count: 1
 ---
 
 ## When to use
@@ -110,7 +111,7 @@ Good: "Read access to 247,000 customer records including PAN cards, addresses, G
 Recon notes (subdomains found, ports open, technologies fingerprinted) belong in a separate **Recon / Attack Surface** appendix, not the findings list. A finding must have an attacker-attainable outcome.
 
 ### 5. Don't bury the PoC
-Each finding MUST have reproducible steps. The PoC section is what proves the finding to a skeptical reader. If you can't write the PoC clearly, the finding probably isn't ready to ship.
+Each finding needs reproducible steps. The PoC section is what proves the finding to a skeptical reader. If you can't write the PoC clearly, the finding probably isn't ready to ship.
 
 ---
 

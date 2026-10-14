@@ -37,7 +37,36 @@ versioning is loosely [SemVer](https://semver.org/) at the bundle level.
   subdomain-takeover provider status, Frida and Android 14+ CA paths, Burp
   single-packet attack wording, React2Shell and Livewire gates, SAML parser
   differentials, platform CVSS 4.0 policy dates, Redis probes reduced to `PING`.
-- Plugin version 2.3.0; skill count 112 (70 `hunt-*`).
+- Plugin version 2.3.0; skill count 111 (70 `hunt-*`); `pyproject.toml`,
+  `cbh.__version__` and the recon-manifest producer string now carry the same
+  version.
+- **Claude 5 model-switch guidance**: the README names the Opus 5 / Opus 5.5
+  (to Opus 4.8) and Sonnet 5.5 (to Sonnet 5) fallbacks, that content the model
+  reads can trigger them on its own, and the Cyber Verification Program status at
+  launch; the safeguards paragraph no longer says "block by default".
+- **Engine model default removed**: `engine/engine.py --model` and
+  `engine/agent.py run_agent()` inherit the claude CLI's configured model instead
+  of pinning `claude-sonnet-4-6`; `eval/` keeps its pins for reproducibility.
+- **References Index moved to the top** of the 28 reference-heavy skills so it
+  survives the post-compaction 5,000-token budget per loaded skill; sources and
+  lab notes stay at the old position under `## Sources`.
+- **Custom frontmatter keys under `metadata:`** (`sources`, `report_count`,
+  `version`, `triggers`) so the files pass claude.ai uploads and the Skills API;
+  `lint_skills.py` rejects any other top-level key; the installers'
+  `--normalize-frontmatter` strips the block.
+- An authorization frame line opens the 17 skills that had none; uppercase
+  emphasis calmed in six skills (severity labels untouched).
+- `bug-bounty` and `osint-methodology` descriptions trimmed to the 1,024-char
+  limit; the lint grandfather list is gone, so the limit is an error everywhere.
+- `hunt-dispatch` is `user-invocable: false`; credits and architecture agree on
+  81 original, 22 community and 8 vendored skills.
+- Docs: the throttle `PreToolUse` hook is wired by the plugin install only, with
+  the `settings.json` block for copy installs; CI fails when `docs/skills.md` or
+  `cbh/data/skill_index.json` is stale.
+
+### Removed
+- `bb-local-toolkit`: a byte-identical copy of `bug-bounty` (18.7k tokens, over
+  the description limit).
 
 ### Added (earlier, unreleased)
 - **A request ceiling and required headers, enforced in code** (`engine/throttle.py`,

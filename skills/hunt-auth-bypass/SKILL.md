@@ -1,9 +1,12 @@
 ---
 name: hunt-auth-bypass
 description: Hunting skill for auth bypass vulnerabilities. Built from 12 public bug bounty reports across SAML XSW / parser-differential (ruby-saml CVE-2025-25291/25292), SAML signature stripping (Uber, Rocket.Chat, samlify CVE-2025-47949), SAML domain enforcement bypass via control characters (HackerOne 2024), partner-portal cross-IdP assertion reuse (Slack), WordPress XMLRPC bypassing SSO (Uber), JWT alg-confusion HS256/RS256 (Jitsi), JWT signature-validation skip (Linktree, Newspack), and token-audience confusion (Argo CD CVE-2023-22482). For standalone JWT signature/crypto forging (alg:none, key confusion, kid/jku) see hunt-jwt-crypto; this skill covers JWT only inside SSO/SAML/token-trust bypass chains. SAML assertion-layer attacks (XSW, comment injection, signature stripping, XXE-in-assertion) are owned by hunt-saml; this skill owns the broader cross-protocol auth-bypass taxonomy. Use when hunting auth bypass — see the Legacy-Protocol Matrix for branded-UI vs legacy-endpoint patterns.
-sources: github, hackerone_public, github_security_lab, projectdiscovery_research
-report_count: 12
+metadata:
+  sources: github, hackerone_public, github_security_lab, projectdiscovery_research
+  report_count: 12
 ---
+
+> Authorized testing only: run this against assets you own or that a signed scope or a program's in-scope list names. It is a find-and-report methodology, not a weapon.
 
 ## Crown Jewel Targets
 
@@ -418,7 +421,7 @@ No Duende.BFF-direct CVE exists. The three classes are exploitable via real-worl
 
 Cross-references for the chain:
 - `hunt-csrf` — the role-partitioned antiforgery class (the CSRF angle on the same BFF surface).
-- `hunt-subdomain-takeover` / `hunt-subdomain` — required primitive for the cookie-domain attack.
+- `hunt-subdomain` / `hunt-subdomain` — required primitive for the cookie-domain attack.
 
 ---
 

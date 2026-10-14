@@ -21,14 +21,16 @@ ALLOWED_TOOLS = " ".join([
 ])
 
 
-def run_agent(task, skills_on=False, model="claude-sonnet-4-6", max_turns=40, timeout=600):
+def run_agent(task, skills_on=False, model=None, max_turns=40, timeout=600):
     # skills OFF by default: the eval showed they add ~0 capability but cost ~12-15k tokens/agent.
     cmd = ["claude", "-p", task,
            "--mcp-config", MCP_CONFIG, "--strict-mcp-config",
            "--permission-mode", "bypassPermissions",
            "--allowedTools", ALLOWED_TOOLS,
-           "--max-turns", str(max_turns), "--model", model,
+           "--max-turns", str(max_turns),
            "--output-format", "json"]
+    if model:  # None = whatever model the claude CLI is configured with
+        cmd += ["--model", model]
     if not skills_on:
         cmd.append("--disable-slash-commands")
     t0 = time.time()

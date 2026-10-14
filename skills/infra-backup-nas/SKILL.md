@@ -1,8 +1,9 @@
 ---
 name: infra-backup-nas
 description: "Triage internet-exposed backup servers, NAS appliances, object storage and file-sync platforms. Backup: Veeam Backup & Replication and Enterprise Manager (9392, 9401, 9380, 9443), Commvault (8400-8403), NetBackup (1556, 13724), Backup Exec, Bacula (9101-9103), Acronis Cyber Protect (9877), NAKIVO (4443), Arcserve UDP (8014/8015), Dell NetWorker and Avamar, Rubrik, Cohesity. NAS: QNAP, Synology DSM (5000/5001), TrueNAS, WD My Cloud, Asustor, Buffalo. Object storage: MinIO (9000/9001), Ceph RGW (7480), SeaweedFS. File sync: Nextcloud, ownCloud, Seafile, Syncthing (8384), FileCloud. Fingerprint and version-gate against a 2021-2026 CVE matrix with CISA KEV status (CVE-2024-40711, CVE-2025-34028, CVE-2024-48248, CVE-2023-28432, CVE-2023-49105, Qlocker, DeadBolt), anonymous bucket listing, unauthenticated admin GUIs. Stage A is read-only; any login, default credential, write or restore is Stage B with written sign-off. Use when a scan, certificate or title names one of these products on an in-scope host."
-sources: cisa_kev, nvd, cve_list_cna_records, vendor_advisories, vendor_documentation, project_documentation, researcher_writeups
-report_count: 0
+metadata:
+  sources: cisa_kev, nvd, cve_list_cna_records, vendor_advisories, vendor_documentation, project_documentation, researcher_writeups
+  report_count: 0
 ---
 
 ## When to use
@@ -54,6 +55,17 @@ described, evidence captured**. Concretely:
 | TLS posture on any of these ports | `hunt-tls-network` |
 | NTLM metadata from a Windows-hosted console | `hunt-ntlm-info` |
 | Anything after login, inside the network, or against Active Directory | Nobody. Out of scope by `SECURITY.md` |
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/backup-servers.md` | Veeam B&R, Enterprise Manager, VSPC; Commvault; NetBackup and Backup Exec; Bacula; Acronis Cyber Protect and Cyber Infrastructure; NAKIVO; Arcserve UDP; Dell NetWorker, Avamar, RecoverPoint for VMs; Rubrik; Cohesity. Ports, fingerprints, CVE/KEV matrix | veeam exposed, cve-2024-40711, cve-2023-27532, commvault command center, cve-2025-34028, nakivo 4443, arcserve udp, netbackup pbx 1556, backup exec ndmp, bacula 9101, acronis 9877, networker nsrexecd |
+| `references/nas-appliances.md` | QNAP QTS/QuTS hero and apps, Synology DSM and Photos, TrueNAS, WD My Cloud, Asustor ADM, Buffalo; ransom-note triage; owner routing for other NAS services | qnap exposed, qlocker, deadbolt, hbs 3, synology 5001, dsm cve, risk:station, truenas, my cloud cve, asustor adm |
+| `references/object-storage.md` | MinIO (incl. maintenance status, default root pair), Ceph RGW, SeaweedFS; anonymous listing and write rules | minio exposed, cve-2023-28432, minioadmin, s3 compatible bucket listing, ceph rgw 7480, radosgw, seaweedfs 9333 |
+| `references/file-sync.md` | Nextcloud, ownCloud (KEV rows), Seafile, Syncthing (unauthenticated GUI), FileCloud | owncloud graphapi, cve-2023-49105, nextcloud status.php, seafile, syncthing 8384 exposed, filecloud |
 
 ---
 
@@ -394,14 +406,7 @@ there should be none. For a canary, record its key so the client can remove it.
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/backup-servers.md` | Veeam B&R, Enterprise Manager, VSPC; Commvault; NetBackup and Backup Exec; Bacula; Acronis Cyber Protect and Cyber Infrastructure; NAKIVO; Arcserve UDP; Dell NetWorker, Avamar, RecoverPoint for VMs; Rubrik; Cohesity. Ports, fingerprints, CVE/KEV matrix | veeam exposed, cve-2024-40711, cve-2023-27532, commvault command center, cve-2025-34028, nakivo 4443, arcserve udp, netbackup pbx 1556, backup exec ndmp, bacula 9101, acronis 9877, networker nsrexecd |
-| `references/nas-appliances.md` | QNAP QTS/QuTS hero and apps, Synology DSM and Photos, TrueNAS, WD My Cloud, Asustor ADM, Buffalo; ransom-note triage; owner routing for other NAS services | qnap exposed, qlocker, deadbolt, hbs 3, synology 5001, dsm cve, risk:station, truenas, my cloud cve, asustor adm |
-| `references/object-storage.md` | MinIO (incl. maintenance status, default root pair), Ceph RGW, SeaweedFS; anonymous listing and write rules | minio exposed, cve-2023-28432, minioadmin, s3 compatible bucket listing, ceph rgw 7480, radosgw, seaweedfs 9333 |
-| `references/file-sync.md` | Nextcloud, ownCloud (KEV rows), Seafile, Syncthing (unauthenticated GUI), FileCloud | owncloud graphapi, cve-2023-49105, nextcloud status.php, seafile, syncthing 8384 exposed, filecloud |
+## Sources
 
 Primary sources (fetched 2026-10-13):
 

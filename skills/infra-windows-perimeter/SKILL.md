@@ -1,8 +1,9 @@
 ---
 name: infra-windows-perimeter
 description: "Triage Windows and Active Directory services answering from the public internet: SMB port 445, NetBIOS 137/138/139, MSRPC 135 and dynamic RPC 49152+, RDP 3389, Kerberos 88, CLDAP 389/udp, MSSQL 1433 and SQL Browser 1434/udp. The finding is the exposure plus what unauthenticated read-only enumeration proves: SMBv1 and dialects, SMB signing not required, null session and guest share listing, hostname, domain and OS build leaked by SMB, RDP and MSSQL NTLMSSP or the RDP certificate, NLA state, a reachable KDC, CLDAP domain disclosure, SQL Server version and instances. KEV pre-auth CVEs (EternalBlue MS17-010, BlueKeep, SMBGhost, MS08-067) are graded by version gate and read-only checks only. Stage B needs written sign-off: intrusive NSE scripts, one sa attempt, Kerberos checks on client test accounts. No Kerberoasting, AS-REP roasting, spraying, relay, Responder, pass-the-hash or exploitation. Use when a scan shows 445, 3389, 88, 135 or 1433 open on an in-scope external host."
-sources: msrc_update_guide, microsoft_learn, cisa_kev, nvd, nmap_script_source, impacket_source, metasploit_source, netexec_source, project_documentation
-report_count: 0
+metadata:
+  sources: msrc_update_guide, microsoft_learn, cisa_kev, nvd, nmap_script_source, impacket_source, metasploit_source, netexec_source, project_documentation
+  report_count: 0
 ---
 
 ## When to use
@@ -74,6 +75,15 @@ None of these is unlocked by sign-off. They are outside the bundle.
 | Windows DNS Server on 53 | `infra-dns` |
 | Any credential attempt | `hunt-brute-force` |
 | TLS protocol or cipher findings on 3389, 1433, 636 | `hunt-tls-network` |
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/enumeration-commands.md` | Stage A and gated Stage B commands per service: SMB/NetBIOS, MSRPC, RDP (NLA and certificate script), Kerberos, CLDAP, MSSQL; expected output and how to read it | null session, smbclient anonymous, smb signing not required, smbv1 enabled, rpcdump endpoint mapper, rdp nla check, rdp certificate cn, cldap ping, ldap rootdse udp, kdc reachable, ms-sql-info, sql browser 1434, nbstat |
+| `references/windows-service-cve-matrix.md` | KEV and recent pre-auth CVEs for SMB, RDP, MSRPC, Kerberos, MSSQL, Samba, with the observable gate, NTLMSSP build-to-OS table, RD Gateway and KDC Proxy cross-reference rows | eternalblue, ms17-010, bluekeep, smbghost, ms08-067, cve-2026-69525, rd gateway cve, kdc proxy, zerologon, sambacry, windows build number |
 
 ---
 
@@ -426,12 +436,7 @@ Follow `evidence-hygiene` and `hunt-exposed-services` Step 7. Windows specifics:
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/enumeration-commands.md` | Stage A and gated Stage B commands per service: SMB/NetBIOS, MSRPC, RDP (NLA and certificate script), Kerberos, CLDAP, MSSQL; expected output and how to read it | null session, smbclient anonymous, smb signing not required, smbv1 enabled, rpcdump endpoint mapper, rdp nla check, rdp certificate cn, cldap ping, ldap rootdse udp, kdc reachable, ms-sql-info, sql browser 1434, nbstat |
-| `references/windows-service-cve-matrix.md` | KEV and recent pre-auth CVEs for SMB, RDP, MSRPC, Kerberos, MSSQL, Samba, with the observable gate, NTLMSSP build-to-OS table, RD Gateway and KDC Proxy cross-reference rows | eternalblue, ms17-010, bluekeep, smbghost, ms08-067, cve-2026-69525, rd gateway cve, kdc proxy, zerologon, sambacry, windows build number |
+## Sources
 
 External sources this skill was checked against (2026-10-13):
 

@@ -1,8 +1,9 @@
 ---
 name: hunt-misc
 description: Hunting skill for misc vulnerabilities. Built from 225 public bug bounty reports. Use when hunting misc on any target.
-sources: github, hackerone_public, rfc_5322, python_email_docs
-report_count: 225
+metadata:
+  sources: github, hackerone_public, rfc_5322, python_email_docs
+  report_count: 225
 ---
 
 ## Crown Jewel Targets

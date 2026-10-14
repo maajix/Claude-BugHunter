@@ -1,9 +1,12 @@
 ---
 name: hunt-cache-poison
 description: Hunting skill for cache poison vulnerabilities. Built from 8 public bug bounty reports including X-Forwarded-Host poisoning, X-HTTP-Method-Override / GCS cache, reflected→stored XSS via cache, classic Omer-Gil Web Cache Deception, Cloudflare Cache Deception Armor bypass, session-token cache deception, Akamai hop-by-hop smuggling → server-side edge poisoning, Doyhenard's 2024 delimiter/normalization WCD and Cache-What-Where (Gotta cache 'em all), and Next.js internal cache poisoning (CVE-2024-46982). Host/X-Forwarded-Host injection that reaches app logic (reset-link poisoning, routing SSRF, OAuth issuer) is owned by hunt-host-header; this skill owns the case where the poisoned response is CACHED and served to other users. Use when hunting cache poisoning, Web Cache Deception, CDN-fronted apps.
-sources: github, hackerone_public, portswigger_research, omergil_research, youstin_research
-report_count: 8
+metadata:
+  sources: github, hackerone_public, portswigger_research, omergil_research, youstin_research
+  report_count: 8
 ---
+
+> Authorized testing only: run this against assets you own or that a signed scope or a program's in-scope list names. It is a find-and-report methodology, not a weapon.
 
 ## Crown Jewel Targets
 

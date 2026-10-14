@@ -1,8 +1,9 @@
 ---
 name: hunt-healthcare-fhir
 description: "Hunt authorization flaws in HL7 FHIR R4 healthcare APIs, where a token scoped to one patient reaches another patient's records. Covers CapabilityStatement and .well-known/smart-configuration recon, the Patient compartment as the real access-control boundary, cross-compartment reads via Patient/[id]/$everything, search chaining and reverse chaining with _has, _include and _revinclude as compartment-escape vectors, SMART on FHIR v1 and v2 scope semantics (patient/*.read versus patient/Observation.rs and the .cruds letters) and launch-context binding, and Bulk Data $export manifest and requiresAccessToken gaps. Read-only throughout: writes, Subscription creation and $export kick-off are Stage B and need written sign-off. Proof is an identifier you are not entitled to, or a status-code differential, with the body redacted. Use when testing an EHR, patient portal, health information exchange, telehealth API, or any /fhir/, /baseR4/, /R4/ or SMART-branded endpoint, on a sandbox or synthetic dataset."
-sources: hl7-fhir-r4-spec, hl7-patient-compartment-r4, hl7-smart-app-launch-v1, hl7-smart-app-launch-v2, hl7-bulk-data-access-ig, smart-health-it-sandbox, hapi-public-test-server, community-fork-draft
-report_count: 0
+metadata:
+  sources: hl7-fhir-r4-spec, hl7-patient-compartment-r4, hl7-smart-app-launch-v1, hl7-smart-app-launch-v2, hl7-bulk-data-access-ig, smart-health-it-sandbox, hapi-public-test-server, community-fork-draft
+  report_count: 0
 ---
 
 **Read this before the first request.** Healthcare records are special-category

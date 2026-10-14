@@ -37,7 +37,7 @@ PRs and issues welcome.
 
 ### Skill quality standards
 
-- **Frontmatter**: `name` (lowercase-hyphen-only) + `description` (≤ 1024 chars, weaves in trigger keywords as natural prose)
+- **Frontmatter**: `name` (lowercase-hyphen-only) + `description` (≤ 1024 chars, weaves in trigger keywords as natural prose). Grounding keys (`sources`, plus `report_count` for `hunt-*`) live under `metadata:`, the Agent Skills slot for custom keys; any other top-level key fails `lint_skills.py`.
 - **Body**: **max 500 lines** — this one is enforced (`lint_skills.py` warns above it).
   Word count is not enforced and the bundle's real spread is wide: median ~2,400,
   middle half 1,400–3,400, with reference-heavy skills far above. Write what the

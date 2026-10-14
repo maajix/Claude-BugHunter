@@ -2,7 +2,7 @@
 
 # claude-bughunter
 
-> A self-contained Claude skill bundle for bug hunting and external red-team work · **112 skills** · 15 slash commands · **681 disclosed-report patterns** (433 now individually cited & auditable) across 24 core vulnerability classes · enterprise identity + infrastructure attack matrices · engagement-folder scaffolding · Burp MCP integration · battle-tested across authorized red-team and bug-hunting engagements, plus public training platforms (DVWA, OWASP Juice Shop, Hacker101, testphp.vulnweb.com).
+> A self-contained Claude skill bundle for bug hunting and external red-team work · **111 skills** · 15 slash commands · **681 disclosed-report patterns** (433 now individually cited & auditable) across 24 core vulnerability classes · enterprise identity + infrastructure attack matrices · engagement-folder scaffolding · Burp MCP integration · battle-tested across authorized red-team and bug-hunting engagements, plus public training platforms (DVWA, OWASP Juice Shop, Hacker101, testphp.vulnweb.com).
 
 Built by **[Sachin Sharma](https://www.linkedin.com/in/sachinsharma8080/)** — Bug Hunting & GenAI Security Research.
 
@@ -50,7 +50,7 @@ All triggered automatically by topic — describe what you're testing in plain E
 /plugin install bughunter@maajix
 ```
 
-All 112 skills + 15 commands load namespaced under `bughunter:` and update when you bump the plugin version — no files copied into `~/.claude/`.
+All 111 skills + 15 commands load namespaced under `bughunter:` and update when you bump the plugin version — no files copied into `~/.claude/`.
 
 **Option B — copy install (no plugin system / pin to a clone):**
 
@@ -71,7 +71,7 @@ Both copy the skills + commands into `~/.claude/` (macOS/Linux) or `%USERPROFILE
 
 **What each install path gives you:**
 
-| Path | 112 skills + 15 slash commands | `cbh` CLI | `hunt` scaffolder |
+| Path | 111 skills + 15 slash commands | `cbh` CLI | `hunt` scaffolder |
 |---|---|---|---|
 | **A — plugin** | ✅ namespaced under `bughunter:` | ➕ separate `pipx install` | ❌ clone-only |
 | **B — copy install** | ✅ copied into `~/.claude/` | ✅ from the clone | ✅ from the clone |
@@ -173,7 +173,7 @@ If you're running an internal red team that includes domain-takeover chains via 
 
 ## What's inside
 
-**112 skills**, auto-loaded by topic — no invocation by name. Coverage across the external attack surface:
+**111 skills**, auto-loaded by topic — no invocation by name. Coverage across the external attack surface:
 
 | Category | # | Examples |
 |---|---|---|
@@ -182,7 +182,7 @@ If you're running an internal red team that includes domain-takeover chains via 
 | External infrastructure — ports and services ★ | 16 | infra-external-methodology (port-to-skill routing), SSH, FTP, mail, DNS servers, Windows perimeter (SMB/RDP/Kerberos/MSSQL), VoIP/SIP, IKE/IPsec and tunnel VPNs, network devices, RMM, backup/NAS, enterprise app servers, data platforms, AI/ML services, DevOps platforms, monitoring/logging |
 | Reporting & validation | 6 | triage-validation, evidence-hygiene, report-writing, bugcrowd-reporting |
 | Recon & OSINT | 5 | web2-recon, offensive-osint, osint-methodology, recon-scope-triage |
-| Methodology & mindset | 5 | bb-methodology, bug-bounty, redteam-mindset, bb-local-toolkit, nuclei-template-forge |
+| Methodology & mindset | 4 | bb-methodology, bug-bounty, redteam-mindset, nuclei-template-forge |
 
 Full searchable catalog → **[docs/skills.md](docs/skills.md)**. Also ships **15 slash commands** (`/hunt`, `/recon`, `/report`, …) and a deterministic **engagement engine** (`engine/`) that maps a target's attack surface and routes each finding to the skill that handles it.
 
@@ -215,15 +215,23 @@ The skills include validation gates that auto-trigger when you point Claude at u
 
 The bundle explicitly **excludes**: weaponizing 0-days against unauthorized targets, post-exploitation tooling, malware development, mass-targeting infrastructure. See [`SECURITY.md`](SECURITY.md) for the full posture.
 
-> **Heads-up — Anthropic runtime cyber safeguards.** Anthropic's models apply real-time safeguards that **block "vulnerability exploitation or offensive security tooling development" by default** — so even *authorized, in-scope* work can hit a refusal that isn't this bundle's doing. If you do authorized offensive security (pentest / bug bounty / red team), enroll in Anthropic's **free, application-based [Cyber Verification Program (CVP)](https://claude.com/form/cyber-use-case)** to get safeguards adjusted for legitimate dual-use work. (Mass data exfiltration and ransomware development stay prohibited and are *not* adjustable.) Details: [Anthropic — real-time cyber safeguards](https://support.claude.com/en/articles/14604842-real-time-cyber-safeguards-on-claude).
+> **Heads-up — Anthropic runtime cyber safeguards.** Anthropic's models apply real-time safeguards to cyber work: higher-risk requests (exploit generation, binary-based vulnerability scanning, penetration testing) are **handed to an older model** rather than refused, and reasoning extraction is blocked outright. Even *authorized, in-scope* work can therefore change behaviour mid-session through no fault of this bundle. If you do authorized offensive security (pentest / bug bounty / red team), enroll in Anthropic's **free, application-based [Cyber Verification Program (CVP)](https://claude.com/form/cyber-use-case)** to get safeguards adjusted for legitimate dual-use work. (Mass data exfiltration and ransomware development stay prohibited and are *not* adjustable.) Details: [Anthropic — real-time cyber safeguards](https://support.claude.com/en/articles/14604842-real-time-cyber-safeguards-on-claude).
 
 ### Why your model switched mid-session
 
-Separate from refusals, and easy to miss. On **Opus 5**, a narrow set of higher-risk cyber requests —
-Anthropic names *exploit generation*, *binary-based vulnerability scanning* and *penetration testing* —
-**fall back to Opus 4.8** rather than being refused. You get a notice and the response is labelled with
-the model that answered, but in a long agentic run that is easy to scroll past, so it can look like
-Opus 5 quietly got worse. See [why Claude switched models](https://support.claude.com/en/articles/16049681-why-claude-switched-models-in-your-conversation-with-opus-5).
+Separate from refusals, and easy to miss. On **Opus 5, Opus 5.5 and Sonnet 5.5**, a narrow set of
+higher-risk cyber requests (Anthropic names *exploit generation*, *binary-based vulnerability scanning*
+and *penetration testing*) is **handed to an older model** rather than refused: Opus 5 and Opus 5.5 fall
+back to Opus 4.8, Sonnet 5.5 falls back to Sonnet 5. The classifiers review what the model reads as well
+as what you type, so a loaded skill or a pasted advisory can trigger the switch on its own. You get a
+notice and the response is labelled with the model that answered, but in a long agentic run that is
+easy to scroll past, so it can look like the model quietly got worse. Opus 5.5 and Sonnet 5.5 were not
+covered by the Cyber Verification Program at launch, so check the current article before relying on an
+exemption. Fable 5.1 states the same Opus 4.8 fallback in its system card; Mythos 5.1 is trusted-access
+only and publishes no fallback statement (unverified). Sources:
+[Opus 5](https://support.claude.com/en/articles/16049681-why-claude-switched-models-in-your-conversation-with-opus-5) ·
+[Sonnet 5.5](https://support.claude.com/en/articles/17161993-why-claude-switched-models-in-your-conversation-with-sonnet-5-5) ·
+[Fable and Mythos 5.1](https://www.anthropic.com/claude-fable-and-mythos-5-1).
 
 What to do depends on what you are actually doing:
 
@@ -249,7 +257,7 @@ for exactly this reason — engagement context belongs in the session explicitly
 | [`docs/cbh-cli.md`](docs/cbh-cli.md) | `cbh` CLI — native runner orchestrating recon + classify + triage + report |
 | [`docs/rate-limiting.md`](docs/rate-limiting.md) | Request ceiling + required headers enforced in code · what is governed and what is not |
 | [`docs/cve-coverage.md`](docs/cve-coverage.md) | CISA KEV coverage snapshot — refreshed weekly via the workflow template at `docs/automation/cve-refresh.yml.template` |
-| [`docs/credits.md`](docs/credits.md) | Full attribution: 43 original skills + 8 vendored from upstream |
+| [`docs/credits.md`](docs/credits.md) | Full attribution: 81 original, 22 community and 8 vendored skills |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | PR guidelines · skill quality standards · scope |
 | [`SECURITY.md`](SECURITY.md) | Authorized-use posture · responsible disclosure · what's excluded |
 | [`LICENSE`](LICENSE) | MIT |
@@ -327,7 +335,7 @@ Operational tradecraft accumulated across bug-bounty engagements and authorized 
 
 **Sister project:** [Claude-OSINT](https://github.com/elementalsouls/Claude-OSINT) — paired skills for the recon phase that this bundle picks up after. Its two recon skills (`offensive-osint`, `osint-methodology`) are **canonically maintained here** and re-exported there, so the two are byte-identical. **Installing both is safe:** each bundle's installer (`install.sh` on macOS/Linux, `install.ps1` on Windows) records a manifest, the script skips re-copying an identical skill, and `--uninstall` keeps any skill the other bundle still owns — uninstalling one never breaks the other.
 
-**Vendored foundation:** [shuvonsec/claude-bug-bounty](https://github.com/shuvonsec/claude-bug-bounty) — methodology, validation, reporting, payload library (8 of 112 skills + 15 slash commands)
+**Vendored foundation:** [shuvonsec/claude-bug-bounty](https://github.com/shuvonsec/claude-bug-bounty) — methodology, validation, reporting, payload library (8 of 111 skills + 15 slash commands)
 
 **Generator tool used (not vendored):** [shuvonsec/public-skills-builder](https://github.com/shuvonsec/public-skills-builder) — used to scaffold per-class skills from H1 disclosed reports
 

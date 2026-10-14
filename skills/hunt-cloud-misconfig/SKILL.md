@@ -1,9 +1,12 @@
 ---
 name: hunt-cloud-misconfig
 description: "Hunt cloud / infrastructure misconfigurations. AWS: public S3 buckets (s3:GetObject anonymous), permissive bucket policies (PutObjectAcl public-write), exposed CloudFront origin, public Lambda function URL, public RDS snapshot, IAM credentials in JS bundles, AWS metadata accessible via SSRF. GCP: public GCS buckets, exposed Cloud Run services, leaked service account JSON. Azure: public blob containers, exposed Function App. (Kubernetes/Docker exposure is owned by hunt-k8s; CI/CD pipeline attacks by hunt-cicd; post-credential IAM escalation by cloud-iam-deep.) Detection: targeted dorking, certificate transparency, JS bundle secret extraction, port scan for known service ports. Validate: actual data read / write / RCE. Use when hunting cloud-native storage and compute misconfig (S3/GCS/Blob, IMDS-via-SSRF, serverless, public managed services)."
-sources: hackerone_public, public_research
-report_count: 6
+metadata:
+  sources: hackerone_public, public_research
+  report_count: 6
 ---
+
+> Authorized testing only: run this against assets you own or that a signed scope or a program's in-scope list names. It is a find-and-report methodology, not a weapon.
 
 ## 16. CLOUD / INFRA MISCONFIGS
 
@@ -71,6 +74,17 @@ An exposed Jenkins that authenticates ANY personal Google/OAuth account (missing
 
 ### Exposed message broker (RabbitMQ / AMQP) with default creds
 Probe RabbitMQ management (`http://TARGET:15672/`, API `:15672/api/overview`) and AMQP `:5672`; try default `guest:guest` (works off-localhost when `loopback_users` is misconfigured) → queue/message read, vhost enumeration, management-plugin admin. Disclosed: reports/753602.
+
+## References Index
+
+| File | Use when |
+|---|---|
+| `references/storage-by-provider.md` | Anonymous object-storage checks and name patterns for S3, GCS, Azure Blob, DigitalOcean Spaces, Cloudflare R2, OCI, Alibaba OSS, Hetzner, Backblaze B2, Wasabi, Linode, Scaleway; enumeration tooling with flags checked in 2026 |
+| `references/metadata-endpoints.md` | Instance metadata URL, header and token per provider (AWS, Azure, GCP, DigitalOcean, Hetzner, OCI, Alibaba, Vultr, Linode, Scaleway, OpenStack, Equinix) plus ECS / Fargate / Cloud Run / Kubernetes task metadata, as SSRF targets |
+| `references/serverless-and-paas.md` | Lambda function URLs, API Gateway stages, Cloud Run / Cloud Functions, Azure Functions / App Service / Static Web Apps, Cloudflare Workers / Pages, Vercel, Netlify, Render, Fly.io, Heroku: hostnames, dangling status, source-map and auth checks |
+| `references/managed-services-exposure.md` | Public RDS / EBS snapshots and AMIs, public managed databases, public container registries, SNS / SQS / Pub/Sub, PaaS front doors and load balancers |
+
+---
 
 ## Local-verification toolchain
 
@@ -214,14 +228,7 @@ No CVE assigned specifically to AWS RUM as of 2026-05. The attack class is docum
 
 ---
 
-## References Index
-
-| File | Use when |
-|---|---|
-| `references/storage-by-provider.md` | Anonymous object-storage checks and name patterns for S3, GCS, Azure Blob, DigitalOcean Spaces, Cloudflare R2, OCI, Alibaba OSS, Hetzner, Backblaze B2, Wasabi, Linode, Scaleway; enumeration tooling with flags checked in 2026 |
-| `references/metadata-endpoints.md` | Instance metadata URL, header and token per provider (AWS, Azure, GCP, DigitalOcean, Hetzner, OCI, Alibaba, Vultr, Linode, Scaleway, OpenStack, Equinix) plus ECS / Fargate / Cloud Run / Kubernetes task metadata, as SSRF targets |
-| `references/serverless-and-paas.md` | Lambda function URLs, API Gateway stages, Cloud Run / Cloud Functions, Azure Functions / App Service / Static Web Apps, Cloudflare Workers / Pages, Vercel, Netlify, Render, Fly.io, Heroku: hostnames, dangling status, source-map and auth checks |
-| `references/managed-services-exposure.md` | Public RDS / EBS snapshots and AMIs, public managed databases, public container registries, SNS / SQS / Pub/Sub, PaaS front doors and load balancers |
+## Sources
 
 Terraform state, CloudFormation and CI federation leaks live in `cloud-iam-deep` `references/iac-state-and-ci-tokens.md`; Firebase, Supabase, Cognito and other client-embedded backends live in `hunt-cloud-backends`.
 
@@ -236,4 +243,3 @@ Terraform state, CloudFormation and CI federation leaks live in `cloud-iam-deep`
 - **`supply-chain-attack-recon`** — Exposed CI/CD endpoints and SBOMs reveal internal package names. Chain primitive: Exposed Jenkins/GitLab + internal package name leak → npm/PyPI dependency-confusion publish → CI build pwn.
 - **`security-arsenal`** — Load the Cloud Bucket Wordlist (target-prod / target-backup / target-staging permutations) and the Admin-Panel Path List for fast enumeration.
 - **`triage-validation`** — Apply the Unique-Marker gate: any "writable bucket" claim requires a write of a unique marker file and a read-back from a clean session before report submission.
-

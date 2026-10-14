@@ -1,8 +1,9 @@
 ---
 name: hunt-mobile-frameworks
 description: "Test apps built with cross-platform mobile frameworks and route what the bundle ships to the backend skills. Flutter (Dart AOT, Blutter, reFlutter, Shorebird, BoringSSL pinning, no system proxy), React Native (Hermes bytecode, hermes-dec, CodePush and EAS Update, react-native-ssl-pinning), Xamarin and .NET MAUI (assembly stores, ILSpy), Unity (IL2CPP metadata, Il2CppDumper, Cpp2IL, client-trust bugs), Cordova, Capacitor and Ionic (www bundle, plugin bridges, allow-navigation, CSP), Kotlin and Compose Multiplatform, PWA and TWA wrappers. Per framework: detection, secrets and endpoints, interception, pinning bypass, why stock Frida scripts miss. Also finds every app a target ships across stores, TestFlight, enterprise distribution and mirrors, and diffs versions. Backend writes are Stage B; OTA channels are read-only. Use when an APK or IPA shows libflutter.so, index.android.bundle, assemblies.blob, global-metadata.dat, www/ or capacitor.config.json."
-sources: vendor_docs, project_source_code, tool_documentation, public_research, nvd, github_security_advisories
-report_count: 0
+metadata:
+  sources: vendor_docs, project_source_code, tool_documentation, public_research, nvd, github_security_advisories
+  report_count: 0
 ---
 
 ## When to use
@@ -55,6 +56,21 @@ impact described, evidence captured**:
 | BaaS rules (Firebase, Supabase, Cognito, Auth0, Clerk) | `hunt-cloud-backends` |
 | App ownership scoring before deep analysis | `offensive-osint` §21 |
 | Game cheats, aimbots, memory editors and anti-cheat bypass | Nobody. Out of scope. Client-trust bugs on the server are in scope (Unity row). |
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/flutter.md` | Detection, snapshot hash, Blutter, reFlutter, Dart obfuscation, proxy-unaware traffic, BoringSSL pinning, Shorebird | libflutter.so, libapp.so, flutter_assets, reflutter, blutter, dart snapshot, flutter ssl pinning |
+| `references/react-native.md` | Hermes bytecode, hermes-dec, JSC bundles, CodePush and EAS Update config, RN pinning libraries, New Architecture | index.android.bundle, hermes bytecode, hbc, hermes-dec, codepush, expo-updates, react-native-ssl-pinning |
+| `references/xamarin-maui.md` | Assembly stores, unpackers, ILSpy, dnSpyEx, AOT, HTTP handlers, Mono hooking | assemblies.blob, xamarin, maui, ilspy, dnspy, monodroid |
+| `references/unity.md` | IL2CPP metadata, Il2CppDumper, Cpp2IL, frida-il2cpp-bridge, Mono builds, game-backend client trust | global-metadata.dat, libil2cpp.so, il2cppdumper, cpp2il, unity backend |
+| `references/hybrid-webview.md` | Cordova, Capacitor, Ionic, live updates, plugin bridges, allow-navigation, CSP, TWA and PWA wrappers | cordova, capacitor, ionic, www bundle, allow-navigation, trusted web activity, bubblewrap |
+| `references/kotlin-multiplatform.md` | KMP and Compose MP detection, Kotlin/Native on iOS, Ktor engines and pinning | kotlin multiplatform, compose multiplatform, ktor, kotlin native, skiko |
+| `references/bundle-to-backend.md` | Artefact-to-skill decision table, device-ID auth, version-gated features, debug endpoints, mobile-only APIs | api from apk, endpoints in app, mobile backend, device id auth, feature flag |
+| `references/app-store-recon.md` | Finding every app across stores, TestFlight, enterprise distribution, mirrors, version history and diffing, HarmonyOS NEXT | developer page, app store id, appgallery, galaxy store, testflight, apk mirror, harmonyos |
 
 ---
 
@@ -307,21 +323,6 @@ before they leave your machine.
 - [ ] OTA channels observed read-only; nothing published, replayed or served.
 - [ ] Platform-level observations handed to `hunt-mobile-android` /
       `hunt-mobile-ios` rather than reported here.
-
----
-
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/flutter.md` | Detection, snapshot hash, Blutter, reFlutter, Dart obfuscation, proxy-unaware traffic, BoringSSL pinning, Shorebird | libflutter.so, libapp.so, flutter_assets, reflutter, blutter, dart snapshot, flutter ssl pinning |
-| `references/react-native.md` | Hermes bytecode, hermes-dec, JSC bundles, CodePush and EAS Update config, RN pinning libraries, New Architecture | index.android.bundle, hermes bytecode, hbc, hermes-dec, codepush, expo-updates, react-native-ssl-pinning |
-| `references/xamarin-maui.md` | Assembly stores, unpackers, ILSpy, dnSpyEx, AOT, HTTP handlers, Mono hooking | assemblies.blob, xamarin, maui, ilspy, dnspy, monodroid |
-| `references/unity.md` | IL2CPP metadata, Il2CppDumper, Cpp2IL, frida-il2cpp-bridge, Mono builds, game-backend client trust | global-metadata.dat, libil2cpp.so, il2cppdumper, cpp2il, unity backend |
-| `references/hybrid-webview.md` | Cordova, Capacitor, Ionic, live updates, plugin bridges, allow-navigation, CSP, TWA and PWA wrappers | cordova, capacitor, ionic, www bundle, allow-navigation, trusted web activity, bubblewrap |
-| `references/kotlin-multiplatform.md` | KMP and Compose MP detection, Kotlin/Native on iOS, Ktor engines and pinning | kotlin multiplatform, compose multiplatform, ktor, kotlin native, skiko |
-| `references/bundle-to-backend.md` | Artefact-to-skill decision table, device-ID auth, version-gated features, debug endpoints, mobile-only APIs | api from apk, endpoints in app, mobile backend, device id auth, feature flag |
-| `references/app-store-recon.md` | Finding every app across stores, TestFlight, enterprise distribution, mirrors, version history and diffing, HarmonyOS NEXT | developer page, app store id, appgallery, galaxy store, testflight, apk mirror, harmonyos |
 
 ---
 

@@ -1,8 +1,9 @@
 ---
 name: infra-rmm-remote-support
 description: "Triage internet-exposed RMM and remote-support servers and the remote-display protocols behind them: ConnectWise ScreenConnect, SimpleHelp, BeyondTrust Remote Support and PRA, N-able N-central, Kaseya VSA, ManageEngine Endpoint Central, Splashtop and AnyDesk on-premises, SaaS RMMs (Atera, NinjaOne, Datto RMM), TeamViewer 5938 and AnyDesk 7070 listeners, Citrix ICA 1494, CGP 2598, XML service and StoreFront, Apache Guacamole and guacd 4822, NoMachine 4000 and SPICE. Separates vendor cloud from client-owned servers, fingerprints product and version passively, and version-gates against a 2021-2026 CVE matrix with CISA KEV status and fixed builds (ScreenConnect CVE-2024-1709, SimpleHelp CVE-2024-57727, BeyondTrust CVE-2026-1731, N-central CVE-2026-86218). Stage A is read-only; any exploit path, login, session or agent enrollment is Stage B with written sign-off. Use when a scan, certificate or Shodan record shows a remote-support console or remote-display port on an in-scope host."
-sources: nvd, cisa_kev, vendor_advisories, cve_org, divd_csirt, project_documentation, nmap_service_probes, bugcrowd_vrt
-report_count: 0
+metadata:
+  sources: nvd, cisa_kev, vendor_advisories, cve_org, divd_csirt, project_documentation, nmap_service_probes, bugcrowd_vrt
+  report_count: 0
 ---
 
 ## When to use
@@ -62,6 +63,17 @@ persistence (`SECURITY.md`).
 | TLS protocol and certificate findings on any of these ports | `hunt-tls-network` |
 | Agent and client CVEs that need local access (most Splashtop, NoMachine, Endpoint Central 2024-2026 rows) | Nobody. Not reachable from outside |
 | Phishing users into installing a remote-support client | Nobody. Not a perimeter test |
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/rmm-self-hosted.md` | ScreenConnect, SimpleHelp, BeyondTrust RS/PRA, N-central, Kaseya VSA, Endpoint Central: ports, cloud tells, passive fingerprint, version disclosure, what not to request | screenconnect exposed, screenconnect version, simplehelp allversions, bomgar appliance, beyondtrust remote support exposed, n-central login exposed, kaseya vsa on premise, desktop central 8383, endpoint central version |
+| `references/saas-and-relays.md` | Atera, NinjaOne, Datto RMM, Splashtop cloud and On-Prem, TeamViewer 5938, AnyDesk 7070 and On-Premises: vendor domains, inbound listeners, installer and tenant exposure | atera installer link, ninjaone agent, datto rmm agent, splashtop on-prem, teamviewer 5938 exposed, anydesk 7070 direct connection, anydesk on-premises |
+| `references/remote-display-protocols.md` | Citrix ICA 1494, CGP 2598, XML service, StoreFront; Apache Guacamole and guacd 4822; NoMachine 4000; SPICE; RD Gateway routing | citrix ica exposed, 1494 open, session reliability 2598, citrix xml service, storefront version, guacd 4822 exposed, guacamole default password, nomachine 4000, nx server version, spice console exposed, proxmox spiceproxy |
+| `references/cve-matrix.md` | All products: 2021-2026 CVE rows with class, pre-auth, affected, fixed, KEV date, source | screenconnect cve-2024-1709, slashandgrab, simplehelp cve-2024-57727, beyondtrust cve-2026-1731, cve-2024-12356, n-central cve-2026-86218, kaseya vsa cve-2021-30116, endpoint central cve-2021-44515, guacamole cve, anydesk cve-2025-27918 |
 
 ---
 
@@ -390,14 +402,7 @@ RMM server.
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/rmm-self-hosted.md` | ScreenConnect, SimpleHelp, BeyondTrust RS/PRA, N-central, Kaseya VSA, Endpoint Central: ports, cloud tells, passive fingerprint, version disclosure, what not to request | screenconnect exposed, screenconnect version, simplehelp allversions, bomgar appliance, beyondtrust remote support exposed, n-central login exposed, kaseya vsa on premise, desktop central 8383, endpoint central version |
-| `references/saas-and-relays.md` | Atera, NinjaOne, Datto RMM, Splashtop cloud and On-Prem, TeamViewer 5938, AnyDesk 7070 and On-Premises: vendor domains, inbound listeners, installer and tenant exposure | atera installer link, ninjaone agent, datto rmm agent, splashtop on-prem, teamviewer 5938 exposed, anydesk 7070 direct connection, anydesk on-premises |
-| `references/remote-display-protocols.md` | Citrix ICA 1494, CGP 2598, XML service, StoreFront; Apache Guacamole and guacd 4822; NoMachine 4000; SPICE; RD Gateway routing | citrix ica exposed, 1494 open, session reliability 2598, citrix xml service, storefront version, guacd 4822 exposed, guacamole default password, nomachine 4000, nx server version, spice console exposed, proxmox spiceproxy |
-| `references/cve-matrix.md` | All products: 2021-2026 CVE rows with class, pre-auth, affected, fixed, KEV date, source | screenconnect cve-2024-1709, slashandgrab, simplehelp cve-2024-57727, beyondtrust cve-2026-1731, cve-2024-12356, n-central cve-2026-86218, kaseya vsa cve-2021-30116, endpoint central cve-2021-44515, guacamole cve, anydesk cve-2025-27918 |
+## Sources
 
 Primary sources (fetched 2026-10-13): CISA KEV feed, catalog 2026.10.13
 <https://www.cisa.gov/known-exploited-vulnerabilities-catalog>; NVD API

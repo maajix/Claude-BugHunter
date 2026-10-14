@@ -1,8 +1,9 @@
 ---
 name: hunt-exposed-panels
 description: "Triage internet-exposed HTTP admin, monitoring and infrastructure-tooling panels: an enterprise web console answering from the public internet that belonged behind a VPN. Fingerprint the product and version first, then route to default credentials, unauthenticated endpoints, information disclosure and pre-auth CVEs. Covers Zabbix, Grafana, Prometheus, Netdata, JBoss/WildFly (jmx-console, web-console, JMXInvokerServlet), Tomcat Manager, phpMyAdmin, Adminer, Jupyter, Apache Spark UI, Flink JobManager, Airflow, JFrog Artifactory, Consul, Nomad, Portainer, MeshCentral, ServiceNow public data exposure, and the nginx alias off-by-slash traversal that fronts them. Stage A read-only by default; deploy, write, execute and config-change probes gated on written sign-off. Default-credential attempts capped at one pair per account. Use when an HTTP service on an in-scope external host is clearly an internal admin tool. Non-HTTP ports belong to hunt-exposed-services; CI/CD to hunt-cicd."
-sources: hacktricks_coverage_checklist, nvd, vendor_documentation, vendor_advisories, github_security_advisories, researcher_writeups, gixy, authorized-engagement
-report_count: 0
+metadata:
+  sources: hacktricks_coverage_checklist, nvd, vendor_documentation, vendor_advisories, github_security_advisories, researcher_writeups, gixy, authorized-engagement
+  report_count: 0
 ---
 
 ## When to use
@@ -73,6 +74,18 @@ Three concrete cuts, because the usual public write-ups walk straight past them:
 
 This skill's contribution to the generic classes is the product-specific route
 to them: which path, which parameter, which version.
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `monitoring-and-dashboards.md` | Zabbix frontend and API (CVE-2022-23131, CVE-2024-42327, CVE-2024-22120), Grafana (CVE-2021-43798, CVE-2024-9264), Prometheus 9090 status and admin API, Netdata 19999 | exposed zabbix, zabbix apiinfo version, zabbix admin zabbix, grafana path traversal, grafana public plugins, grafana admin admin, grafana api health, exposed prometheus, prometheus status config leak, prometheus targets internal hosts, netdata 19999 exposed |
+| `java-app-servers.md` | JBoss / EAP / WildFly (`jmx-console`, `web-console`, `EJBInvokerServlet`, `JMXInvokerServlet`, `admin-console`; CVE-2010-0738, CVE-2015-7501, CVE-2017-12149), Tomcat Manager (`/manager/html`, `/manager/text`, `jmxproxy`, `host-manager`; LockOutRealm; CVE-2025-24813) | exposed jmx-console, jboss invoker servlet, jmxinvokerservlet exposed, jboss verb bypass, wildfly management exposed, tomcat manager exposed, manager/html 401, tomcat war deploy, tomcat lockoutrealm, tomcat partial put |
+| `data-and-notebook-tools.md` | phpMyAdmin (CVE-2018-12613, setup script), Adminer (CVE-2021-21311), Jupyter Server (`/api/`, sessions, kernels, terminals, contents), Spark UI 4040 (CVE-2022-33891), Flink 8081 (CVE-2020-17519, CVE-2020-17518), Airflow 8080 (`expose_config`, secret key) | exposed phpmyadmin, phpmyadmin 4.8 file inclusion, adminer exposed, adminer ssrf, jupyter no token, jupyter api kernels open, exposed spark ui, spark doas command injection, flink jobmanager traversal, exposed airflow, airflow expose_config |
+| `devops-and-orchestration.md` | JFrog Artifactory (anonymous access, `api/system/version`, CVE-2026-42018, CVE-2026-69107), Consul 8500 (`default_policy` allow, KV), Nomad 4646, Portainer 9443 (setup token, 5-minute window), MeshCentral (ports, GHSA-c7hr-448w-65px) | exposed artifactory, artifactory anonymous access, artifactory admin password, exposed consul, consul kv secrets, consul catalog services, exposed nomad, portainer exposed, portainer initial admin, portainer setup token, meshcentral exposed |
+| `saas-and-proxy-exposure.md` | ServiceNow public data exposure (`/api/now/sp/widget/{id}`, `/api/now/table/{table}`, count oracle, CVE-2024-4879, CVE-2024-5217), nginx `alias` off-by-slash traversal, `merge_slashes` posture | servicenow public data, servicenow widget api, servicenow table api sys_user, snowpick, nginx alias traversal, off-by-slash, alias lfi misconfiguration, merge_slashes off |
 
 ---
 
@@ -376,15 +389,7 @@ Follow `evidence-hygiene`. Minimum set per finding:
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `monitoring-and-dashboards.md` | Zabbix frontend and API (CVE-2022-23131, CVE-2024-42327, CVE-2024-22120), Grafana (CVE-2021-43798, CVE-2024-9264), Prometheus 9090 status and admin API, Netdata 19999 | exposed zabbix, zabbix apiinfo version, zabbix admin zabbix, grafana path traversal, grafana public plugins, grafana admin admin, grafana api health, exposed prometheus, prometheus status config leak, prometheus targets internal hosts, netdata 19999 exposed |
-| `java-app-servers.md` | JBoss / EAP / WildFly (`jmx-console`, `web-console`, `EJBInvokerServlet`, `JMXInvokerServlet`, `admin-console`; CVE-2010-0738, CVE-2015-7501, CVE-2017-12149), Tomcat Manager (`/manager/html`, `/manager/text`, `jmxproxy`, `host-manager`; LockOutRealm; CVE-2025-24813) | exposed jmx-console, jboss invoker servlet, jmxinvokerservlet exposed, jboss verb bypass, wildfly management exposed, tomcat manager exposed, manager/html 401, tomcat war deploy, tomcat lockoutrealm, tomcat partial put |
-| `data-and-notebook-tools.md` | phpMyAdmin (CVE-2018-12613, setup script), Adminer (CVE-2021-21311), Jupyter Server (`/api/`, sessions, kernels, terminals, contents), Spark UI 4040 (CVE-2022-33891), Flink 8081 (CVE-2020-17519, CVE-2020-17518), Airflow 8080 (`expose_config`, secret key) | exposed phpmyadmin, phpmyadmin 4.8 file inclusion, adminer exposed, adminer ssrf, jupyter no token, jupyter api kernels open, exposed spark ui, spark doas command injection, flink jobmanager traversal, exposed airflow, airflow expose_config |
-| `devops-and-orchestration.md` | JFrog Artifactory (anonymous access, `api/system/version`, CVE-2026-42018, CVE-2026-69107), Consul 8500 (`default_policy` allow, KV), Nomad 4646, Portainer 9443 (setup token, 5-minute window), MeshCentral (ports, GHSA-c7hr-448w-65px) | exposed artifactory, artifactory anonymous access, artifactory admin password, exposed consul, consul kv secrets, consul catalog services, exposed nomad, portainer exposed, portainer initial admin, portainer setup token, meshcentral exposed |
-| `saas-and-proxy-exposure.md` | ServiceNow public data exposure (`/api/now/sp/widget/{id}`, `/api/now/table/{table}`, count oracle, CVE-2024-4879, CVE-2024-5217), nginx `alias` off-by-slash traversal, `merge_slashes` posture | servicenow public data, servicenow widget api, servicenow table api sys_user, snowpick, nginx alias traversal, off-by-slash, alias lfi misconfiguration, merge_slashes off |
+## Sources
 
 Attribution: the product coverage list was checked against the HackTricks
 pentesting-web section (<https://github.com/HackTricks-wiki/hacktricks>,

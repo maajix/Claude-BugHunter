@@ -1,8 +1,9 @@
 ---
 name: hunt-subdomain
 description: Hunting skill for subdomain takeover vulnerabilities. Includes modern provider fingerprints — Microsoft Azure DevOps `cloudapp.azure.com` regional-pool re-issue (1-click OAuth ATO via wildcard `reply_to`, Binary Security), Vercel `cname.vercel-dns.com` deleted-project takeover and S3 dangling-bucket cookie-scope techniques, plus the historical Zendesk email-interception and Fastly service re-attach chains (both now listed Not vulnerable on can-i-take-over-xyz; reference only, not claim targets). Also covers broken-link hijacking of dead external references (lapsed domains, removed CDN assets, dead social handles) the target links to. Use when hunting subdomain takeover or broken-link hijacking — emphasis on ATO-chain primitives (OAuth `redirect_uri`, cookie-domain, email DNS).
-sources: github, hackerone_public, binarysecurity_research, can-i-take-over-xyz_research
-report_count: 3
+metadata:
+  sources: github, hackerone_public, binarysecurity_research, can-i-take-over-xyz_research
+  report_count: 3
 ---
 
 ## Crown Jewel Targets

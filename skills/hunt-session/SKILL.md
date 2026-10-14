@@ -1,8 +1,9 @@
 ---
 name: hunt-session
 description: "Hunt Session Management vulnerabilities — session fixation (no regeneration on login), insufficient invalidation on logout / password-change / email-change, predictable or low-entropy session IDs, JWT-as-session with no exp/revocation, refresh-token rotation/reuse-detection gaps, OAuth/SSO session linkage, device-bound-session (DBSC) downgrade, and cookie attribute issues (Secure/HttpOnly/SameSite/__Host-). Also cookie integrity: cookie tossing from a controlled subdomain (fixation + CSRF-token overwrite delivery), cookie-prefix forgery through edge-vs-origin name-parsing differentials, the cookie sandwich HttpOnly bypass, and cookie jar overflow / cookie bomb handled as precondition-only DoS exposures. Validate with TWO real sessions (attacker A + victim B), body-diff every 200, and OOB confirmation for theft chains. Medium to Critical (fixation→admin hijack, no-invalidation→persistent ATO)."
-sources: hackerone_public, portswigger_research, owasp_wstg, rfc6265bis, mdn_web_docs, mdn_browser_compat_data, chromium_source, gecko_source, ankursundara_research, hacktricks_coverage_checklist
-report_count: 19
+metadata:
+  sources: hackerone_public, portswigger_research, owasp_wstg, rfc6265bis, mdn_web_docs, mdn_browser_compat_data, chromium_source, gecko_source, ankursundara_research, hacktricks_coverage_checklist
+  report_count: 19
 ---
 
 ## Autonomous Testing Priority
@@ -34,6 +35,14 @@ report_count: 19
 ---
 
 # HUNT-SESSION — Session Management
+
+## Reference Files
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `cookie-integrity.md` | Verified per-domain cookie limits and in-source eviction order for Chromium and Firefox; the four-prefix table with Chrome/Firefox/Safari support versions; the RFC 6265bis rules that decide tossing feasibility (Secure-cookie protection, nameless-prefix rule, WSP/percent-decoding, ordering, size limits); parser-differential matrix of named stacks with the exact header to send; cookie-sandwich walkthrough plus locally verified stdlib parser evidence; Stage B runbooks with mandatory cleanup for jar overflow and cookie-bomb exposure; dated source list | cookie tossing, cookie jar overflow, cookie bomb, cookie sandwich, `__Host-`, `__Secure-`, `__Http-`, `__Host-Http-`, prefix bypass, prefix forgery, cookie parser differential, duplicate cookie name, `$Version=1`, RFC 2109, quoted cookie value, cookie eviction, maxPerHost, quotaPerHost, kDomainMaxCookies, CHIPS partition limit, HttpOnly bypass via cookie |
+
+---
 
 ## Crown Jewel Targets
 
@@ -479,11 +488,3 @@ Before claiming ANY session finding:
 - Prefix forgery via a server-side name differential (`__Host-` defeated): **High** (it removes the control the app relies on)
 - Cookie sandwich reflecting a session cookie: **High** (HttpOnly bypass → theft)
 - Cookie-bomb / jar-overflow precondition, impact described but not executed: **Low → Medium** (single-user DoS; raise only with a sign-off-backed demonstration)
-
----
-
-## Reference Files
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `cookie-integrity.md` | Verified per-domain cookie limits and in-source eviction order for Chromium and Firefox; the four-prefix table with Chrome/Firefox/Safari support versions; the RFC 6265bis rules that decide tossing feasibility (Secure-cookie protection, nameless-prefix rule, WSP/percent-decoding, ordering, size limits); parser-differential matrix of named stacks with the exact header to send; cookie-sandwich walkthrough plus locally verified stdlib parser evidence; Stage B runbooks with mandatory cleanup for jar overflow and cookie-bomb exposure; dated source list | cookie tossing, cookie jar overflow, cookie bomb, cookie sandwich, `__Host-`, `__Secure-`, `__Http-`, `__Host-Http-`, prefix bypass, prefix forgery, cookie parser differential, duplicate cookie name, `$Version=1`, RFC 2109, quoted cookie value, cookie eviction, maxPerHost, quotaPerHost, kDomainMaxCookies, CHIPS partition limit, HttpOnly bypass via cookie |

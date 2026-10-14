@@ -1,8 +1,9 @@
 ---
 name: infra-ftp
 description: "Triage an internet-exposed FTP service on an in-scope host: plain FTP on port 21, explicit FTPS via AUTH TLS, implicit FTPS on 990, and the FTP listeners on NAS boxes, cameras, printers and managed-file-transfer products. Covers anonymous login and what it can read, server-reported writable directories, sensitive files in listings, cleartext credentials and TLS that is offered but not required, PASV internal-address leaks, FTP bounce, honeypot tells, and version gates for vsftpd, ProFTPD (mod_copy), Pure-FTPd, FileZilla Server, IIS FTP, Serv-U, WS_FTP, CrushFTP, Wing FTP, Cerberus and Titan. Stage A is read-only: banner, FEAT, SYST, one anonymous login, a bounded listing, an AUTH TLS check. Any write, bounce, credential guess, read of real file content or exploit is Stage B behind written sign-off. Use when a scan shows port 21 or 990 open, a banner names vsftpd, ProFTPD, Pure-FTPd, Serv-U, CrushFTP or Wing FTP, or a Shodan record says anonymous FTP login allowed."
-sources: rfc, nvd, cisa_kev, vendor_advisories, nmap_nsedoc, project_documentation, academic_research, bugcrowd_public_disclosure
-report_count: 0
+metadata:
+  sources: rfc, nvd, cisa_kev, vendor_advisories, nmap_nsedoc, project_documentation, academic_research, bugcrowd_public_disclosure
+  report_count: 0
 ---
 
 ## When to use
@@ -37,6 +38,14 @@ already shows the impact, you have the finding. Write it up and stop.
 | Credential guessing of any kind | `hunt-brute-force` |
 
 `hunt-exposed-services` lists FTP as not covered; this skill owns it.
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/ftp-server-cve-matrix.md` | Affected and fixed versions, KEV dates and version-only detection for vsftpd, ProFTPD, Pure-FTPd, FileZilla Server, IIS FTP, Serv-U, WS_FTP, CrushFTP, Wing FTP, Cerberus, Titan; FTP bounce | proftpd mod_copy, vsftpd backdoor, crushftp kev, wing ftp lua injection, serv-u path traversal, ws_ftp ad hoc transfer, ftp server cve |
 
 ---
 
@@ -461,11 +470,7 @@ kept. For Stage B, the authorization block and proof the canary is gone.
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/ftp-server-cve-matrix.md` | Affected and fixed versions, KEV dates and version-only detection for vsftpd, ProFTPD, Pure-FTPd, FileZilla Server, IIS FTP, Serv-U, WS_FTP, CrushFTP, Wing FTP, Cerberus, Titan; FTP bounce | proftpd mod_copy, vsftpd backdoor, crushftp kev, wing ftp lua injection, serv-u path traversal, ws_ftp ad hoc transfer, ftp server cve |
+## Sources
 
 External sources:
 

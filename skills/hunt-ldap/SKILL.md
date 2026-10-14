@@ -1,9 +1,12 @@
 ---
 name: hunt-ldap
 description: "Hunt LDAP Injection and XPath Injection — authentication bypass, blind char-by-char attribute exfiltration, AD user/group enumeration, XML-store XPath bypass. Covers the LDAP special-character set (* ( ) \\ NUL /), search-filter-context vs DN-injection, parenthesis-balancing, AND/OR filter logic, and {SSHA}/{CRYPT} userPassword exfil on non-AD directories. Use when target uses LDAP/AD authentication, corporate SSO with a directory backend, an address-book/people-search API, or XML-based data stores queried with XPath."
-sources: hackerone_public, owasp, portswigger
-report_count: 0
+metadata:
+  sources: hackerone_public, owasp, portswigger
+  report_count: 0
 ---
+
+> Authorized testing only: run this against assets you own or that a signed scope or a program's in-scope list names. It is a find-and-report methodology, not a weapon.
 
 # HUNT-LDAP — LDAP Injection & XPath Injection
 

@@ -428,7 +428,7 @@ def main():
                     help="explicit phase list; default is recon,rank,map (add --hunt to test)")
     ap.add_argument("--hunt", action="store_true",
                     help="OPT-IN: after mapping, auto-test with agents (recon,rank,map,hunt,validate,report)")
-    ap.add_argument("--model", default="claude-sonnet-4-6")
+    ap.add_argument("--model", default=None, help="claude model id; default: the claude CLI's configured model")
     ap.add_argument("--max-hunts", type=int, default=10)
     ap.add_argument("--max-turns", type=int, default=40)
     ap.add_argument("--timeout", type=int, default=600)

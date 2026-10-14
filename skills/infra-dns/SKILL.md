@@ -1,8 +1,9 @@
 ---
 name: infra-dns
 description: "Triage internet-exposed DNS servers the client owns, authoritative and recursive, on 53/udp and 53/tcp, DoT 853 and DoH. Covers the open recursive resolver (RFC 5358) proven with one canary query, cache snooping with RD=0 queries, version.bind, hostname.bind, id.server and NSID version disclosure, unauthenticated dynamic update (RFC 2136, gated), NSEC walking and NSEC3 hash exposure, DNSSEC misconfiguration, lame delegation, split-horizon internal zone leaks, the ANY amplification factor, EDNS and TCP fallback, and DNS on non-standard ports. Version gates for BIND, PowerDNS, Unbound, Knot, NSD, Microsoft DNS, dnsmasq and Technitium with 2024-2026 CVEs and CISA KEV status, including the October 2025 cache-poisoning wave and the BIND 9.18 end of life. Stage A is read-only, a handful of queries per server. Dynamic update, full zone walks, hash cracking and amplification beyond one measured query need written sign-off. Use when port 53 is open on an in-scope host or a client nameserver needs assessment."
-sources: rfc, isc_advisories, nlnetlabs_advisories, powerdns_advisories, msrc, cisa_kev, cve_org, nmap_nsedoc, bugcrowd_vrt, hackerone_docs, authorized-engagement
-report_count: 0
+metadata:
+  sources: rfc, isc_advisories, nlnetlabs_advisories, powerdns_advisories, msrc, cisa_kev, cve_org, nmap_nsedoc, bugcrowd_vrt, hackerone_docs, authorized-engagement
+  report_count: 0
 ---
 
 ## When to use
@@ -55,6 +56,15 @@ Three cuts the public write-ups walk straight past:
 | DNS rebinding and SSRF through a resolver | `hunt-ssrf` |
 | Technitium (5380/53443) and PowerDNS (8081/8082) web consoles and APIs | treat as an exposed panel, `hunt-exposed-panels` method |
 | Active Directory behind an exposed DC's DNS | out of scope, `SECURITY.md` |
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/dns-server-cve-matrix.md` | BIND 9 (2024-2026, 9.18 EOL), PowerDNS Recursor and Authoritative, Unbound, NSD, Knot DNS and Knot Resolver, dnsmasq, Technitium, Windows DNS Server; KEV status; the October 2025 poisoning wave; how to read a version string | bind version vulnerable, cve-2025-40778, cve-2025-40780, cve-2025-11411, cve-2025-59023, bind 9.18 eol, windows dns server rce, cve-2026-62878, dnsmasq 2.92, unbound 1.26.1, keytrap, dns kev |
+| `references/zone-and-dnssec-checks.md` | DNSSEC validation with delv and DNSViz, NSEC walking (a handful vs full), NSEC3 parameters and hash cracking, lame delegation, dangling NS hand-off, split-horizon leak queries, EDNS/TCP/DoT/DoH checks | nsec walking, nsec3 hashes, nsec3param, dnssec bogus, lame delegation, dangling ns, split horizon leak, internal zone exposed, _msdcs external, edns compliance, dns over tcp, dot 853 |
 
 ---
 
@@ -457,12 +467,7 @@ Follow `evidence-hygiene`. Per finding:
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/dns-server-cve-matrix.md` | BIND 9 (2024-2026, 9.18 EOL), PowerDNS Recursor and Authoritative, Unbound, NSD, Knot DNS and Knot Resolver, dnsmasq, Technitium, Windows DNS Server; KEV status; the October 2025 poisoning wave; how to read a version string | bind version vulnerable, cve-2025-40778, cve-2025-40780, cve-2025-11411, cve-2025-59023, bind 9.18 eol, windows dns server rce, cve-2026-62878, dnsmasq 2.92, unbound 1.26.1, keytrap, dns kev |
-| `references/zone-and-dnssec-checks.md` | DNSSEC validation with delv and DNSViz, NSEC walking (a handful vs full), NSEC3 parameters and hash cracking, lame delegation, dangling NS hand-off, split-horizon leak queries, EDNS/TCP/DoT/DoH checks | nsec walking, nsec3 hashes, nsec3param, dnssec bogus, lame delegation, dangling ns, split horizon leak, internal zone exposed, _msdcs external, edns compliance, dns over tcp, dot 853 |
+## Sources
 
 External references (all checked 2026-10-13):
 

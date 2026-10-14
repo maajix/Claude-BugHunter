@@ -143,12 +143,12 @@ This file is the calibration source. Readers who want to know "is the bundle's c
 
 ---
 
-## How to Read the Frontmatter `sources:` Field on Individual Skills
+## How to Read the Frontmatter `metadata.sources` Field on Individual Skills
 
 Each `skills/*/SKILL.md` declares its evidence basis. The convention used in this repo:
 
-- `sources: hackerone_public, github_security_advisories, ...` — skill is **report-curated** from public disclosed corpus. Citations live in the `## Disclosed Report Citations` section of that skill.
-- `sources: authorized-engagement` — skill is **engagement-derived** from one of the engagements listed above. The lessons codified in the skill came from first-hand reproduction in a real target rather than from public reports.
-- `sources: <mixed>` — skill has both report-curated patterns AND engagement-derived sections (e.g. `cloud-iam-deep` after Workstream B added the Cognito Identity Pool chain).
+- `metadata.sources: hackerone_public, github_security_advisories, ...` — skill is **report-curated** from public disclosed corpus. Citations live in the `## Disclosed Report Citations` section of that skill.
+- `metadata.sources: authorized-engagement` — skill is **engagement-derived** from one of the engagements listed above. The lessons codified in the skill came from first-hand reproduction in a real target rather than from public reports.
+- `metadata.sources: <mixed>` — skill has both report-curated patterns AND engagement-derived sections (e.g. `cloud-iam-deep` after Workstream B added the Cognito Identity Pool chain).
 
 The honest claim for any skill in the bundle is what its `sources:` field says — not the README's headline. The README is the marketing; the skill frontmatter is the contract.

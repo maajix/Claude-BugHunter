@@ -1,8 +1,9 @@
 ---
 name: hunt-cms
 description: "Hunt internet-facing content-management and groupware applications: WordPress, Drupal, Joomla, Moodle, PrestaShop, Roundcube, Bolt CMS, Craft CMS and Adobe Experience Manager (AEM, Sling, CRX). Covers per-product version fingerprinting and branch-support checks, the plugin/module/extension/theme supply chain where most real bugs live (wp-content/plugins, admin-ajax.php wp_ajax_nopriv handlers, register_rest_route permission_callback, Drupal contrib modules, Joomla com_* components, Moodle /mod/ /blocks/ /local/), leftover installer and configuration paths (install.php, /installation/, /install/, /config/sync/*.yml, CHANGELOG.txt), user and author enumeration, and the authenticated-admin-to-RCE path per product (theme and template editors, plugin ZIP upload, Twig templateselect, calculated questions, CRX package manager). Stage A read-only by default; anything that installs, posts or updates is Stage B behind written sign-off. Use when a target fingerprints as a CMS, webmail or e-commerce platform."
-sources: hacktricks_coverage_checklist, nvd, vendor_advisories, patchstack_advisories, project_documentation, vendor_release_apis, authorized-engagement
-report_count: 0
+metadata:
+  sources: hacktricks_coverage_checklist, nvd, vendor_advisories, patchstack_advisories, project_documentation, vendor_release_apis, authorized-engagement
+  report_count: 0
 ---
 
 ## Crown Jewel Targets
@@ -34,6 +35,21 @@ money is in the three layers bolted on around core.
    credential-bearing application sitting on the public internet. A post-auth
    RCE there is worth more than its CVSS vector suggests, because one phished
    or sprayed mailbox password reaches it.
+
+## References Index
+
+Load one file. Each is self-contained and carries its own Stage A and Stage B
+guards, because an agent routed by the fingerprint table reads only that file.
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `wordpress.md` | Core version pinning and the stable-check API, 2026 core chains (login-screen XSS to RCE, REST batch route confusion plus WP_Query SQLi), plugin and theme supply chain with verified CVE table, `wp_ajax_nopriv` and `permission_callback` audit patterns, author and REST user enumeration, installer and backup leftovers, admin-to-RCE paths | wordpress version, wp-content plugins, wp-json, admin-ajax, wp_ajax_nopriv, wpscan, woocommerce payments header, suretriggers ottokit, depicter sqli, kubio lfi, funnelkit plugin install, motors theme, xss2shell, wp2shell |
+| `drupal.md` | Version artifacts per major branch, supported-branch API, SA-CORE advisories with CVE and fixed versions, PostgreSQL SQL injection, JSON:API object injection, gadget chains, contrib module enumeration, config-sync and installer exposure, node and user enumeration | drupal version, changelog.txt drupal, drupal contrib module, sa-core, jsonapi drupal, config sync yml, droopescan drupal, node fuzzing, drupal gadget chain |
+| `joomla.md` | Manifest and language XML version artifacts, Security Centre workflow, web-services access-check disclosure, 2026 core advisories (SSRF, MFA bypass via remember-me, filter bypass XSS), com_* extension enumeration, Vulnerable Extensions List, administrator surface, template-edit RCE as Stage B | joomla version, joomla.xml manifest, com_ component, joomla api config, joomla vulnerable extensions, joomscan, joomla template rce, joomla mfa bypass |
+| `moodle.md` | Branch fingerprinting from upgrade.txt, composer.lock, behat features and environment.xml, calculated-question code injection with fixed versions, authenticated SSRF via TOCTOU DNS on calendar import and the file picker, plugin enumeration under /mod/ /blocks/ /theme/ /auth/ /local/, capability-not-role testing, plugin installer as Stage B | moodle version, moodle plugin, moodlescan, badmoodle, calculated question rce, moodle ssrf calendar import, mdl_ capability, moodle site:config |
+| `aem.md` | Sling and Dispatcher fingerprinting, high-value unauthenticated endpoints, QueryBuilder and DefaultGetServlet exposure, Dispatcher path-normalisation bypasses, AEM Forms on JEE pre-auth OGNL and XXE with CVSS, APSB bulletin workflow, default credentials as a detection-only check, package manager and console as Stage B | aem version, adobe experience manager, sling servlet, dispatcher bypass, querybuilder json, crx packmgr, groovy console, adminui debug ognl, apsb bulletin, etc.clientlibs |
+| `craft.md` | Craft fingerprint from config defaults, version sourcing, CVE-2025-32432 pre-auth asset-transform RCE (CVSS 10, CISA KEV) with fixed versions per branch, why there is no Stage B for it, remediation notes | craft cms, craftcms, cpresources, CraftSessionId, generate-transform, cve-2025-32432, yii __class |
+| `prestashop-roundcube-bolt.md` | PrestaShop version and admin-directory discovery, installer leftover, ps_checkout Express Checkout silent login with version ranges; Roundcube version from the JS global, post-auth deserialization RCE, release cadence; Bolt back-end discovery, editor async-upload to Twig template execution, template editor as Stage B. Thin products, covered honestly short | prestashop version, prestashop install folder, ps_checkout expresscheckout, roundcube version, rcversion, roundcube rce, bolt cms, bolt twig template, templateselect, role_editor upload |
 
 ## OOB/Confirmation Gate
 
@@ -439,20 +455,7 @@ Patterns, with the product-specific detail in the reference files.
   extensions, denied endpoints answer anyway, and the ones that answer return
   repository content including user nodes.
 
-## References Index
-
-Load one file. Each is self-contained and carries its own Stage A and Stage B
-guards, because an agent routed by the fingerprint table reads only that file.
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `wordpress.md` | Core version pinning and the stable-check API, 2026 core chains (login-screen XSS to RCE, REST batch route confusion plus WP_Query SQLi), plugin and theme supply chain with verified CVE table, `wp_ajax_nopriv` and `permission_callback` audit patterns, author and REST user enumeration, installer and backup leftovers, admin-to-RCE paths | wordpress version, wp-content plugins, wp-json, admin-ajax, wp_ajax_nopriv, wpscan, woocommerce payments header, suretriggers ottokit, depicter sqli, kubio lfi, funnelkit plugin install, motors theme, xss2shell, wp2shell |
-| `drupal.md` | Version artifacts per major branch, supported-branch API, SA-CORE advisories with CVE and fixed versions, PostgreSQL SQL injection, JSON:API object injection, gadget chains, contrib module enumeration, config-sync and installer exposure, node and user enumeration | drupal version, changelog.txt drupal, drupal contrib module, sa-core, jsonapi drupal, config sync yml, droopescan drupal, node fuzzing, drupal gadget chain |
-| `joomla.md` | Manifest and language XML version artifacts, Security Centre workflow, web-services access-check disclosure, 2026 core advisories (SSRF, MFA bypass via remember-me, filter bypass XSS), com_* extension enumeration, Vulnerable Extensions List, administrator surface, template-edit RCE as Stage B | joomla version, joomla.xml manifest, com_ component, joomla api config, joomla vulnerable extensions, joomscan, joomla template rce, joomla mfa bypass |
-| `moodle.md` | Branch fingerprinting from upgrade.txt, composer.lock, behat features and environment.xml, calculated-question code injection with fixed versions, authenticated SSRF via TOCTOU DNS on calendar import and the file picker, plugin enumeration under /mod/ /blocks/ /theme/ /auth/ /local/, capability-not-role testing, plugin installer as Stage B | moodle version, moodle plugin, moodlescan, badmoodle, calculated question rce, moodle ssrf calendar import, mdl_ capability, moodle site:config |
-| `aem.md` | Sling and Dispatcher fingerprinting, high-value unauthenticated endpoints, QueryBuilder and DefaultGetServlet exposure, Dispatcher path-normalisation bypasses, AEM Forms on JEE pre-auth OGNL and XXE with CVSS, APSB bulletin workflow, default credentials as a detection-only check, package manager and console as Stage B | aem version, adobe experience manager, sling servlet, dispatcher bypass, querybuilder json, crx packmgr, groovy console, adminui debug ognl, apsb bulletin, etc.clientlibs |
-| `craft.md` | Craft fingerprint from config defaults, version sourcing, CVE-2025-32432 pre-auth asset-transform RCE (CVSS 10, CISA KEV) with fixed versions per branch, why there is no Stage B for it, remediation notes | craft cms, craftcms, cpresources, CraftSessionId, generate-transform, cve-2025-32432, yii __class |
-| `prestashop-roundcube-bolt.md` | PrestaShop version and admin-directory discovery, installer leftover, ps_checkout Express Checkout silent login with version ranges; Roundcube version from the JS global, post-auth deserialization RCE, release cadence; Bolt back-end discovery, editor async-upload to Twig template execution, template editor as Stage B. Thin products, covered honestly short | prestashop version, prestashop install folder, ps_checkout expresscheckout, roundcube version, rcversion, roundcube rce, bolt cms, bolt twig template, templateselect, role_editor upload |
+## Sources
 
 Attribution: the product and technique coverage list was checked against the
 HackTricks `pentesting-web` CMS pages

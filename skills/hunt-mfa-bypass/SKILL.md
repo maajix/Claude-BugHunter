@@ -1,9 +1,12 @@
 ---
 name: hunt-mfa-bypass
 description: "Hunt MFA / 2FA bypass — 12 patterns. (1) no rate limit on OTP verify (10^6 keyspace), (2) OTP not invalidated after use, (3) response manipulation (client-side check), (4) skip the MFA step via direct navigation with the pre-MFA session, (5) race on OTP validation, (6) backup-code brute force, (7) remember-device cookie not bound, (8) passkeys / WebAuthn (origin / rpId checks, none attestation, stale related origins, challenge replay, fallback downgrade), (9) push fatigue / no number matching, (10) MFA enrollment from a pre-MFA session, (11) TOTP skew-window reuse, (12) SSO / OAuth login path skipping local MFA. Chain: cookie theft + password oracle + no step-up = ATO. Detection: trace auth flow in Burp, find every state transition, check if MFA is middleware-gated vs per-endpoint, check OTP entropy and rate limit on OTP-validate. Validate: attacker session reaching post-MFA state. Use when hunting auth bypass, MFA flows, passkey deployments, chaining primitives toward ATO."
-sources: hackerone_public, cve_database, nist_800_63b, public_research
-report_count: 5
+metadata:
+  sources: hackerone_public, cve_database, nist_800_63b, public_research
+  report_count: 5
 ---
+
+> Authorized testing only: run this against assets you own or that a signed scope or a program's in-scope list names. It is a find-and-report methodology, not a weapon.
 
 ## Autonomous Testing Priority
 

@@ -18,8 +18,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FRONTMATTER = """---
 name: {name}
 description: "A throwaway skill used by test_lint_skills.py to exercise the safety scan."
-sources: test_fixture
-report_count: 0
+metadata:
+  sources: test_fixture
+  report_count: 0
 ---
 
 Body.
@@ -114,12 +115,25 @@ def main():
             fh.write(REAL_KEY)
         check("key in nested references/", skill_dir, want_errors=True)
 
+        # 8. A custom key at top level is rejected: it belongs under metadata:.
+        skill_dir = make_skill(root, "top-level-key")
+        with open(os.path.join(skill_dir, "SKILL.md"), "w", encoding="utf-8") as fh:
+            fh.write(FRONTMATTER.format(name="top-level-key").replace(
+                "metadata:\n  sources: test_fixture\n  report_count: 0", "sources: test_fixture\nreport_count: 0"))
+        check("top-level custom key", skill_dir, want_errors=True)
+
+        # 9. report_count under metadata: must be an integer for hunt-* skills.
+        skill_dir = make_skill(root, "hunt-bad-count")
+        with open(os.path.join(skill_dir, "SKILL.md"), "w", encoding="utf-8") as fh:
+            fh.write(FRONTMATTER.format(name="hunt-bad-count").replace("report_count: 0", "report_count: many"))
+        check("non-integer report_count", skill_dir, want_errors=True)
+
     if failures:
         for f in failures:
             print(f"FAIL  {f}")
         print(f"\ntest_lint_skills: {len(failures)} failure(s).")
         return 1
-    print("test_lint_skills: 7 case(s) passed.")
+    print("test_lint_skills: 9 case(s) passed.")
     return 0
 
 

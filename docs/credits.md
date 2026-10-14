@@ -10,11 +10,11 @@ This is a **bundle**: skills and commands are vendored directly into `skills/` a
 
 | Category | Count | Source |
 |---|---|---|
-| **Original / personally-curated skills** | 75 | This repo |
-| Community-contributed skills (v3) | 20 | community PRs (e.g. #7) |
+| **Original / personally-curated skills** | 81 | This repo |
+| Community-contributed skills (v3 + community forks) | 22 | community PRs (e.g. #7) |
 | Vendored foundation skills | 8 | shuvonsec/claude-bug-bounty (MIT) |
 | Vendored slash commands | 12 | shuvonsec/claude-bug-bounty (MIT) |
-| **Total** | 112 skills + 15 commands | |
+| **Total** | 111 skills + 15 commands | |
 
 ---
 
@@ -53,7 +53,6 @@ Plus 12 additional `hunt-*` skills curated by topic without an explicit report-c
 - **`osint-methodology` (v2.1)** — 5-stage recon pipeline, 29-type asset graph, severity rubric, identity-fabric mapping, vulnerability prioritization (CVE/EPSS/KEV), bug bounty submission templates, threat-actor investigation, cryptocurrency tracing, image/video forensics.
 - **`bugcrowd-reporting`** — Bugcrowd-specific reporting tactics: VRT category fallback hierarchy, severity-request paragraphs, OOS-clause rebuttal templates (rate limiting on auth-flow endpoints, debug-info framing, user-enumeration with sensitive PII, theoretical-issue counter), chained-finding cross-reference patterns, target selection for QA-vs-prod programs, researcher-side hygiene.
 - **`evidence-hygiene`** — Cookie redaction protocols, PII black-bar discipline, HAR sanitization recipes, Burp/DevTools screenshot patterns, post-submission rotation hygiene. The redaction protocol distinguishes "your-account secrets" (always redact) from "other-user PII" (redact-by-default with explicit cross-account-impact exception) from "triager-useful metadata" (leave visible).
-- **`bb-local-toolkit`** — Personal customization of the master bug-bounty workflow with author's pipeline preferences.
 
 ### Enterprise-platform attack skills
 
@@ -79,7 +78,7 @@ Built from authorized red-team engagements (enterprise targets including on-prem
 ### Tooling and docs
 
 - **`hunt <target>` command** — Engagement-folder scaffolding: creates `~/Targets/<name>/` with `CLAUDE.md`, `scope.md`, `findings/`, `evidence/`, `submissions.txt`, `notes.md`, and a sensible `.gitignore` for engagement artifacts. Ships as `scripts/hunt.sh` (bash) and `scripts/hunt.ps1` (PowerShell).
-- **Bundle packaging** — Single-step installer that copies all 112 skills, 15 commands, and the hunt scaffold into `~/.claude/`: `scripts/install.sh` (macOS/Linux) and `scripts/install.ps1` (Windows/PowerShell).
+- **Bundle packaging** — Single-step installer that copies all 111 skills, 15 commands, and the hunt scaffold into `~/.claude/`: `scripts/install.sh` (macOS/Linux) and `scripts/install.ps1` (Windows/PowerShell).
 - **Autopilot ledger (`engine/memory.py`) + the `/remember`, `/memory-gc`, `/pickup` commands** — Original design and implementation (cross-engagement capture + skip-decision for the engine hunt loop). Not derived from any external memory implementation.
 - **`assets/banner-v2.svg`** — Hand-coded SVG banner.
 - **Documentation** — `README.md`, `INSTALL.md`, `USAGE.md`, `CONTRIBUTING.md`, `docs/architecture.md`, this credits file.

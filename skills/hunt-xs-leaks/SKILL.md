@@ -1,9 +1,12 @@
 ---
 name: hunt-xs-leaks
 description: "Hunt cross-site leaks (XS-Leaks) and XS-Search — inferring a victim's cross-origin state through side channels the same-origin policy does not close. Channels: error events (onload/onerror), CORB/ORB script-load oracles, frame counting (window.length) by popup or iframe, navigation/redirect detection (history.length, 20-redirect cap, URL max length), performance.getEntries() detection, same-site cache probing, connection-pool and event-loop timing, cookie-bomb onerror oracles, CSS :visited history. Every channel carries a browser status verified on 2026-10-10 and the header that kills it (COOP, COEP, CORP, X-Frame-Options, Fetch Metadata resource isolation, SameSite, cache and network-state partitioning). Confirmation needs two accounts in known states plus a blinded 20-run trial per state with the exact browser version recorded — a missing header is never the finding. Noisy channels (connection-pool exhaustion, cookie bombs) are Stage-B gated on written operator sign-off."
-sources: xsleaks_dev_wiki, chrome_developers, mdn_web_docs, chromium_source, privacy_sandbox_blog, rfc_6585, meta_bugbounty_guidelines, ysamm_research, hacktricks_xs_search
-report_count: 1
+metadata:
+  sources: xsleaks_dev_wiki, chrome_developers, mdn_web_docs, chromium_source, privacy_sandbox_blog, rfc_6585, meta_bugbounty_guidelines, ysamm_research, hacktricks_xs_search
+  report_count: 1
 ---
+
+> Authorized testing only: run this against assets you own or that a signed scope or a program's in-scope list names. It is a find-and-report methodology, not a weapon.
 
 # HUNT-XS-LEAKS — Cross-Site Leaks & XS-Search
 
@@ -52,6 +55,15 @@ indexes private content:
 
 Deprioritise pure login-state detection on a consumer site: usually known, often
 accepted, rarely paid alone.
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `leak-channel-catalog.md` | Per-channel detail for 12 live channel families with probe code, verified browser status, the mitigation that kills each, and per-channel false-positive traps; mandatory cost/rate gates for connection-pool timing, cookie bombs and event-loop blocking; the dead/historical list (XSS Auditor, SharedArrayBuffer clock, XSinator-era browser bugs); channel decision table keyed on the target's observed defences; the two PortSwigger Top 10 of 2025 entries (Cross-Site ETag Length Leak, XSS-Leak connection-pool redirect leak) | ETag length leak, If-None-Match, XSS-Leak, redirect hostname leak, connection pool exhaustion, socket limit, cookie bomb, 431 header too large, frame counting, window.length, event loop blocking, busy event loop, cache probing, error events, onerror oracle, CORB, ORB, performance.getEntries, resource timing, redirect detection, history.length, URL max length, CSS :visited, postMessage oracle, dead technique |
+| `defences-and-headers.md` | Exact values and semantics for COOP, COEP, CORP, XFO and `frame-ancestors`; the Fetch Metadata resource isolation rule with its allow/reject logic and `Vary` requirement; the 2026 credential matrix (Chrome/Firefox/Safari third-party-cookie and SameSite posture); the cache and network-state partitioning timeline per engine; application-level mitigations and a per-channel remediation table; the dated source list | COOP, COEP, CORP, Cross-Origin-Opener-Policy, Fetch Metadata, Sec-Fetch-Site, SameSite default, third-party cookies, cache partitioning, state partitioning, network partitioning, remediation, how to fix XS-Leak, browser baseline |
 
 ---
 
@@ -374,12 +386,3 @@ Program policy (not a disclosed report, listed for scoping):
 | `hunt-csrf` | Chain target: an XS-Leak that recovers a token or confirms a state often supplies the missing precondition for a CSRF. |
 | `triage-validation` | Run before submitting; the blinded-trial numbers belong in its output. |
 | `evidence-hygiene`, `report-writing` | Capture the browser versions, the trial table and the single-header fix. |
-
----
-
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `leak-channel-catalog.md` | Per-channel detail for 12 live channel families with probe code, verified browser status, the mitigation that kills each, and per-channel false-positive traps; mandatory cost/rate gates for connection-pool timing, cookie bombs and event-loop blocking; the dead/historical list (XSS Auditor, SharedArrayBuffer clock, XSinator-era browser bugs); channel decision table keyed on the target's observed defences; the two PortSwigger Top 10 of 2025 entries (Cross-Site ETag Length Leak, XSS-Leak connection-pool redirect leak) | ETag length leak, If-None-Match, XSS-Leak, redirect hostname leak, connection pool exhaustion, socket limit, cookie bomb, 431 header too large, frame counting, window.length, event loop blocking, busy event loop, cache probing, error events, onerror oracle, CORB, ORB, performance.getEntries, resource timing, redirect detection, history.length, URL max length, CSS :visited, postMessage oracle, dead technique |
-| `defences-and-headers.md` | Exact values and semantics for COOP, COEP, CORP, XFO and `frame-ancestors`; the Fetch Metadata resource isolation rule with its allow/reject logic and `Vary` requirement; the 2026 credential matrix (Chrome/Firefox/Safari third-party-cookie and SameSite posture); the cache and network-state partitioning timeline per engine; application-level mitigations and a per-channel remediation table; the dated source list | COOP, COEP, CORP, Cross-Origin-Opener-Policy, Fetch Metadata, Sec-Fetch-Site, SameSite default, third-party cookies, cache partitioning, state partitioning, network partitioning, remediation, how to fix XS-Leak, browser baseline |

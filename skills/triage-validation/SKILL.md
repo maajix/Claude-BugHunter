@@ -1,7 +1,8 @@
 ---
 name: triage-validation
 description: Finding validation before writing any report — 7-Question Gate (all 7 questions), 4 pre-submission gates, always-rejected list, conditionally valid with chain table, CVSS 3.1 quick reference, severity decision guide, report title formula, 60-second pre-submit checklist. Use BEFORE writing any report. One wrong answer = kill the finding and move on. Saves N/A ratio.
-sources: community, operator_experience
+metadata:
+  sources: community, operator_experience
 ---
 
 # TRIAGE & VALIDATION
@@ -183,7 +184,7 @@ Run in sequence. ALL 4 must PASS.
 [ ] Evidence: screenshot/video of actual impact (not just 200 status)
 [ ] Severity: matches program-selected CVSS (3.1 / 4.0) score AND program's severity definitions
 [ ] Remediation: 1-2 sentences of concrete fix
-[ ] NEVER used "could potentially" or "may allow"
+[ ] Never used "could potentially" or "may allow"
 ```
 
 ---
@@ -296,7 +297,7 @@ The goal is to QUICKLY disqualify bad leads so you hunt real bugs:
 1. **5-minute rule**: If you can't fill in Q1's template in 5 minutes → move on
 2. **Precondition count**: More than 2 preconditions simultaneously required → kill it
 3. **Impact test**: "What does attacker walk away with?" — if nothing tangible → kill it
-4. **Admin bypass**: "Admin can do X" is NEVER a bug → kill it immediately
+4. **Admin bypass**: "Admin can do X" is never a bug → kill it immediately
 5. **Design doc test**: If it's documented behavior → kill it immediately
 6. **Rabbit hole signal**: 30+ min on Q6 with no reproducible PoC → kill it
 

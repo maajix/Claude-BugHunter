@@ -1,8 +1,9 @@
 ---
 name: infra-enterprise-appservers
 description: "Triage internet-exposed enterprise application servers and ERP platforms: SAP NetWeaver ABAP and Java (DIAG 32NN, Gateway 33NN, Message Server 36NN, ICM 80NN/443NN, AS Java 5NN00-5NN04), SAP Web Dispatcher, Oracle WebLogic (7001/7002, T3 and IIOP), E-Business Suite, PeopleSoft, Siebel, JD Edwards, IBM WebSphere (9060/9080/9443/8880), JBoss EAP and WildFly management (9990, 4447), GlassFish and Payara (4848), Adobe ColdFusion (8500), Liferay, Pega, Apache Tomcat version gates, and Atlassian Confluence, Jira, Bitbucket and Bamboo Data Center. The finding is the exposure plus a version inside a known-exploited range: fingerprinting, version disclosure, a 2020-2026 CVE matrix with CISA KEV status and fixed releases, and read-only reachability checks. Stage A is read-only; any login, upload, deserialization payload, smuggling probe or exploit confirmation is Stage B with written sign-off. Use when a scan, banner or page title shows one of these products on an in-scope host."
-sources: nvd, cvelistv5, cisa_kev, vendor_advisories, vendor_documentation, oracle_security_alerts, sap_security_notes, nmap_nse_source, researcher_writeups
-report_count: 0
+metadata:
+  sources: nvd, cvelistv5, cisa_kev, vendor_advisories, vendor_documentation, oracle_security_alerts, sap_security_notes, nmap_nse_source, researcher_writeups
+  report_count: 0
 ---
 
 ## When to use
@@ -65,6 +66,18 @@ or triggers memory corruption. Concretely:
 | Credential guessing beyond one documented default | `hunt-brute-force` |
 | Jenkins, TeamCity, GitLab and other build servers | `hunt-cicd` |
 | Anything after a login: internal pivoting, AD, lateral movement | Not in this bundle (`SECURITY.md`) |
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/sap-netweaver.md` | SAP port scheme (32NN/33NN/36NN/80NN/5NN00-5NN14), ICM, AS Java, Web Dispatcher, Message Server, Gateway, `sapstartsrv`; fingerprint paths; CVE matrix 2020-2026 with SAP Notes and KEV dates (RECON, ICMAD, Visual Composer, P4, 2026 kernel CVEs) | sap exposed, sap netweaver cve, cve-2025-31324, recon cve-2020-6287, icmad, sap p4 port, sap message server exposed, sap gateway internet, web dispatcher cve |
+| `references/oracle-weblogic-and-apps.md` | WebLogic T3/IIOP/console fingerprint and CVE matrix through the September 2026 CSPU, Oracle HTTP Server proxy plug-in, E-Business Suite, PeopleSoft, Siebel, JD Edwards; Oracle CPU/CSPU/Alert cadence | weblogic t3 exposed, weblogic cve, cve-2020-14882, cve-2026-21962, oracle ebs cve-2025-61882, peoplesoft cve-2026-35273, siebel exposed, jd edwards exposed |
+| `references/java-ee-servers.md` | WebSphere traditional and Liberty, JBoss EAP / WildFly management and remoting, GlassFish / Payara admin, Tomcat version gate | websphere exposed, websphere soap connector 8880, wildfly 9990, jboss remoting 4447, glassfish 4848, payara traversal, tomcat version cve |
+| `references/coldfusion-liferay-pega.md` | ColdFusion admin and RDS exposure with APSB update levels, Liferay JSONWS and version header, Pega `prweb` and JMX | coldfusion exposed, cfide administrator, cve-2026-48282, coldfusion rds, liferay jsonws, liferay-portal header, pega prweb, pega jmx |
+| `references/atlassian-data-center.md` | Confluence, Jira, Bitbucket, Bamboo DC: version endpoints, anonymous-access checks, CVE matrix with fixed versions and KEV dates, checks that are not read-only | confluence version, confluence cve-2023-22527, jira serverinfo, jira cve-2021-26086, bitbucket cve-2022-36804, bitbucket hazelcast 5701, bamboo exposed |
 
 ---
 
@@ -383,15 +396,7 @@ credential. Never keep page content behind a login beyond what proves access.
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/sap-netweaver.md` | SAP port scheme (32NN/33NN/36NN/80NN/5NN00-5NN14), ICM, AS Java, Web Dispatcher, Message Server, Gateway, `sapstartsrv`; fingerprint paths; CVE matrix 2020-2026 with SAP Notes and KEV dates (RECON, ICMAD, Visual Composer, P4, 2026 kernel CVEs) | sap exposed, sap netweaver cve, cve-2025-31324, recon cve-2020-6287, icmad, sap p4 port, sap message server exposed, sap gateway internet, web dispatcher cve |
-| `references/oracle-weblogic-and-apps.md` | WebLogic T3/IIOP/console fingerprint and CVE matrix through the September 2026 CSPU, Oracle HTTP Server proxy plug-in, E-Business Suite, PeopleSoft, Siebel, JD Edwards; Oracle CPU/CSPU/Alert cadence | weblogic t3 exposed, weblogic cve, cve-2020-14882, cve-2026-21962, oracle ebs cve-2025-61882, peoplesoft cve-2026-35273, siebel exposed, jd edwards exposed |
-| `references/java-ee-servers.md` | WebSphere traditional and Liberty, JBoss EAP / WildFly management and remoting, GlassFish / Payara admin, Tomcat version gate | websphere exposed, websphere soap connector 8880, wildfly 9990, jboss remoting 4447, glassfish 4848, payara traversal, tomcat version cve |
-| `references/coldfusion-liferay-pega.md` | ColdFusion admin and RDS exposure with APSB update levels, Liferay JSONWS and version header, Pega `prweb` and JMX | coldfusion exposed, cfide administrator, cve-2026-48282, coldfusion rds, liferay jsonws, liferay-portal header, pega prweb, pega jmx |
-| `references/atlassian-data-center.md` | Confluence, Jira, Bitbucket, Bamboo DC: version endpoints, anonymous-access checks, CVE matrix with fixed versions and KEV dates, checks that are not read-only | confluence version, confluence cve-2023-22527, jira serverinfo, jira cve-2021-26086, bitbucket cve-2022-36804, bitbucket hazelcast 5701, bamboo exposed |
+## Sources
 
 Primary sources (checked 2026-10-13): CISA KEV catalog version 2026.10.13
 (<https://www.cisa.gov/known-exploited-vulnerabilities-catalog>), NVD API 2.0

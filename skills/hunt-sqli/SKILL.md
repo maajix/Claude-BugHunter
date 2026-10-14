@@ -1,8 +1,9 @@
 ---
 name: hunt-sqli
 description: "Hunting skill for sqli vulnerabilities. Built from 12 public bug bounty reports including modern NoSQL injection (Rocket.Chat CVE-2021-22911 MongoDB $regex, Mongoose ORM CVE-2024-53900 $where bypass), modern ORM raw-fragment SQLi (Django CVE-2024-42005, Sequelize GHSA-wrh9-cjv3-2hpw), second-order SOQL injection (HackerOne Salesforce), time-based blind SQLi in GraphQL resolvers, and SQLi on OIDC-proxy backends. Use when hunting SQLi on any target. Dedicated NoSQL operator injection (MongoDB/CouchDB $where/$regex/$ne) is owned by hunt-nosqli — NoSQL appears here only as adjacent ORM/WAF context. Also covers PostgreSQL escalation (dblink, lo_import, COPY FROM PROGRAM, pg_read_file), Cypher injection in Neo4j, MS Access and Jet dialect injection, ORM leaks and relational filtering (Django, Prisma, Sequelize, Ransack, Strapi, Directus), and RSQL/FIQL and OData filter-language injection."
-sources: github, hackerone_public, github_security_advisories, snyk_research, sonarsource_research, hacktricks_coverage_checklist, postgresql_documentation, neo4j_documentation, vendor_documentation, elttam_research, bishopfox_research, odata_spec, rsql_parser, cve_database
-report_count: 29
+metadata:
+  sources: github, hackerone_public, github_security_advisories, snyk_research, sonarsource_research, hacktricks_coverage_checklist, postgresql_documentation, neo4j_documentation, vendor_documentation, elttam_research, bishopfox_research, odata_spec, rsql_parser, cve_database
+  report_count: 29
 ---
 
 ## Autonomous Testing Priority

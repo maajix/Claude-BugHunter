@@ -1,7 +1,8 @@
 ---
 name: report-writing
 description: Bug bounty report writing for H1/Bugcrowd/Intigriti/Immunefi — report templates, human tone guidelines, impact-first writing, CVSS 3.1 scoring, title formula, impact statement formula, severity decision guide, downgrade counters, pre-submit checklist. Validation gates and the submittability/always-rejected decision are owned by triage-validation; this skill owns the written report itself (templates, tone, formulas). Use after validating a finding and before submitting. Never use "could potentially" — prove it or don't report.
-sources: community, operator_experience
+metadata:
+  sources: community, operator_experience
 ---
 
 # REPORT WRITING

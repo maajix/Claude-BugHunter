@@ -1,8 +1,9 @@
 ---
 name: hunt-cloud-backends
 description: "Hunt misconfigured backend-as-a-service and managed-auth platforms that web and mobile apps embed client-side, tested from outside with only the public app config. Covers Firebase (Realtime Database, Firestore and Storage rules, Cloud Functions, Remote Config, legacy FCM server keys, Dynamic Links), Supabase (anon vs service_role and sb_ keys, RLS gaps, PostgREST, Storage, Edge Functions, Auth settings), AWS Amplify and Cognito user pools (self-signup, writable attributes, AppSync API-key auth), Auth0 / Okta CIC and Clerk tenants, Appwrite, PocketBase, Parse Server and Back4App, Hasura, Directus, Strapi, Convex, Nhost, and Maps or Gemini abuse of AIza keys. Finds the config in JS bundles and app packages, proves the misconfiguration with count-only reads and public settings endpoints, and keeps every write, signup, reset email or rule change behind Stage B sign-off. Use when a bundle or APK shows firebaseConfig, supabaseUrl, aws-exports, an Auth0 domain, a Clerk pk_ key or a BaaS SDK init."
-sources: vendor_docs, github_security_advisories, cve_org, nvd, public_research, disclosed_incidents, project_source_code
-report_count: 0
+metadata:
+  sources: vendor_docs, github_security_advisories, cve_org, nvd, public_research, disclosed_incidents, project_source_code
+  report_count: 0
 ---
 
 ## When to use
@@ -57,6 +58,19 @@ described, evidence captured**:
 | Parse Server CVE-2026-31828 (LDAP adapter) | `hunt-ldap` |
 | Subdomain takeover of a dead Firebase Hosting / Dynamic Links custom domain | `hunt-subdomain` |
 | Password spraying any of these auth APIs | `hunt-brute-force` (usually out of scope) |
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/firebase.md` | RTDB, Firestore, Storage, Auth / Identity Toolkit, Functions, Remote Config, FCM legacy keys, Dynamic Links, App Check, incidents 2024-2026 | firebaseio, firestore rules, firebase storage, google-services.json, accounts:signUp, remote config, fcm server key |
+| `references/supabase-convex-nhost.md` | Supabase keys, PostgREST, RLS and grants, Auth settings, Storage, Edge Functions, pg_graphql, 2026 platform changes; Convex public functions; Nhost | supabase anon key, service_role, sb_secret, rls, rest/v1, convex.cloud, nhost.run |
+| `references/aws-amplify-cognito.md` | aws-exports and amplify_outputs, user pool self-signup, user existence errors, writable attributes, AppSync API keys and introspection, Amplify CLI CVE | cognito user pool, amplify, appsync api key, da2-, custom attribute |
+| `references/auth-platforms.md` | Auth0 / Okta CIC tenant discovery, signup, metadata, password reset, SDK CVEs; Clerk keys, Frontend API, SDK CVEs | auth0 tenant, dbconnections, user_metadata, clerk pk_live, clerk sk_live |
+| `references/self-hosted-baas.md` | Hasura, Directus, Strapi, PocketBase, Appwrite, Parse Server and Back4App: state endpoints, exposure checks, first-admin states, CVEs 2022-2026 | hasura admin secret, directus public role, strapi hasAdmin, pocketbase api rules, appwrite role.any, parse master key |
+| `references/google-api-keys.md` | AIza keys across Maps, Places and Gemini; billing, restrictions, program stance | google maps api key, places api, gmapsapiscanner, gemini api key |
 
 ---
 
@@ -334,19 +348,6 @@ characters and its location are enough.
 - [ ] Billable Google APIs: policy checked, one request per API, no generation.
 - [ ] "Not a finding" table checked before writing the report.
 - [ ] Test accounts created in Stage B listed for deletion; personal data redacted.
-
----
-
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/firebase.md` | RTDB, Firestore, Storage, Auth / Identity Toolkit, Functions, Remote Config, FCM legacy keys, Dynamic Links, App Check, incidents 2024-2026 | firebaseio, firestore rules, firebase storage, google-services.json, accounts:signUp, remote config, fcm server key |
-| `references/supabase-convex-nhost.md` | Supabase keys, PostgREST, RLS and grants, Auth settings, Storage, Edge Functions, pg_graphql, 2026 platform changes; Convex public functions; Nhost | supabase anon key, service_role, sb_secret, rls, rest/v1, convex.cloud, nhost.run |
-| `references/aws-amplify-cognito.md` | aws-exports and amplify_outputs, user pool self-signup, user existence errors, writable attributes, AppSync API keys and introspection, Amplify CLI CVE | cognito user pool, amplify, appsync api key, da2-, custom attribute |
-| `references/auth-platforms.md` | Auth0 / Okta CIC tenant discovery, signup, metadata, password reset, SDK CVEs; Clerk keys, Frontend API, SDK CVEs | auth0 tenant, dbconnections, user_metadata, clerk pk_live, clerk sk_live |
-| `references/self-hosted-baas.md` | Hasura, Directus, Strapi, PocketBase, Appwrite, Parse Server and Back4App: state endpoints, exposure checks, first-admin states, CVEs 2022-2026 | hasura admin secret, directus public role, strapi hasAdmin, pocketbase api rules, appwrite role.any, parse master key |
-| `references/google-api-keys.md` | AIza keys across Maps, Places and Gemini; billing, restrictions, program stance | google maps api key, places api, gmapsapiscanner, gemini api key |
 
 ---
 

@@ -1,8 +1,11 @@
 ---
 name: nuclei-template-forge
 description: "Forge and validate custom Nuclei templates so a finding you confirmed once by hand becomes a repeatable, estate-wide check. Covers the current Nuclei template schema (top-level id/info/http keys, the seven matcher types, the five extractor types, the six severity values), matcher discipline that kills false positives, syntax validation with `nuclei -validate`, the mandatory known-bad / known-good host pair before any fleet run, rate-limit posture for production targets, and the Stage A / Stage B split that keeps a template read-only unless an active payload is signed off in writing. Use when turning a CVE advisory, a disclosed report, or your own manual finding into a scan across the operator's own estate; when building a private CVE-monitor corpus to re-run on a schedule; or when someone says 'write a nuclei template', 'validate this template', or 'scan our estate for this CVE'. NOT for spraying the default community template set at a target, and NOT a discovery tool for unknown bugs."
-sources: projectdiscovery-nuclei-docs, nuclei-engine-v3.11.1, community-fork-draft
+metadata:
+  sources: projectdiscovery-nuclei-docs, nuclei-engine-v3.11.1, community-fork-draft
 ---
+
+> Authorized testing only: run this against assets you own or that a signed scope or a program's in-scope list names. It is a find-and-report methodology, not a weapon.
 
 ## When to use
 
@@ -353,7 +356,6 @@ above it is a decision the operator makes, not the agent.
 | Skill | Direction | What it hands over |
 |---|---|---|
 | `web2-recon` | into forge | Live-host and technology-fingerprint lists; the `-l` input for a corpus sweep |
-| `bb-local-toolkit` | into forge | Engine install and the baseline scan workflow this skill repositions away from default templates |
 | `recon-scope-triage` | into forge | The authorised asset list and the rate ceiling for Step 7 |
 | `triage-validation` | out of forge | A template hit is a lead, not a finding. Run the hit through its gate before reporting |
 | `evidence-hygiene` | out of forge | Extractor output may contain a live secret. Redact before the hit reaches a report or a ticket |

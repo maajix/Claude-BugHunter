@@ -1,9 +1,12 @@
 ---
 name: hunt-xxe
 description: Hunting skill for xxe vulnerabilities. Built from 10 public bug bounty reports including SVG-upload XXE, Office-doc (PPTX/DOCX) XXE, SOAP XXE, SAML AssertionConsumer XXE, blind OOB XXE via DTD callback, parameter-entity XXE, XXE-to-LFI, XXE-to-SSRF, and XXE-to-RCE chains (Adobe Commerce CosmicSting CVE-2024-34102). Use when hunting XXE on any target — emphasis on OOB-Or-It-Didn't-Happen Gate for blind cases.
-sources: github, hackerone_public, assetnote_research, splunk_security
-report_count: 10
+metadata:
+  sources: github, hackerone_public, assetnote_research, splunk_security
+  report_count: 10
 ---
+
+> Authorized testing only: run this against assets you own or that a signed scope or a program's in-scope list names. It is a find-and-report methodology, not a weapon.
 
 ## Crown Jewel Targets
 

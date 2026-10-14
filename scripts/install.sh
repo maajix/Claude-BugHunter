@@ -22,7 +22,7 @@
 #   --burp-mcp  wire your existing Burp MCP server into the selected harnesses'
 #               configs (opt-in; backs up each config first; uses python3)
 #   --normalize-frontmatter
-#               strip non-standard keys (sources/report_count) from the NON-Claude
+#               strip the metadata: block (sources/report_count/version/triggers) from the NON-Claude
 #               copies — only needed if a harness rejects unknown frontmatter keys
 #   --no-shell  don't modify any shell rc; just print the 'source hunt.sh' line to add
 #   --uninstall remove this bundle's footprint via the install manifest; skills a
@@ -248,7 +248,7 @@ if [ "$DO_AGENTS" = "1" ]; then
   # Codex (which reads ~/.agents/skills) HARD-rejects descriptions > 1024 chars.
   # Auto-truncate over-length descriptions in THIS copy only — ~/.claude and
   # ~/.hermes keep full descriptions. Optional --normalize-frontmatter also strips
-  # non-standard keys (sources/report_count). Python3 only; skipped if absent.
+  # the metadata: block (sources/report_count/version/triggers). Python3 only; skipped if absent.
   if command -v python3 >/dev/null 2>&1; then
     python3 - "$HOME/.agents/skills" "$NORMALIZE" <<'PY'
 import os, re, sys
@@ -260,9 +260,13 @@ for name in sorted(os.listdir(root)):
         continue
     lines = open(p, encoding="utf-8").read().split("\n")
     out, changed = [], False
+    state, in_meta = 0, False  # state 0 = before the frontmatter, 1 = inside it, 2 = body
     for i, line in enumerate(lines):
-        # frontmatter sits at the very top; only touch the first ~12 lines
-        m = re.match(r'^description:\s*(.*)$', line) if i < 12 else None
+        if state < 2 and line.strip() == '---':
+            state += 1
+            out.append(line)
+            continue
+        m = re.match(r'^description:\s*(.*)$', line) if state == 1 else None
         if m:
             val = m.group(1)
             quoted = len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'"
@@ -272,9 +276,10 @@ for name in sorted(os.listdir(root)):
                 line = 'description: "' + cut + '…"'
                 changed = True
                 print(f"    ✂ truncated {name} description {len(inner)}→{len(cut)+1} (Codex 1024 limit)")
-        if strip_extra and i < 12 and re.match(r'^(sources|report_count):\s', line):
-            changed = True
+        if strip_extra and state == 1 and (line.startswith('metadata:') or (in_meta and line[:1] in ' \t')):
+            in_meta = changed = True
             continue
+        in_meta = False
         out.append(line)
     if changed:
         open(p, "w", encoding="utf-8").write("\n".join(out))

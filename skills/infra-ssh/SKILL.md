@@ -1,8 +1,9 @@
 ---
 name: infra-ssh
 description: "Triage internet-exposed SSH on port 22 and non-standard ports, including SFTP-over-SSH and SSH on appliances, firewalls, BMCs and network devices. The finding is the exposure plus what it leaks or grants: OpenSSH banner and version gates (regreSSHion CVE-2024-6387, Erlang/OTP SSH CVE-2025-32433 in CISA KEV, libssh auth bypass), algorithm posture from one ssh-audit run (Terrapin CVE-2023-48795, non-post-quantum key exchange, DHEat), authentication methods exposed (password, keyboard-interactive, none), user enumeration conditions, host-key and certificate intelligence, Cowrie honeypot false positives, one gated default-credential attempt on an appliance, git or SFTP-only accounts that grant a shell, and private keys leaked elsewhere tested against the exposed sshd. Stage A is read-only by default; any login, exploit or DoS-class check is Stage B with written sign-off. Use when a port scan, Shodan or Censys record shows an SSH banner answering on an in-scope host."
-sources: openssh_security_advisories, nvd, cisa_kev, vendor_advisories, project_documentation, bugcrowd_vrt, lab_verified
-report_count: 0
+metadata:
+  sources: openssh_security_advisories, nvd, cisa_kev, vendor_advisories, project_documentation, bugcrowd_vrt, lab_verified
+  report_count: 0
 ---
 
 ## When to use
@@ -46,6 +47,16 @@ works, the finding is already complete. Write it up and stop.
 - TLS on any port: `hunt-tls-network`.
 - Finding the leaked key in the first place: `hunt-source-leak`,
   `supply-chain-attack-recon`.
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/ssh-cve-matrix.md` | Version-gate table for OpenSSH (portable, distro deltas, Windows port), Erlang/OTP SSH, libssh, Dropbear, Go x/crypto/ssh, Paramiko, AsyncSSH, Apache MINA SSHD; KEV status; which banners can decide; client-side CVEs not to report | regresshion, cve-2024-6387, erlang otp ssh rce, cve-2025-32433, libssh auth bypass, dropbear version, openssh version vulnerable, openssh 10 cve |
+| `references/algorithms-and-posture.md` | OpenSSH 9.8-10.6 default changes, PerSourcePenalties, ssh-audit output semantics and exit codes, Terrapin conditions, post-quantum warnings, DHEat, SSH certificates and FIDO keys | ssh-audit fail, weak ssh ciphers, terrapin reportable, post-quantum ssh, mlkem768x25519, dsa removed, ssh certificates, sk-ssh-ed25519 |
+| `references/appliance-ssh.md` | SSH on network devices and storage appliances: banners, documented factory credentials (Cisco, Fortinet, Juniper, Ubiquiti, MikroTik, QNAP, Synology), Erlang-embedding products, management-plane grading | default ssh password appliance, mikrotik ssh, fortigate ssh admin, ubiquiti ubnt, cisco ssh exposed, qnap ssh, confd nso ssh |
 
 ---
 
@@ -455,13 +466,7 @@ key the same day, whether or not PK_OK succeeded.
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/ssh-cve-matrix.md` | Version-gate table for OpenSSH (portable, distro deltas, Windows port), Erlang/OTP SSH, libssh, Dropbear, Go x/crypto/ssh, Paramiko, AsyncSSH, Apache MINA SSHD; KEV status; which banners can decide; client-side CVEs not to report | regresshion, cve-2024-6387, erlang otp ssh rce, cve-2025-32433, libssh auth bypass, dropbear version, openssh version vulnerable, openssh 10 cve |
-| `references/algorithms-and-posture.md` | OpenSSH 9.8-10.6 default changes, PerSourcePenalties, ssh-audit output semantics and exit codes, Terrapin conditions, post-quantum warnings, DHEat, SSH certificates and FIDO keys | ssh-audit fail, weak ssh ciphers, terrapin reportable, post-quantum ssh, mlkem768x25519, dsa removed, ssh certificates, sk-ssh-ed25519 |
-| `references/appliance-ssh.md` | SSH on network devices and storage appliances: banners, documented factory credentials (Cisco, Fortinet, Juniper, Ubiquiti, MikroTik, QNAP, Synology), Erlang-embedding products, management-plane grading | default ssh password appliance, mikrotik ssh, fortigate ssh admin, ubiquiti ubnt, cisco ssh exposed, qnap ssh, confd nso ssh |
+## Sources
 
 Primary sources (fetched 2026-10-13):
 

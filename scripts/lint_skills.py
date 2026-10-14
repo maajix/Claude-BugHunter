@@ -10,6 +10,7 @@ Checks per skills/<name>/SKILL.md:
     - frontmatter block present (between the first two `---` lines)
     - `name` present, matches ^[a-z0-9-]+$, and equals the directory name
     - `description` present and <= 1024 chars
+    - only Agent Skills / Claude Code keys at top level; custom keys under `metadata:`
     - body (everything after frontmatter) <= 500 lines
   SAFETY (errors) — SKILL.md *and* every other .md in the skill dir (references/)
     - client-identifier denylist: hashes every 1- and 2-word shingle of the file
@@ -42,8 +43,18 @@ MAX_BODY_LINES = 500
 # Grounding enforcement. Every skill must declare `sources:`; hunt-* skills (built
 # from disclosed reports) must also declare an integer `report_count:` (0 is fine
 # when `sources:` justifies it — e.g. a pattern library or research-derived skill).
+# Both live under `metadata:`, the Agent Skills slot for custom keys: claude.ai
+# uploads and the Skills API reject any other top-level key, Claude Code ignores it.
 # Phase 4a shipped this as WARNINGS while the backfill landed; now enforced as errors.
 GROUNDING_STRICT = True
+
+# Top-level frontmatter keys the Agent Skills spec and Claude Code define. Anything
+# else is an error: put custom keys under `metadata:`.
+ALLOWED_TOP_KEYS = {
+    "name", "description", "license", "compatibility", "metadata", "allowed-tools",
+    "when_to_use", "disable-model-invocation", "user-invocable", "paths", "model",
+    "effort", "context",
+}
 
 # --- real-secret patterns (kept tight to avoid flagging documented regexes) ---
 PRIVATE_KEY_LABEL = "Private key block"
@@ -64,11 +75,6 @@ SECRET_PATTERNS = [
 SECRET_ALLOW = re.compile(
     r"AKIAIOSFODNN7EXAMPLE|EXAMPLE|wJalrXUtnFEMI|\[0-9A-Z\]|\{1[06]\}|<[^>]+>|\.\.\."
 )
-
-# Intentional kitchen-sink router/aggregator skills whose descriptions deliberately
-# exceed the per-skill limit (they route to everything). Over-length is a warning,
-# not an error, for these. Do NOT add new skills here — write focused descriptions.
-DESC_LIMIT_GRANDFATHERED = {"bug-bounty", "bb-local-toolkit", "osint-methodology"}
 
 WORD_RE = re.compile(r"[a-z0-9]+")
 
@@ -117,14 +123,37 @@ def split_frontmatter(raw):
     if close is None:
         return {}, raw, "frontmatter opened with '---' but never closed"
     fm = {}
+    in_meta = False
     for line in parts[1:close]:
         if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line[0] in " \t":
+            # nested line: `metadata:` children are flattened into fm so the grounding
+            # checks read them like top-level keys; list items are skipped
+            m = re.match(r"^\s+([A-Za-z0-9_-]+):\s*(.*)$", line) if in_meta else None
+            if m:
+                fm[m.group(1)] = m.group(2).strip()
             continue
         m = re.match(r"^([A-Za-z0-9_-]+):\s*(.*)$", line)
         if m:
             fm[m.group(1)] = m.group(2).strip()
+            in_meta = m.group(1) == "metadata"
     body = "\n".join(parts[close + 1:])
     return fm, body, None
+
+
+def top_level_keys(raw):
+    """Keys at column 0 of the frontmatter block (nested `metadata:` children excluded)."""
+    keys = []
+    if not raw.startswith("---"):
+        return keys
+    for line in raw.split("\n")[1:]:
+        if line.strip() == "---":
+            break
+        m = re.match(r"^([A-Za-z0-9_-]+):", line)
+        if m:
+            keys.append(m.group(1))
+    return keys
 
 
 def yaml_safety_errors(name, raw):
@@ -138,7 +167,7 @@ def yaml_safety_errors(name, raw):
     for i in range(1, len(lines)):
         if lines[i].strip() == "---":
             break
-        m = re.match(r"^([A-Za-z0-9_-]+):\s*(.*)$", lines[i])
+        m = re.match(r"^\s*([A-Za-z0-9_-]+):\s*(.*)$", lines[i])
         if not m or not m.group(2):
             continue
         val = m.group(2)
@@ -162,6 +191,10 @@ def lint_skill(skill_dir, denylist):
     if fm_err:
         errors.append(f"{name}: {fm_err}")
     errors += yaml_safety_errors(name, raw)
+    for key in top_level_keys(raw):
+        if key not in ALLOWED_TOP_KEYS:
+            errors.append(f"{name}: frontmatter key `{key}` is not an Agent Skills / Claude Code field — "
+                          f"move custom keys under `metadata:` (claude.ai and the Skills API reject it)")
     # name
     fn = fm.get("name", "")
     if not fn:
@@ -176,9 +209,8 @@ def lint_skill(skill_dir, denylist):
     if not desc:
         errors.append(f"{name}: frontmatter missing `description`")
     elif len(desc) > MAX_DESC:
-        msg = (f"{name}: description {len(desc)} chars > {MAX_DESC} limit "
-               f"(Codex rejects >1024; install.sh --agents auto-truncates the Codex copy)")
-        (warnings if name in DESC_LIMIT_GRANDFATHERED else errors).append(msg)
+        errors.append(f"{name}: description {len(desc)} chars > {MAX_DESC} limit "
+                      f"(Codex rejects >1024; install.sh --agents auto-truncates the Codex copy)")
     elif len(desc) < 40:
         warnings.append(f"{name}: description very short ({len(desc)} chars) — weak trigger surface")
     # body length

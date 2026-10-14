@@ -1,8 +1,9 @@
 ---
 name: hunt-graphql
 description: Hunting skill for graphql vulnerabilities. Built from 26 public bug bounty reports across IDOR via node() / GID, mutation IDOR including AI/LLM features, cross-tenant IDOR, SSRF via argument, batching-DoS, query-cost-bypass, SQLi via argument, broken-object-level-authz, auth-bypass via unscoped mutations, and PII exposure from missing field-level authz. Use when hunting graphql on any target.
-sources: hackerone_public, github, gitlab_security
-report_count: 26
+metadata:
+  sources: hackerone_public, github, gitlab_security
+  report_count: 26
 ---
 
 ## Crown Jewel Targets

@@ -1,8 +1,9 @@
 ---
 name: infra-devops-platforms
 description: "Triage internet-exposed DevOps control planes, secret stores, service discovery, artifact registries and source-control daemons at the protocol and unauthenticated-API layer: HashiCorp Vault 8200, Consul 8500 and DNS 8600, Nomad 4646, Netflix Eureka 8761, Spring Cloud Config, the Jenkins inbound-agent port 50000, TeamCity 8111, GitLab self-managed, Gitea, Gogs, Forgejo, Gerrit SSH 29418, git daemon 9418, Sonatype Nexus, JFrog Artifactory, Harbor, Docker Registry v2 on 5000, Quay, Verdaccio 4873, devpi, SonarQube 9000, Drone, Argo CD, Argo Workflows, Rundeck 4440, AWX and Ansible Tower, Terraform Enterprise, Portainer and Rancher. Covers version oracles, default auth posture, a 2021-2026 CVE matrix with CISA KEV status and fixed versions, and safe read-only checks. Stage A is GET-only; anything that registers, writes, submits, pushes, publishes, initialises or executes is Stage B behind written sign-off. Use when a scan or certificate shows one of these products on an in-scope external host."
-sources: nvd, cisa_kev, vendor_advisories, vendor_documentation, project_source_code, github_security_advisories, bugcrowd_vrt
-report_count: 0
+metadata:
+  sources: nvd, cisa_kev, vendor_advisories, vendor_documentation, project_source_code, github_security_advisories, bugcrowd_vrt
+  report_count: 0
 ---
 
 ## When to use
@@ -62,6 +63,18 @@ write-ups walk straight past:
 | Credential guessing of any kind | `hunt-brute-force` |
 | Leaked tokens and keys for these products | `hunt-source-leak`, `cloud-iam-deep` |
 | Mattermost and Rocket.Chat | Fingerprint rows only (Step 3). Their web surface goes to `hunt-exposed-panels` and the generic `hunt-*` classes. |
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/secrets-and-discovery.md` | Vault 8200/8201 unauthenticated `sys/*`, redaction options, uninitialised state; Consul 8600 DNS and gossip/RPC ports, ACL oracle; Nomad 4647/4648; Eureka 8761; Spring Cloud Config key-name extraction | vault exposed, vault seal-status, consul dns 8600, consul acl disabled, nomad acl disabled, eureka apps exposed, spring cloud config exposed |
+| `references/build-and-automation.md` | Jenkins agent port 50000 and `/tcpSlaveAgentListener/`; TeamCity; Drone `/version` and `/varz`; Argo CD; Argo Workflows auth modes; Rundeck; AWX `/api/v2/ping/`; Terraform Enterprise; SonarQube | jenkins 50000, jnlp port, teamcity exposed, drone varz, argocd settings, argo workflows auth-mode server, rundeck 4440, awx ping, sonarqube api exposed |
+| `references/source-control.md` | GitLab self-managed, Gitea, Gogs, Forgejo, Gerrit 8080/29418, git daemon 9418, open registration | gitlab self-managed version, gitea api version, gogs exposed, gerrit 29418, git daemon 9418, git ls-remote |
+| `references/artifact-registries.md` | Nexus, Harbor, Docker Registry v2 on 5000, Quay, Verdaccio, devpi; Artifactory cross-reference | nexus 8081, harbor systeminfo, docker registry catalog, registry v2 exposed, quay exposed, verdaccio 4873, devpi 3141 |
+| `references/devops-cve-matrix.md` | 2021-2026 CVE matrix with KEV status and fixed versions for every product above; older KEV entries; client-side rows not to report | teamcity cve, gitlab kev, artifactory kev, gogs cve, gitea cve, vault cve, nexus cve, harbor cve, argo cd cve, kev devops |
 
 ---
 
@@ -385,15 +398,7 @@ that any created account, token or session was removed.
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/secrets-and-discovery.md` | Vault 8200/8201 unauthenticated `sys/*`, redaction options, uninitialised state; Consul 8600 DNS and gossip/RPC ports, ACL oracle; Nomad 4647/4648; Eureka 8761; Spring Cloud Config key-name extraction | vault exposed, vault seal-status, consul dns 8600, consul acl disabled, nomad acl disabled, eureka apps exposed, spring cloud config exposed |
-| `references/build-and-automation.md` | Jenkins agent port 50000 and `/tcpSlaveAgentListener/`; TeamCity; Drone `/version` and `/varz`; Argo CD; Argo Workflows auth modes; Rundeck; AWX `/api/v2/ping/`; Terraform Enterprise; SonarQube | jenkins 50000, jnlp port, teamcity exposed, drone varz, argocd settings, argo workflows auth-mode server, rundeck 4440, awx ping, sonarqube api exposed |
-| `references/source-control.md` | GitLab self-managed, Gitea, Gogs, Forgejo, Gerrit 8080/29418, git daemon 9418, open registration | gitlab self-managed version, gitea api version, gogs exposed, gerrit 29418, git daemon 9418, git ls-remote |
-| `references/artifact-registries.md` | Nexus, Harbor, Docker Registry v2 on 5000, Quay, Verdaccio, devpi; Artifactory cross-reference | nexus 8081, harbor systeminfo, docker registry catalog, registry v2 exposed, quay exposed, verdaccio 4873, devpi 3141 |
-| `references/devops-cve-matrix.md` | 2021-2026 CVE matrix with KEV status and fixed versions for every product above; older KEV entries; client-side rows not to report | teamcity cve, gitlab kev, artifactory kev, gogs cve, gitea cve, vault cve, nexus cve, harbor cve, argo cd cve, kev devops |
+## Sources
 
 Primary sources (checked 2026-10-13): CISA KEV feed, catalog 2026.10.13
 <https://www.cisa.gov/known-exploited-vulnerabilities-catalog>; NVD API

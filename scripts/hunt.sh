@@ -64,7 +64,7 @@ Files in this folder:
 1. **Plan** — fill in `scope.md` from the program page. Use the `bb-methodology`
    and `osint-methodology` skills. Note Focus Areas and Bounty bands.
 
-2. **Recon** — `offensive-osint`, `web2-recon`, and `bb-local-toolkit` for
+2. **Recon** — `offensive-osint` and `web2-recon` for
    discovery. Pipe Burp through every browser session for proxy history.
 
 3. **Hunt** — `web2-vuln-classes` (or per-class `hunt-*` skills if installed)

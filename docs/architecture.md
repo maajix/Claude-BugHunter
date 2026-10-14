@@ -4,15 +4,15 @@ The Claude-BugHunter bundle maps to a 6-phase workflow that supports both bug hu
 
 ## Primary view — phase-by-phase architecture
 
-112 skills mapped to 6 phases, with a 70-skill `hunt-*` sub-stack, an 8-skill enterprise-platform attack layer, a 16-skill external-infrastructure layer, integration layer, and usage decision tree. This is the main reference for "which skill do I use when?".
+111 skills mapped to 6 phases, with a 70-skill `hunt-*` sub-stack, an 8-skill enterprise-platform attack layer, a 16-skill external-infrastructure layer, integration layer, and usage decision tree. This is the main reference for "which skill do I use when?".
 
 ![architecture overview](assets/architecture-overview.svg)
 
-The "Source" column in the per-phase tables below tags each skill: **`original`** = author's work in this repo, `community` = community-contributed (v3), `vendored` = from [shuvonsec/claude-bug-bounty](https://github.com/shuvonsec/claude-bug-bounty) (MIT). Of 112 skills: 82 original, 22 community (v3 + community forks), 8 vendored.
+The "Source" column in the per-phase tables below tags each skill: **`original`** = author's work in this repo, `community` = community-contributed (v3), `vendored` = from [shuvonsec/claude-bug-bounty](https://github.com/shuvonsec/claude-bug-bounty) (MIT). Of 111 skills: 81 original, 22 community (v3 + community forks), 8 vendored.
 
 ## Alternate view — 3-layer capability stack
 
-The same 112 skills, regrouped by **role in an engagement** rather than by phase. Methodology + Recon (bottom) feeds the Hunt Arsenal (middle), which produces findings that flow up through Ship It (top) to a paid submission or client deliverable.
+The same 111 skills, regrouped by **role in an engagement** rather than by phase. Methodology + Recon (bottom) feeds the Hunt Arsenal (middle), which produces findings that flow up through Ship It (top) to a paid submission or client deliverable.
 
 ![capability map](assets/capability-map.svg)
 
@@ -35,7 +35,6 @@ The 6-phase workflow expanded into a pipeline showing per-phase active skills, t
 | `bug-bounty` | vendored | Master orchestrator — pulls in other skills as needed |
 | `bb-methodology` | vendored | 5-phase workflow + hunting mindset |
 | **`osint-methodology`** | original | Recon framework, 29-type asset graph, time budgeting |
-| **`bb-local-toolkit`** | original | Full pipeline router for local cloned bug-bounty repos |
 | **`hunt <target>` (shell)** | original | Scaffolds `~/Targets/<name>/` with full template |
 
 ## Phase 2 — RECON (discovery)
@@ -47,7 +46,6 @@ The 6-phase workflow expanded into a pipeline showing per-phase active skills, t
 | **`offensive-osint`** | original | 15-reference probe/regex/dork arsenal — loads on demand |
 | **`recon-scope-triage`** | original | On receiving an ASM/recon dataset — ownership & namespace-collision dedup, in-scope triage before testing |
 | `web2-recon` | vendored | Subdomain enumeration, host discovery, URL crawling |
-| **`bb-local-toolkit`** | original | Routes to local cloned bug-bounty repos when applicable |
 
 ## Phase 3 — HUNT (active testing)
 

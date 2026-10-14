@@ -1,8 +1,9 @@
 ---
 name: infra-voip-sip
 description: "Triage internet-exposed VoIP and unified-communications infrastructure found by an external infrastructure pentest: SIP 5060/5061, SIPS, RTP ranges, H.323 1720, IAX2 4569, STUN/TURN 3478/5349, and the PBX or SBC behind them (Asterisk, FreePBX, FreeSWITCH, Kamailio, OpenSIPS, 3CX, Cisco CUCM, Mitel MiCollab, Avaya, Grandstream, Yealink, AudioCodes, Microsoft Teams Direct Routing SBCs). Stage A is one SIP OPTIONS fingerprint, one STUN binding request and a version gate against the KEV-listed PBX CVE matrix (FreePBX CVE-2025-57819, Mitel CVE-2024-41713, Cisco UCM CVE-2026-20045). The finding is the exposure plus what the version proves: unauthenticated call routing (toll fraud), extension enumeration and TURN relay abuse are defined here as findings but their proof is Stage B with written sign-off. Use when a port scan shows 5060, 5061, 1720, 4569, 3478 or a Server/User-Agent header names a PBX. Never calls third parties, never floods, never captures real calls."
-sources: cisa_kev, github_security_advisories, asterisk_security_advisories, freepbx_security_advisories, nmap_nse_docs, rfc_3261, rfc_5389, microsoft_learn, authorized-engagement
-report_count: 0
+metadata:
+  sources: cisa_kev, github_security_advisories, asterisk_security_advisories, freepbx_security_advisories, nmap_nse_docs, rfc_3261, rfc_5389, microsoft_learn, authorized-engagement
+  report_count: 0
 ---
 
 ## When to use
@@ -43,6 +44,16 @@ else's credentials. No flood, no fuzzing, no DoS-class CVE check.
   MiCollab portal): `hunt-exposed-panels` owns the web surface. This skill
   uses the web banner only as a version source.
 - Phone handset web interfaces: same, `hunt-exposed-panels`.
+
+---
+
+## References Index
+
+- `references/voip-cve-matrix.md` — product, CVE, affected, fixed, KEV date, source URL.
+- RFC 3261 §11 (OPTIONS), RFC 5389 (STUN), RFC 8656 (TURN).
+- CISA KEV catalog (2026.10.13 snapshot used for the dates above).
+- nmap NSE script categories read from the local script headers: `sip-methods` (default, safe, discovery), `sip-enum-users` (auth, intrusive), `sip-brute` (intrusive, brute), `sip-call-spoof` (discovery, intrusive), `stun-info` (discovery, safe).
+- Microsoft Learn, "Plan Direct Routing": signaling source ranges and SRTP requirement.
 
 ---
 
@@ -204,14 +215,6 @@ honeypot" and do not grade a CVE match from the banner.
 - [ ] Honeypot signals checked before grading any banner-based CVE.
 - [ ] Every Stage B item (call, relay allocation, credential use) has written sign-off naming scope, destination and time window, or was not done.
 - [ ] Report states what the exposure grants, not only that the port is open.
-
-## References Index
-
-- `references/voip-cve-matrix.md` — product, CVE, affected, fixed, KEV date, source URL.
-- RFC 3261 §11 (OPTIONS), RFC 5389 (STUN), RFC 8656 (TURN).
-- CISA KEV catalog (2026.10.13 snapshot used for the dates above).
-- nmap NSE script categories read from the local script headers: `sip-methods` (default, safe, discovery), `sip-enum-users` (auth, intrusive), `sip-brute` (intrusive, brute), `sip-call-spoof` (discovery, intrusive), `stun-info` (discovery, safe).
-- Microsoft Learn, "Plan Direct Routing": signaling source ranges and SRTP requirement.
 
 ## Related Skills & Chains
 

@@ -1,8 +1,9 @@
 ---
 name: infra-network-devices
 description: "Triage internet-exposed management and control planes of network devices. Families: MikroTik RouterOS (Winbox 8291, API 8728/8729, WebFig/REST, btest 2000); Ubiquiti (discovery 10001/udp, UniFi Network 8443, UniFi OS, EdgeOS, airOS); TR-069/CWMP 7547 CPEs and ACS servers (GenieACS NBI 7557); Cisco IOS XE web UI, ASA and FMC; Juniper J-Web; Fortinet FGFM 541 and FortiGate admin; PAN-OS management; SOHO/CPE admin UIs (Zyxel, DrayTek, TP-Link, D-Link KEV rows; Netgear, Linksys, Tenda); Aruba, Ruckus and Cisco wireless controllers; fingerprint rows for TACACS+ 49, RADIUS 1812, BGP 179, RIP 520/udp, syslog 514/udp, NetFlow/sFlow and SSDP 1900/udp. Read-only fingerprinting, version gates against a KEV-checked CVE matrix, one-datagram amplification checks, grading. Stage A read-only; logins, enumeration and CVE triggers are Stage B with written sign-off; DoS checks are declined. Use when a scan, banner or title shows one of these devices or ports on an in-scope host."
-sources: nvd, cisa_kev, cisa_ics_advisories, vendor_advisories, project_documentation, tool_source_code, public_research
-report_count: 0
+metadata:
+  sources: nvd, cisa_kev, cisa_ics_advisories, vendor_advisories, project_documentation, tool_source_code, public_research
+  report_count: 0
 ---
 
 ## When to use
@@ -43,6 +44,15 @@ attack, outside `SECURITY.md`.
   Talk, Connect, UISP, Expedition, ACS front-ends and Grafana go to
   `hunt-exposed-panels`; NAS models to `infra-backup-nas`.
 - **Every credential attempt**: `hunt-brute-force`, and Stage B here.
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/device-cve-matrix.md` | Every family's CVEs with affected and fixed builds, KEV status (catalog 2026.10.13), how the version is known, test stance, owned-elsewhere pointers, the `infra-ssh` cross-reference, sources | mikrotik cve, winbox cve-2018-14847, mikrotrick ssh, unifi os kev, cve-2026-22557, misfortune cookie, genieacs cve, ios xe cve-2023-20198, j-web cve-2023-36845, fortimanager cve-2024-47575, fgfm 541, pan-os management cve, zyxel kev, draytek kev, tp-link kev, d-link kev, aruba papi cve, ruckus cve-2023-25717, callstranger, blast-radius |
+| `references/fingerprints-and-ports.md` | Port and owner map, banners, titles and nmap labels, probes that fire on these ports, collisions, honeypot signs, offline discovery decoder, SSDP reading, AAA and control-plane rows | which skill for 8291, winbox fingerprint, routeros api 8728, btest 2000, ubiquiti 10001, unifi ports, cwmp 7547, genieacs ports, fgfm port 541, aruba 4343 8211, tacacs 49, radius 1812, bgp 179, rip 520, ssdp 1900, sccp 2000 collision |
 
 ---
 
@@ -484,13 +494,6 @@ Compromise markers also get a `mid-engagement-ir-detection` record.
 - [ ] Versions labelled with source and "unconfirmed"; logins only with a
       logged sign-off; compromise markers reported the same day.
 - [ ] The report ends at exposure and impact. The device was not used as a hop.
-
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/device-cve-matrix.md` | Every family's CVEs with affected and fixed builds, KEV status (catalog 2026.10.13), how the version is known, test stance, owned-elsewhere pointers, the `infra-ssh` cross-reference, sources | mikrotik cve, winbox cve-2018-14847, mikrotrick ssh, unifi os kev, cve-2026-22557, misfortune cookie, genieacs cve, ios xe cve-2023-20198, j-web cve-2023-36845, fortimanager cve-2024-47575, fgfm 541, pan-os management cve, zyxel kev, draytek kev, tp-link kev, d-link kev, aruba papi cve, ruckus cve-2023-25717, callstranger, blast-radius |
-| `references/fingerprints-and-ports.md` | Port and owner map, banners, titles and nmap labels, probes that fire on these ports, collisions, honeypot signs, offline discovery decoder, SSDP reading, AAA and control-plane rows | which skill for 8291, winbox fingerprint, routeros api 8728, btest 2000, ubiquiti 10001, unifi ports, cwmp 7547, genieacs ports, fgfm port 541, aruba 4343 8211, tacacs 49, radius 1812, bgp 179, rip 520, ssdp 1900, sccp 2000 collision |
 
 ## Related Skills & Chains
 

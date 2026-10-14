@@ -1,8 +1,9 @@
 ---
 name: hunt-springboot
 description: Hunt Spring Boot specific vulnerabilities — Actuator endpoints (heapdump, env, loggers, mappings, shutdown), Spring Expression Language (SpEL) injection → RCE, H2 console RCE, Jolokia JMX exposure, Spring4Shell (CVE-2022-22965), Spring Cloud Function SPEL (CVE-2022-22963), Spring Cloud Gateway actuator (CVE-2022-22947, CVE-2025-41243), heap dump credential extraction. Use when target runs Spring Boot — detected via X-Application-Context header, /actuator, Whitelabel Error Page, or Java stack traces.
-sources: hackerone_public, cve_database, spring_security_advisories
-report_count: 16
+metadata:
+  sources: hackerone_public, cve_database, spring_security_advisories
+  report_count: 16
 ---
 
 # HUNT-SPRINGBOOT — Spring Boot Specific Vulnerabilities

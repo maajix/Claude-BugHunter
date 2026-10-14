@@ -1,8 +1,9 @@
 ---
 name: hunt-deserialization
 description: "Hunt Insecure Deserialization — Java gadget chains (ysoserial), PHP object injection (phpggc), Python pickle RCE, .NET BinaryFormatter, Ruby Marshal.load, JNDI/Log4Shell. RCE via deserialization is almost always Critical. Also covers blind-sink confirmation without code execution (ysoserial URLDNS DNS-only oracle, GadgetProbe classpath enumeration), SignedObject wrapping past per-stream look-ahead filters, Laravel Livewire snapshot hydration (CVE-2025-54068), Ruby class pollution and Rails _json juggling, and ML model files as deserialization sinks (PyTorch torch.load pickle, Keras .keras/.h5 config deserialization, joblib, numpy allow_pickle). Use when target runs Java, PHP serialization, Python pickle, .NET, Ruby on Rails or Livewire, or when it loads uploaded or fetched model/checkpoint files."
-sources: hackerone_public, hacktricks_coverage_checklist, ysoserial_project, ysoserial_net_project, gadgetprobe_bishopfox, github_advisory_database, pytorch_docs, keras_docs, numpy_docs, joblib_docs, python_stdlib_docs, hdf_group_format_spec, openjdk_source, synacktiv_research, doyensec_research, trailofbits_fickling, protectai_modelscan
-report_count: 22
+metadata:
+  sources: hackerone_public, hacktricks_coverage_checklist, ysoserial_project, ysoserial_net_project, gadgetprobe_bishopfox, github_advisory_database, pytorch_docs, keras_docs, numpy_docs, joblib_docs, python_stdlib_docs, hdf_group_format_spec, openjdk_source, synacktiv_research, doyensec_research, trailofbits_fickling, protectai_modelscan
+  report_count: 22
 ---
 
 # HUNT-DESERIALIZATION — Insecure Deserialization

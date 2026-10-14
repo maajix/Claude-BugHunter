@@ -1,9 +1,12 @@
 ---
 name: hunt-electron
 description: "Hunt Electron and Chromium-wrapper desktop apps as a web attack surface - the app is web code, so an XSS inside it reaches the OS. Covers the per-version security model (nodeIntegration false since Electron 5, contextIsolation true since 12, remote module removed in 14, sandbox true since 20, new-window removed in 22), the escalation path from a DOM sink to require('child_process') or a preload-exposed bridge, over-broad contextBridge.exposeInMainWorld APIs, ipcMain handlers that never check event.senderFrame (CVE-2022-29247), navigation control (will-navigate, will-frame-navigate, setWindowOpenHandler), custom myapp:// deep links and Windows command-line argument injection (CVE-2018-1000006), shell.openExternal with attacker-controlled input, asar unpacking and why asar is not a security boundary, electron-updater signing bypass (CVE-2024-39698), and shipped secrets. Use when scope includes a downloadable desktop client, an Electron/NW.js/CEF wrapper, or an app whose UI is HTML."
-sources: electron_docs, electron_breaking_changes, github_security_advisories, hackerone_public, doyensec_research, public_research, hacktricks_coverage_checklist
-report_count: 6
+metadata:
+  sources: electron_docs, electron_breaking_changes, github_security_advisories, hackerone_public, doyensec_research, public_research, hacktricks_coverage_checklist
+  report_count: 6
 ---
+
+> Authorized testing only: run this against assets you own or that a signed scope or a program's in-scope list names. It is a find-and-report methodology, not a weapon.
 
 ## Crown Jewel Targets
 

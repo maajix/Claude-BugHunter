@@ -52,6 +52,32 @@ export BUGHUNTER_ENGAGEMENT=/path/to/engagement.json
 python3 engine/throttle.py show
 ```
 
+### Where the guard runs
+
+`hooks/throttle-guard.py` is a Claude Code `PreToolUse` hook. The plugin install
+wires it through `hooks/hooks.json` on its own. The copy install
+(`scripts/install.sh`, `scripts/install.ps1`) copies skills and commands only, so
+add the hook to `~/.claude/settings.json` yourself, with the absolute path of your
+clone in place of `${CLAUDE_PLUGIN_ROOT}`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$|^WebFetch$",
+        "hooks": [
+          {"type": "command", "command": "python3 -I /path/to/Claude-BugHunter/hooks/throttle-guard.py", "timeout": 10}
+        ]
+      }
+    ]
+  }
+}
+```
+
+Without the hook, the ceiling still holds for every command run through
+`engine/throttle.py exec`; only traffic that goes around it is unguarded.
+
 ## Using it
 
 Prefix a network tool. That is the whole interface:

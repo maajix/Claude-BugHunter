@@ -1,7 +1,8 @@
 ---
 name: bug-bounty
-description: Complete bug bounty workflow — recon (subdomain enumeration, asset discovery, fingerprinting, HackerOne scope, source code audit), pre-hunt learning (disclosed reports, tech stack research, mind maps, threat modeling), vulnerability hunting (IDOR, SSRF, XSS, auth bypass, CSRF, race conditions, SQLi, XXE, file upload, business logic, GraphQL, HTTP smuggling, cache poisoning, OAuth, timing side-channels, OIDC, SSTI, subdomain takeover, cloud misconfig, ATO chains, agentic AI), LLM/AI security testing (chatbot IDOR, prompt injection, indirect injection, ASCII smuggling, exfil channels, RCE via code tools, system prompt extraction, ASI01-ASI10), A-to-B bug chaining (IDOR→auth bypass, SSRF→cloud metadata, XSS→ATO, open redirect→OAuth theft, S3→bundle→secret→OAuth), bypass tables (SSRF IP bypass, open redirect bypass, file upload bypass), language-specific grep (JS prototype pollution, Python pickle, PHP type juggling, Go template.HTML, Ruby YAML.load, Rust unwrap), and reporting (7-Question Gate, 4 validation gates, human-tone writing, templates by vuln class, CVSS 3.1, PoC generation, always-rejected list, conditional chain table, submission checklist). Use for ANY bug bounty task — starting a new target, doing recon, hunting specific vulns, auditing source code, testing AI features, validating findings, or writing reports. 中文触发词：漏洞赏金、安全测试、渗透测试、漏洞挖掘、信息收集、子域名枚举、XSS测试、SQL注入、SSRF、安全审计、漏洞报告
-sources: community, public_research
+description: "Complete bug bounty workflow: recon (subdomain enumeration, asset discovery, fingerprinting, scope parsing, source code audit), pre-hunt learning (disclosed reports, tech stack research, threat modeling), vulnerability hunting (IDOR, SSRF, XSS, auth bypass, CSRF, race conditions, SQLi, XXE, file upload, business logic, GraphQL, HTTP smuggling, cache poisoning, OAuth/OIDC, SSTI, subdomain takeover, cloud misconfig, ATO chains, agentic AI), LLM/AI testing (prompt injection, exfil channels, system prompt extraction), A-to-B bug chaining, bypass tables, language-specific grep (JS, Python, PHP, Go, Ruby, Rust), and reporting (7-Question Gate, templates by vuln class, CVSS 3.1, PoC, submission checklist). Use for any bug bounty task: starting a new target, recon, hunting specific vulns, auditing source code, testing AI features, validating findings, or writing reports. 中文触发词：漏洞赏金、安全测试、渗透测试、漏洞挖掘、信息收集、子域名枚举、XSS测试、SQL注入、SSRF、安全审计、漏洞报告"
+metadata:
+  sources: community, public_research
 ---
 
 # Bug Bounty Master Workflow
@@ -1606,7 +1607,7 @@ Then in Claude Code, this skill loads automatically when you ask about bug bount
 
 ### When to use the orchestrator vs a direct skill
 
-The orchestrator (this skill) is for the "I don't yet know what bug class to hunt for" case. If you've already identified the candidate — "the response reflects my Host header into a JavaScript src URL, that's cache poisoning" — load `hunt-cache-poisoning` directly. The orchestrator's value is the initial routing from a fuzzy intent ("there's a chatbot, what should I test") to a concrete skill set (`hunt-llm-ai` + `hunt-api-misconfig`).
+The orchestrator (this skill) is for the "I don't yet know what bug class to hunt for" case. If you've already identified the candidate — "the response reflects my Host header into a JavaScript src URL, that's cache poisoning" — load `hunt-cache-poison` directly. The orchestrator's value is the initial routing from a fuzzy intent ("there's a chatbot, what should I test") to a concrete skill set (`hunt-llm-ai` + `hunt-api-misconfig`).
 
 When in doubt: open the orchestrator FIRST on any new target, let it route, then close the orchestrator and work in the loaded skills. Don't keep the orchestrator loaded all session — it occupies context window that could hold actual probe results.
 
@@ -1640,4 +1641,3 @@ Use the scaffold from the start. Half-organized engagements lose findings — a 
 ### When the orchestrator gets it wrong
 
 Across 30+ Phase 2 verification tests in this repo, the orchestrator correctly auto-triggered the matching skill in every test — zero misfires. If on a future target the orchestrator misroutes (loads the wrong hunt-* for the topic), the cause is almost always the `description:` frontmatter field on the target skill: a missing keyword that would have matched the user's intent. Fix forward by editing that skill's frontmatter `description:` field to include the missing trigger word. Don't add another layer of dispatch logic; tighten the description.
-- **`bb-local-toolkit`** — When you need to know which local clone has the tool for a given task. Workflow primitive: this skill is general bug-bounty guidance; `bb-local-toolkit` answers the specific "where is jhaddix/SecLists installed on this machine?" question.

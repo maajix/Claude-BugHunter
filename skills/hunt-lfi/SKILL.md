@@ -1,9 +1,12 @@
 ---
 name: hunt-lfi
 description: "Hunt Local File Inclusion (LFI), Remote File Inclusion (RFI), and Path Traversal — /etc/passwd read, log poisoning → RCE, PHP filter-chain RCE (no upload needed), php:// / data:// / zip:// / phar:// wrappers, RFI via allow_url_include, directory traversal read/write/delete, pearcmd.php config-create RCE on containerised PHP, and PHP_SESSION_UPLOAD_PROGRESS to force a controlled session file when no writable path is known. Covers OOB/blind LFI confirmation and false-positive discipline. Use when hunting file-include or path-traversal bugs on any target."
-sources: hackerone_public, synacktiv_research, portswigger_research, hacktricks_coverage_checklist, php_documentation, php_src, watchtowr_research, orange_tsai_research, leavesongs_research
-report_count: 24
+metadata:
+  sources: hackerone_public, synacktiv_research, portswigger_research, hacktricks_coverage_checklist, php_documentation, php_src, watchtowr_research, orange_tsai_research, leavesongs_research
+  report_count: 24
 ---
+
+> Authorized testing only: run this against assets you own or that a signed scope or a program's in-scope list names. It is a find-and-report methodology, not a weapon.
 
 # HUNT-LFI — Local / Remote File Inclusion & Path Traversal
 

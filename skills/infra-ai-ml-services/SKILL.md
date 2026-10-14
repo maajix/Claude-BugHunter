@@ -1,8 +1,9 @@
 ---
 name: infra-ai-ml-services
 description: "Triage internet-exposed AI/ML serving, training, orchestration and agent-builder services at the service layer: Ollama 11434, vLLM, TGI, llama.cpp, LM Studio, LiteLLM and OpenAI-compatible endpoints; Ray (ShadowRay CVE-2023-48022), TorchServe, NVIDIA Triton, BentoML, Kubeflow/KServe; MLflow, ClearML, Label Studio, Prefect, Dagster, JupyterHub; Gradio, ComfyUI, Open WebUI, AnythingLLM; Langflow (six CISA KEV rows), Flowise, Dify, n8n; and MCP servers over SSE or Streamable HTTP. The finding is unauthenticated access plus what it exposes: model lists, system prompts, provider keys, job queues, tool lists, unclaimed first-run admin. Stage A reads version, health and config endpoints only; inference, job or flow submission, model pull or push, uploads, signup and tool calls are Stage B with written sign-off. Use when a port scan, Shodan or Censys record, JS bundle or compose file shows one of these services on an in-scope host. Prompt injection stays with hunt-llm-ai; vector databases with hunt-rag-vector."
-sources: nvd, cisa_kev, github_advisories, osv, vendor_documentation, project_source, bugcrowd_vrt
-report_count: 0
+metadata:
+  sources: nvd, cisa_kev, github_advisories, osv, vendor_documentation, project_source, bugcrowd_vrt
+  report_count: 0
 ---
 
 ## When to use
@@ -52,6 +53,19 @@ credential, the finding is already complete. Write it up and stop.
   (`references/databases.md`). Ray's GCS also sits on 6379; Step 3 tells them apart.
 - Validating a provider API key you read from a config: `cloud-iam-deep`.
 - Credential guessing of any kind: `hunt-brute-force`.
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/ai-ml-cve-matrix.md` | 2023-2026 version-gate table for every product in this skill with KEV status (catalog 2026.10.13), unauthenticated-or-not column, affected and fixed versions, GHSA sources; the twelve-row KEV escalation set; MCP SDK rows | shadowray, cve-2023-48022, shelltorch, ollama cve, langflow kev, cve-2025-3248, mlflow cve, litellm mcp, triton cve, gradio file read |
+| `references/llm-inference-servers.md` | Ollama, vLLM, TGI, llama.cpp server and RPC, LM Studio, LiteLLM, any OpenAI-compatible endpoint: ports, default binds, version and model-list endpoints, what the listing leaks | ollama 11434, /api/tags, /v1/models no auth, vllm exposed, litellm proxy, lm studio 1234, ggml-rpc |
+| `references/ml-serving-and-compute.md` | Ray dashboard, client and GCS ports, TorchServe three-port layout, NVIDIA Triton `/v2` API, BentoML, Kubeflow Pipelines, KServe, Seldon | ray dashboard 8265, ray jobs api, torchserve 8081, triton 8000, bentoml, kubeflow pipelines exposed |
+| `references/mlops-platforms.md` | MLflow tracking server, ClearML server, Label Studio, Prefect, Dagster, JupyterHub and jupyter-server-proxy | mlflow 5000 no auth, clearml 8008, label studio exposed, prefect 4200, dagster graphql, jupyterhub /hub/api |
+| `references/ai-web-uis.md` | Gradio and Hugging Face Spaces, ComfyUI, Open WebUI, AnythingLLM: config and status endpoints, unclaimed-admin states, share links | gradio /config, gradio.live, comfyui 8188, open webui onboarding, anythingllm setup |
+| `references/agent-builders-and-mcp.md` | Langflow, Flowise, Dify, n8n status and version endpoints, owner-setup states, webhook surfaces; MCP servers over SSE and Streamable HTTP, protected-resource metadata, `initialize` and `tools/list`, MCP Inspector proxy | langflow auto_login, flowise chatflows, dify setup not_started, n8n /rest/settings, mcp server exposed, /sse endpoint, tools/list, mcp inspector 6277 |
 
 ---
 
@@ -303,16 +317,7 @@ readable, whether or not you validated it.
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/ai-ml-cve-matrix.md` | 2023-2026 version-gate table for every product in this skill with KEV status (catalog 2026.10.13), unauthenticated-or-not column, affected and fixed versions, GHSA sources; the twelve-row KEV escalation set; MCP SDK rows | shadowray, cve-2023-48022, shelltorch, ollama cve, langflow kev, cve-2025-3248, mlflow cve, litellm mcp, triton cve, gradio file read |
-| `references/llm-inference-servers.md` | Ollama, vLLM, TGI, llama.cpp server and RPC, LM Studio, LiteLLM, any OpenAI-compatible endpoint: ports, default binds, version and model-list endpoints, what the listing leaks | ollama 11434, /api/tags, /v1/models no auth, vllm exposed, litellm proxy, lm studio 1234, ggml-rpc |
-| `references/ml-serving-and-compute.md` | Ray dashboard, client and GCS ports, TorchServe three-port layout, NVIDIA Triton `/v2` API, BentoML, Kubeflow Pipelines, KServe, Seldon | ray dashboard 8265, ray jobs api, torchserve 8081, triton 8000, bentoml, kubeflow pipelines exposed |
-| `references/mlops-platforms.md` | MLflow tracking server, ClearML server, Label Studio, Prefect, Dagster, JupyterHub and jupyter-server-proxy | mlflow 5000 no auth, clearml 8008, label studio exposed, prefect 4200, dagster graphql, jupyterhub /hub/api |
-| `references/ai-web-uis.md` | Gradio and Hugging Face Spaces, ComfyUI, Open WebUI, AnythingLLM: config and status endpoints, unclaimed-admin states, share links | gradio /config, gradio.live, comfyui 8188, open webui onboarding, anythingllm setup |
-| `references/agent-builders-and-mcp.md` | Langflow, Flowise, Dify, n8n status and version endpoints, owner-setup states, webhook surfaces; MCP servers over SSE and Streamable HTTP, protected-resource metadata, `initialize` and `tools/list`, MCP Inspector proxy | langflow auto_login, flowise chatflows, dify setup not_started, n8n /rest/settings, mcp server exposed, /sse endpoint, tools/list, mcp inspector 6277 |
+## Sources
 
 Primary sources (fetched 2026-10-13): CISA KEV catalog 2026.10.13, NVD and
 cvelistV5 records, GitHub advisories and OSV for the PyPI, npm and Go packages

@@ -1,8 +1,9 @@
 ---
 name: infra-external-methodology
 description: "Orchestrate an external infrastructure penetration test at the port and service layer. Confirm scope and per-IP ownership, plan discovery (nmap TCP top-ports then the full range, targeted UDP, IPv6, and when masscan, naabu or rustscan are acceptable and at what rate), and exclude cloud and CDN ranges that answer for every tenant. Fingerprint services read-only, then send each open port to the skill that owns it through a master port-to-skill routing table. Grades exposure findings and hands off to reporting with a coverage statement. Use for an external infrastructure pentest, a perimeter assessment, a port scan or nmap run against client IP ranges, for reading open-ports and service-enumeration output, or to answer which skill handles port N. Routes to infra-ssh, infra-ftp, infra-mail, infra-dns, infra-windows-perimeter, infra-voip-sip, infra-vpn-ike, hunt-exposed-services, hunt-k8s, hunt-exposed-panels, hunt-tls-network, enterprise-vpn-attack and vmware-vcenter-attack. External perimeter only."
-sources: nist_800_115, ptes, osstmm, nmap_docs, project_documentation, cloud_provider_policies, authorized-engagement
-report_count: 0
+metadata:
+  sources: nist_800_115, ptes, osstmm, nmap_docs, project_documentation, cloud_provider_policies, authorized-engagement
+  report_count: 0
 ---
 
 ## When to use
@@ -52,6 +53,15 @@ Two cuts that matter at this layer:
   candidate list of addresses.
 - Web application testing on 80/443 goes to `web2-recon`, then `hunt-dispatch`.
 - Every per-service probe beyond fingerprinting goes to the owner skill.
+
+---
+
+## References Index
+
+| File | Coverage | Trigger phrases |
+|---|---|---|
+| `references/port-routing-table.md` | Every port and protocol with its owner skill and reference file: TCP, UDP, alternate ports, collisions, ports with no owner | which skill for port, what is port N, route open ports, port to skill map |
+| `references/discovery-commands.md` | nmap TCP, UDP and IPv6 passes; masscan, naabu and rustscan with verified flags; the shared-range classifier; RDAP and ASN lookups; IPv6 address sources | nmap command, full port scan, udp scan, masscan rate, naabu, rustscan, ipv6 scan, cloud ip ranges, cdn ranges, exclude file |
 
 ---
 
@@ -488,12 +498,7 @@ What not to write up:
 
 ---
 
-## References Index
-
-| File | Coverage | Trigger phrases |
-|---|---|---|
-| `references/port-routing-table.md` | Every port and protocol with its owner skill and reference file: TCP, UDP, alternate ports, collisions, ports with no owner | which skill for port, what is port N, route open ports, port to skill map |
-| `references/discovery-commands.md` | nmap TCP, UDP and IPv6 passes; masscan, naabu and rustscan with verified flags; the shared-range classifier; RDAP and ASN lookups; IPv6 address sources | nmap command, full port scan, udp scan, masscan rate, naabu, rustscan, ipv6 scan, cloud ip ranges, cdn ranges, exclude file |
+## Sources
 
 Grounding: NIST SP 800-115 §4.2 and §5.2.1 (planning, discovery, attack,
 reporting); PTES's seven sections (checked against a mirror, official site
