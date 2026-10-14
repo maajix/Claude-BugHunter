@@ -1,6 +1,6 @@
 ---
 name: hunt-cms
-description: "Hunt internet-facing content-management and groupware applications: WordPress, Drupal, Joomla, Moodle, PrestaShop, Roundcube, Bolt CMS and Adobe Experience Manager (AEM, Sling, CRX). Covers per-product version fingerprinting and branch-support checks, the plugin/module/extension/theme supply chain where most real bugs live (wp-content/plugins, admin-ajax.php wp_ajax_nopriv handlers, register_rest_route permission_callback, Drupal contrib modules, Joomla com_* components, Moodle /mod/ /blocks/ /local/), leftover installer and configuration paths (install.php, /installation/, /install/, /config/sync/*.yml, CHANGELOG.txt), user and author enumeration, and the authenticated-admin-to-RCE path per product (theme and template editors, plugin ZIP upload, Twig templateselect, calculated questions, CRX package manager). Stage A read-only by default; anything that installs, posts or updates is Stage B behind written sign-off. Use when a target fingerprints as a CMS, webmail or e-commerce platform."
+description: "Hunt internet-facing content-management and groupware applications: WordPress, Drupal, Joomla, Moodle, PrestaShop, Roundcube, Bolt CMS, Craft CMS and Adobe Experience Manager (AEM, Sling, CRX). Covers per-product version fingerprinting and branch-support checks, the plugin/module/extension/theme supply chain where most real bugs live (wp-content/plugins, admin-ajax.php wp_ajax_nopriv handlers, register_rest_route permission_callback, Drupal contrib modules, Joomla com_* components, Moodle /mod/ /blocks/ /local/), leftover installer and configuration paths (install.php, /installation/, /install/, /config/sync/*.yml, CHANGELOG.txt), user and author enumeration, and the authenticated-admin-to-RCE path per product (theme and template editors, plugin ZIP upload, Twig templateselect, calculated questions, CRX package manager). Stage A read-only by default; anything that installs, posts or updates is Stage B behind written sign-off. Use when a target fingerprints as a CMS, webmail or e-commerce platform."
 sources: hacktricks_coverage_checklist, nvd, vendor_advisories, patchstack_advisories, project_documentation, vendor_release_apis, authorized-engagement
 report_count: 0
 ---
@@ -8,7 +8,11 @@ report_count: 0
 ## Crown Jewel Targets
 
 The money is almost never in CMS core. Core is read by thousands of people and
-patched on a schedule. The money is in the three layers bolted on around it.
+patched on a schedule. Patchstack counted 11,334 new WordPress-ecosystem
+vulnerabilities in 2025: 91% in plugins, 9% in themes, 6 in core, and 46% with
+no developer fix at public disclosure
+(<https://patchstack.com/whitepaper/state-of-wordpress-security-in-2026/>). The
+money is in the three layers bolted on around core.
 
 1. **The extension supply chain.** A plugin, module, component or theme written
    by one person, installed on a corporate domain, running with the same
@@ -77,6 +81,7 @@ diff in this skill compares against them.
 | `/modules/ps_`, `/themes/classic/assets/`, `prestashop` JS global, `/index.php?controller=` | PrestaShop | `references/prestashop-roundcube-bolt.md` |
 | `rcmail.env.rcversion`, `/program/js/app.js`, `roundcube_sessid` cookie, `?_task=login` | Roundcube | `references/prestashop-roundcube-bolt.md` |
 | `/bolt/` back end, `/theme/<name>/` Twig assets, Symfony `X-Debug-Token` on a Bolt route | Bolt CMS | `references/prestashop-roundcube-bolt.md` |
+| `X-Powered-By: Craft CMS`, `CraftSessionId` cookie, `/admin/login` with `CRAFT_CSRF_TOKEN`, `/cpresources/` | Craft CMS | `references/craft.md` |
 
 **Not this skill.** SharePoint goes to `hunt-sharepoint`. Sitecore and
 DotNetNuke go to `hunt-aspnet`. A bare `/xmlrpc.php` or `/wp-json/wp/v2/users`
@@ -225,7 +230,7 @@ source link. For anything not in those tables:
   Extensions List.
 - Moodle: the project's security announcements, which name the exact fixed
   point release per branch.
-- Roundcube, PrestaShop, Bolt: the upstream GitHub security advisories.
+- Roundcube, PrestaShop, Bolt, Craft: the upstream GitHub security advisories.
 
 ### Step 7 - Behavioural check, Stage A only
 
@@ -446,6 +451,7 @@ guards, because an agent routed by the fingerprint table reads only that file.
 | `joomla.md` | Manifest and language XML version artifacts, Security Centre workflow, web-services access-check disclosure, 2026 core advisories (SSRF, MFA bypass via remember-me, filter bypass XSS), com_* extension enumeration, Vulnerable Extensions List, administrator surface, template-edit RCE as Stage B | joomla version, joomla.xml manifest, com_ component, joomla api config, joomla vulnerable extensions, joomscan, joomla template rce, joomla mfa bypass |
 | `moodle.md` | Branch fingerprinting from upgrade.txt, composer.lock, behat features and environment.xml, calculated-question code injection with fixed versions, authenticated SSRF via TOCTOU DNS on calendar import and the file picker, plugin enumeration under /mod/ /blocks/ /theme/ /auth/ /local/, capability-not-role testing, plugin installer as Stage B | moodle version, moodle plugin, moodlescan, badmoodle, calculated question rce, moodle ssrf calendar import, mdl_ capability, moodle site:config |
 | `aem.md` | Sling and Dispatcher fingerprinting, high-value unauthenticated endpoints, QueryBuilder and DefaultGetServlet exposure, Dispatcher path-normalisation bypasses, AEM Forms on JEE pre-auth OGNL and XXE with CVSS, APSB bulletin workflow, default credentials as a detection-only check, package manager and console as Stage B | aem version, adobe experience manager, sling servlet, dispatcher bypass, querybuilder json, crx packmgr, groovy console, adminui debug ognl, apsb bulletin, etc.clientlibs |
+| `craft.md` | Craft fingerprint from config defaults, version sourcing, CVE-2025-32432 pre-auth asset-transform RCE (CVSS 10, CISA KEV) with fixed versions per branch, why there is no Stage B for it, remediation notes | craft cms, craftcms, cpresources, CraftSessionId, generate-transform, cve-2025-32432, yii __class |
 | `prestashop-roundcube-bolt.md` | PrestaShop version and admin-directory discovery, installer leftover, ps_checkout Express Checkout silent login with version ranges; Roundcube version from the JS global, post-auth deserialization RCE, release cadence; Bolt back-end discovery, editor async-upload to Twig template execution, template editor as Stage B. Thin products, covered honestly short | prestashop version, prestashop install folder, ps_checkout expresscheckout, roundcube version, rcversion, roundcube rce, bolt cms, bolt twig template, templateselect, role_editor upload |
 
 Attribution: the product and technique coverage list was checked against the
@@ -454,7 +460,7 @@ HackTricks `pentesting-web` CMS pages
 checklist only. All prose, tables, staging and safety guidance here are
 original. Version ranges, CVE identifiers, paths, parameter names and tool
 flags were verified against NVD, vendor advisories (drupal.org, Joomla Security
-Centre, roundcube.net, Adobe APSB, GitHub Security Advisories), Patchstack
+Centre, roundcube.net, craftcms.com, Adobe APSB, GitHub Security Advisories), Patchstack
 database entries, vendor release APIs and project documentation.
 
 ## Related Skills & Chains

@@ -49,6 +49,17 @@ done
 A `200`/`401`/`403` on an old version path (anything but `404`/connection-refused) means the
 version is still live and worth carrying into Stage 3, even if it demands auth.
 
+Once a live version base answers, sweep its routes with **kiterunner**
+(<https://github.com/assetnote/kiterunner>). Unlike a path wordlist, its `.kite` routes are
+compiled from public Swagger specs and replay each route with the method, headers and
+parameters the spec declared, so it finds API routes that a GET-only brute misses. Keep
+`-x` (connections per host, default 3) low, as the README itself warns:
+
+```bash
+kr scan "https://$TARGET/api/v1/" -w routes-small.kite -x 3 -j 1 --fail-status-codes 404,501,502
+kr kb replay -w routes-small.kite "<paste one result line>"   # re-send a hit through your proxy (--proxy)
+```
+
 ---
 
 ## Stage 2 — Pull Every Reachable Spec, Not Just the Linked One

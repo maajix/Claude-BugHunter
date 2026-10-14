@@ -15,7 +15,7 @@ NoSQL injection is most valuable when it bypasses authentication (Critical) or l
 - **MongoDB auth bypass** — `{"username": {"$gt": ""}, "password": {"$gt": ""}}` logs in as first user in collection (usually admin)
 - **$where JS injection** — if $where is enabled: blind injection → data exfil
 - **Redis command injection** — via SSRF or direct TCP, SLAVEOF attacker-ip → config write → webshell
-- **Elasticsearch injection** — _search endpoint with Groovy script injection (pre-5.0) → RCE
+- **Elasticsearch injection (historical)** — Groovy script injection on `_search` was a pre-5.0 RCE; on a current cluster an open `:9200` is a data-exposure finding, not RCE
 
 ---
 
@@ -38,7 +38,8 @@ Any endpoint accepting JSON body with username/password
 | X-Powered-By: Express | Node.js + MongoDB common stack |
 | CouchDB/_utils UI exposed | Futon/Fauxton admin |
 | Redis port 6379 open (via SSRF) | CONFIG SET / SLAVEOF |
-| Elasticsearch :9200 open | Script injection |
+| Elasticsearch :9200 open | Unauthenticated data access (script RCE only on historical pre-5.0 Groovy) |
+| mongoose with user JSON reaching `populate({match})` | `$where` via populate match: CVE-2024-53900 (fixed 8.8.3 / 7.8.3 / 6.13.5 / 5.13.23) and its bypass CVE-2025-23061 (fixed 8.9.5 / 7.8.4 / 6.13.6; no 5.x fix). See `hunt-sqli` Disclosed Report Citation #10 |
 
 ---
 
@@ -112,20 +113,20 @@ for c in a b c d e f g h i j k l m n o p q r s t u v w x y z; do
 done
 ```
 
-### Phase 5 — Automation
-```bash
-# nosqlmap
-pip3 install nosqlmap
-nosqlmap -u "https://$TARGET/api/login" --attack 1
-
-# nosqlmap data extraction
-nosqlmap -u "https://$TARGET/api/login" --attack 2
-```
+### Phase 5 — Manual confirmation with Burp (no maintained automation)
+NoSQLMap is Python 2 only (last GitHub release 0.5, 2016), and the PyPI name `nosqlmap` belongs to an unrelated placeholder package, so do not `pip install` it. Work it by hand in Burp Repeater / Comparer:
+1. **Baseline** a legitimate value and save the response.
+2. **Type juggling:** resend the same parameter as an operator object (`{"$ne":null}`, `param[$ne]=`). A different result set or a login = operator injection. Control: `{"$eq":"<legit value>"}` must match the baseline.
+3. **String context:** Phase 3b syntax probes.
+4. **Error-based (SensePost, 2025):** with verbose errors, force a type error that echoes a field value, e.g. `{"$expr":{"$toInt":["$username"]}}`; a `$where`-reachable sink can also be made to throw an error carrying the current document. Data appearing in the error body is the proof. <https://sensepost.com/blog/2025/nosql-error-based-injection/>
+5. **Pre-condition removal (SensePost, 2025):** when input lands inside a JSON string of a server-built filter, closing the string and repeating a key overrides the earlier clause (last key wins): `","username":{"$ne":""},"$where":"1`. The author found no equivalent for post-conditions. <https://sensepost.com/blog/2025/getting-rid-of-pre-and-post-conditions-in-nosql-injections/>
+6. **Aggregation pipelines (Soroush Dalili, 2024):** if input reaches an `aggregate([...])` stage list, `$lookup` / `$unionWith` read other collections. Detect with a harmless stage (`{"$limit":1}`, `{"$count":"x"}`) changing the result shape. Never send `$merge` / `$out`: they write. <https://soroush.me/blog/mongodb-nosql-injection-with-aggregation-pipelines/>
+Use Intruder only for the Phase 4 regex walk, in a single-request resource pool with a delay.
 
 ### Phase 6 — Redis via SSRF
 ```bash
-# If SSRF found, probe internal Redis via gopher://
-curl "https://$TARGET/fetch?url=gopher://127.0.0.1:6379/_*1%0d%0a%248%0d%0aflushall%0d%0a"
+# If SSRF found, probe internal Redis via gopher:// (read-only PING; never FLUSHALL on a target)
+curl "https://$TARGET/fetch?url=gopher://127.0.0.1:6379/_*1%0d%0a%244%0d%0aPING%0d%0a"
 
 # CONFIG SET webshell (if Redis has write access to web root)
 # Use SLAVEOF for OOB data exfil

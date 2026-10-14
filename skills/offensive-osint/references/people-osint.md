@@ -62,14 +62,14 @@ Browser extensions: [GetProspect](https://chromewebstore.google.com/detail/email
 | Platform | Tool |
 |----------|------|
 | Instagram | [Picuki](https://www.picuki.com/) — profile view without account |
-| X/Twitter | [snscrape](https://github.com/snscrape/snscrape) — preferred CLI scraper; Twint as fallback |
+| X/Twitter | [X API](https://docs.x.com/x-api/getting-started/pricing) — official, paid pay-per-use credits; [twscrape](https://github.com/vladkens/twscrape) — maintained scraper, needs logged-in X accounts (sock-puppets only, ToS risk). snscrape (blocked since Jun 2023) and Twint (archived Mar 2023) are dead |
 | Facebook | [Graph Search](https://inteltechniques.com/tools/Facebook.html), [sowsearch.info](https://sowsearch.info/), [lookup-id.com](https://lookup-id.com/), [whopostedwhat.com](https://whopostedwhat.com/) |
 | Facebook (research) | [Meta Content Library](https://transparency.meta.com/researcher) — CrowdTangle successor (researcher-gated) |
 | YouTube/Twitch | [Social Blade](https://socialblade.com/) — analytics |
 | TikTok | [Tokboard](https://tokboard.com/) — trends + profile analytics |
 | Reddit | [Reveddit](https://www.reveddit.com/) — removed content; [RedTrack.social](https://redtrack.social/) — user history |
 | Bluesky | [Firesky](https://firesky.tv/) — real-time firehose; [SkyView](https://bsky.jazco.dev/) — follower graphs |
-| Mastodon | [FediSearch](https://fedisearch.skorpil.cz/) — cross-instance search; [Fedifinder](https://fedifinder.glitch.me/) — find Twitter users on Mastodon |
+| Mastodon | [FediSearch](https://fedisearch.skorpil.cz/) — cross-instance search |
 | Faces | [Search4Faces](https://search4faces.com/) |
 
 ---

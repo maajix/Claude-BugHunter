@@ -116,7 +116,6 @@ Any field whose value might be viewed in an admin UI / log viewer / email / repo
 Content-Type: text/html (without nosniff)
 Content-Security-Policy: (absent or using unsafe-inline)
 Content-Type: image/svg+xml (CSP often not applied)
-X-XSS-Protection: 0
 ```
 
 **JS Patterns in source that signal DOM XSS:**
@@ -301,6 +300,13 @@ curl -sk "https://target.example/page" | grep -i "evil.example"
 - **Attribute quoting variations:** `onmouseover=alert(1)` without quotes, backtick delimiters
 - **HTML entity encoding:** `&#106;avascript:` or `&#x6A;avascript:` in href values
 - **Protocol variations:** `javascript:`, `vbscript:`, `data:text/html`
+- **DOMPurify version gates** (read `DOMPurify.version` in the console or the bundle banner, then match):
+  - `< 3.1.3`: public mXSS / namespace-confusion bypasses, fixed across 3.1.1 to 3.1.3 (Mizu, <https://mizu.re/post/exploring-the-dompurify-library-bypasses-and-fixes>).
+  - `< 3.2.4`: CVE-2025-26791 (GHSA-vhxf-7vqr-mrjg), template-literal regex mXSS, only with `SAFE_FOR_TEMPLATES`.
+  - `3.1.3` to `3.2.6` (fixed 3.2.7) and `2.5.3` to `2.5.8` (never patched): CVE-2025-15599 (GHSA-v8jm-5vwx-cfxm), `SAFE_FOR_XML` misses `textarea`, relevant when sanitized output lands inside a rawtext element.
+  - `3.0.1` to `3.3.3` (fixed 3.4.0): CVE-2026-41238 (GHSA-v9jr-rg53-9pgp). With the default config a separate prototype-pollution bug can plant permissive custom-element checks, so pair it with `hunt-dom` / DOM Invader prototype-pollution findings (<https://labs.trace37.com/blog/dompurify-pp-ceh-bypass/>).
+  - Latest fixed release on 2026-10-13 is 3.4.17; check the cure53/DOMPurify advisories for anything newer.
+- **Unicode normalization:** if the app NFKC-normalizes after the filter runs, fullwidth `＜` (U+FF1C), `＞` (U+FF1E) and `＂` (U+FF02) fold to `<`, `>` and `"`. Send one fullwidth character first and check whether it comes back folded. Ref: Ryan & Isabella Barnett, "Lost in Translation: Exploiting Unicode Normalization" (PortSwigger Top 10 2025 #4).
 
 **Filter Evasion:**
 ```html

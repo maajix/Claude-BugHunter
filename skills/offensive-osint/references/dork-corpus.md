@@ -6,6 +6,8 @@
 
 Substitute `{domain}` with the target domain (e.g., `example.com`) and `{company}` with the company name (e.g., `Acme Corporation`). Run via Google, Bing, Brave, DuckDuckGo, Yandex, Baidu — engines surface different results.
 
+**Google paging:** `&num=100` stopped working in Sep 2025 ([Search Engine Roundtable](https://www.seroundtable.com/google-search-drops-100-results-parameter-40097.html); Google says it never formally supported it). Results come 10 per page — page with `&start=10`, `&start=20`, … and budget 10× the requests (and rate-limit/captcha exposure) per dork. `&tbs=li:1` forces Verbatim mode (undocumented; verify it still applies).
+
 ### 18.1 Files
 
 ```

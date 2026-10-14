@@ -9,13 +9,13 @@ report_count: 1
 
 SharePoint Server (on-prem) is one of the richest enterprise attack surfaces in 2025-2026 bug bounty / red-team work. Three forces converge:
 
-1. **End-of-life unpatched code paths.** SharePoint Server 2013 reached extended-support EoL on 2023-04-11 (final build `15.0.5545.1000` / KB5002381). Every SharePoint CVE published after that date is **permanently unpatched** on SP2013 farms. SP2016 reaches EoL 2026-07-14; SP2019 reaches EoL 2026-07-14 (next 2 months as of May 2026); only SP Subscription Edition is currently in active support.
+1. **End-of-life unpatched code paths.** SharePoint Server 2013 reached extended-support EoL on 2023-04-11 (final build `15.0.5545.1000` / KB5002381). Every SharePoint CVE published after that date is **permanently unpatched** on SP2013 farms. SP2016 and SP2019 both reached end of extended support on 2026-07-14 ([2016](https://learn.microsoft.com/en-us/lifecycle/products/sharepoint-server-2016), [2019](https://learn.microsoft.com/en-us/lifecycle/products/sharepoint-server-2019)). Microsoft's [update history](https://learn.microsoft.com/en-us/officeupdates/sharepoint-updates) still lists one post-EoL build dated 2026-08-11 (2016 `16.0.5565.1001`, 2019 `16.0.10417.20198`); any SharePoint CVE fixed after the last listed build stays unpatched on those farms. Only SP Subscription Edition is in active support.
 2. **CVE-2025-53770 / 53771 "ToolShell"** — July 2025 emergency-out-of-band patch chain for SPE / SP2019 / SP2016. The vulnerable code path (anonymous `/_layouts/15/ToolPane.aspx?DisplayMode=Edit` + anonymous `__REQUESTDIGEST` + unencrypted ViewState) is present in **SP2013 too** and will never receive a fix.
 3. **Custom branded login pages forget legacy SOAP login.** `/_vti_bin/Authentication.asmx` with the `Login` SOAP op is the SharePoint equivalent of WordPress XMLRPC bypass — accepts native Forms credentials anonymously with no rate limit on most farms even when the branded UI has lockout.
 
 **Highest-value SharePoint targets:**
 
-- **SP2013 farms still on the public internet** — every CVE since April 2023 is unpatched. Critical-severity findings.
+- **SP2013 farms still on the public internet** — every CVE since April 2023 is unpatched. Critical-severity findings. SP2016/SP2019 farms join this tier for any CVE fixed after their last listed build (Aug 2026).
 - **Dealer / partner / supplier portals** built on SharePoint by enterprise integrators (German VW group, a enterprise system integrator, etc.) — high-impact business data, often nested inside corporate AD trees.
 - **SharePoint farms with anonymous Forms-auth zones** — Authentication.asmx becomes anonymously brute-forceable.
 - **SharePoint inside corporate AD parent forests** — NTLM Type-2 leak (see `hunt-ntlm-info`) discloses the parent forest membership.
@@ -121,8 +121,9 @@ HelpWindowKey('WSSEndUser_troubleshooting                  (anonymous error.aspx
    | Build | Edition | Status | Notable unpatched-after-EoL CVEs |
    |---|---|---|---|
    | `15.0.5545.1000` | SP2013 final CU | **EoL 2023-04-11** | CVE-2023-29357, CVE-2023-33160/33157/36941, CVE-2024-21318/30043/38023/38024/38094, CVE-2025-53770/53771, CVE-2025-29794 |
-   | `16.0.10416.x` | SP2016 | EoL 2026-07-14 | depends on patch level |
-   | `16.0.10417.x+` | SP2019 / SE | active | check Microsoft's monthly Patch Tuesday |
+   | `16.0.4xxx.x` to `16.0.5565.1001` | SP2016 | **EoL 2026-07-14** | depends on patch level; nothing fixed after the last listed build (`16.0.5565.1001`, 2026-08-11) |
+   | `16.0.10xxx.x` to `16.0.10417.20198` | SP2019 | **EoL 2026-07-14** | depends on patch level; nothing fixed after the last listed build (`16.0.10417.20198`, 2026-08-11) |
+   | `16.0.14326.x` and above | SP Subscription Edition | active | check Microsoft's monthly Patch Tuesday ([update history](https://learn.microsoft.com/en-us/officeupdates/sharepoint-updates)) |
 
 2. **Anonymous-endpoint matrix probe.** Walk every endpoint in the table below in one pass. Anything anonymous becomes part of the attack chain.
 
@@ -192,6 +193,8 @@ HelpWindowKey('WSSEndUser_troubleshooting                  (anonymous error.aspx
    **Severity:** Critical on EoL SP2013 (no patch will ever ship). High on SP2016/2019/SE if `__VIEWSTATEENCRYPTED` is non-empty (encrypted ViewState mitigates the deserialization arm but precondition still warns of misconfig).
 
    **IMPORTANT:** Do NOT actually deliver a malicious ViewState payload. The precondition chain is sufficient evidence for the report. In the real CVE-2025-53770 chain, machineKey recovery is NOT a precondition for RCE: the auth-bypass (CVE-2025-49706, crafted Referer to ToolPane.aspx) + insecure deserialization (CVE-2025-49704) yield an initial web shell with no machineKey knowledge. The `<machineKey>` (ValidationKey/DecryptionKey) is then DUMPED by that web shell and used to forge signed `__VIEWSTATE` for persistent/unauthenticated re-exploitation. So machineKey is the loot of the first RCE and the persistence arm, not a gate in front of it — do not under-assess an exploitable farm just because machineKey is unknown.
+
+   **Remediation note for the report:** patching alone does not evict a farm whose machineKey was already dumped; forged ViewState keeps working after the update. Microsoft's guidance: after installing the update (or enabling AMSI), rotate the ASP.NET machine keys with `Set-SPMachineKey -WebApplication <SPWebApplicationPipeBind>` then `Update-SPMachineKey -WebApplication <SPWebApplicationPipeBind>` (new ValidationKey/DecryptionKey), and restart IIS on every SharePoint server with `iisreset.exe` ([MSRC](https://www.microsoft.com/en-us/msrc/blog/2025/07/customer-guidance-for-sharepoint-vulnerability-cve-2025-53770)). Put this in the remediation section of every ToolShell report.
 
 5. **NTLM Type-2 AD topology disclosure.** Cross-reference `hunt-ntlm-info` for full methodology. Quick check:
 

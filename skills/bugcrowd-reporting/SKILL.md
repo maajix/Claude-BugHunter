@@ -10,6 +10,10 @@ sources: bugcrowd, community
 
 This skill encodes patterns that apply specifically to Bugcrowd's submission flow. For the generic per-platform templates (HackerOne / Bugcrowd / Intigriti / Immunefi report bodies), use the `report-writing` skill. For the 7-Question Gate before deciding to report at all, use `triage-validation`.
 
+**Platform changes (2026, per https://docs.bugcrowd.com/changelog/):**
+- **CVSS 4.0** (Apr 29 2026): the CVSS calculator supports 4.0 alongside 3.1. Program administrators enable it, after which new submissions default to 4.0; existing submissions are not converted.
+- **Submission limits on Managed Bug Bounty (MBB) programs**: since May 4 2026, at most 5 simultaneous Open submissions (New or Triaged), restored as reports leave Open; accounts with a proven track record are exempt. Since Oct 8 2026, accounts with a 90-day accuracy rate below 50% (evaluated once an account has 10 submissions in the last 90 days) get a weekly cap of 6 submissions and a minimum 7-day throttle; identity verification is mandatory.
+
 ---
 
 ## 1. VRT Category Selection — Search & Fallback Strategy
@@ -34,15 +38,21 @@ Never select a VRT that misrepresents the bug just to get a higher default sever
 
 ### 1.3 Common mappings worth knowing
 
+Node names and default priorities checked against VRT **v1.19.1** (released 2026-07-08, https://github.com/bugcrowd/vulnerability-rating-taxonomy/releases). VRT 1.16 added the BAC password-confirmation, GraphQL-introspection and AI Application Security nodes; VRT 1.19 split the SSRF nodes and added the No 2FA / No Account Lockout nodes. VARIES = no fixed default, argue the priority.
+
 | Finding type | First-choice VRT | Fallback |
 |---|---|---|
-| ATO via missing 2FA on password change | Broken Authentication & Session Management → Second Factor Authentication (2FA/MFA) → Bypass | Broken Auth → Authentication Bypass → Other |
-| Password oracle without rate limit | Broken Authentication & Session Management → Authentication Bypass → Other | Server Security Misconfiguration → No Rate Limiting on Form → Login |
-| GraphQL introspection / APQ allowlist bypass | Server Security Misconfiguration → Other (justify in body) | Broken Access Control → Other |
-| Username → real name PII enumeration | Sensitive Data Exposure → PII Leakage / Disclosure of Secrets → Non-Corporate User | Broken Access Control → Other |
-| State desync on security-sensitive action | Application-Level DoS → Other (with state-desync framing) | Server Security Misconfiguration → Other |
-| Email/SMS pumping on auth-flow endpoint | Server Security Misconfiguration → No Rate Limiting on Form → Email-Triggering / SMS-Triggering | Server Security Misconfiguration → No Rate Limiting on Action |
-| Token brute-force (email-change OTP, password reset) | Broken Authentication → Authentication Bypass → Other | Server Security Misconfiguration → No Rate Limiting on Action |
+| ATO via missing 2FA on password change | Broken Authentication and Session Management → Second Factor Authentication (2FA) Bypass (P3), when an enrolled 2FA step is skipped | No re-auth at all: Server Security Misconfiguration → Lack of Password Confirmation → Change Password (P5). Confirmation present but bypassable: Broken Access Control (BAC) → Bypass of Password Confirmation → Change Password (P4) |
+| Password oracle without rate limit | Server Security Misconfiguration → No Rate Limiting on Form → Login (P4) + §3 severity request | Insufficient Security Configurability → No Account Lockout (P5). Authentication Bypass (P1) only if the oracle demonstrably yields a session |
+| GraphQL introspection enabled (alone) | Sensitive Data Exposure → GraphQL Introspection Enabled (P5) | Chain it (§4.2) before expecting more than P5 |
+| GraphQL persisted-query / APQ allowlist bypass unlocking mutations | Broken Access Control (BAC) → Privilege Escalation (VARIES), framed per §4.2 | Sensitive Data Exposure → GraphQL Introspection Enabled (P5) + §2 override |
+| Username → real name PII enumeration | Sensitive Data Exposure → Disclosure of Secrets → PII Leakage/Exposure (VARIES) | Broken Access Control (BAC) → Username/Email Enumeration → Non-Brute Force (P4) |
+| State desync on security-sensitive action | Server Security Misconfiguration → Race Condition (VARIES), when timing-driven | Application-Level Denial-of-Service (DoS) → High Impact and/or Medium Difficulty (P3), when the outcome is lockout / denial |
+| Email/SMS pumping on auth-flow endpoint | Server Security Misconfiguration → No Rate Limiting on Form → Email-Triggering / SMS-Triggering (P4) | No action-level rate-limit node exists in 1.19.1: argue toll-fraud cost via §2 |
+| Token brute-force (email-change OTP, password reset) | Broken Authentication and Session Management → Second Factor Authentication (2FA) Bypass (P3) for OTPs; Authentication Bypass (P1) only if the brute force lands the account | Insufficient Security Configurability → No Account Lockout (P5) or a Weak Password Reset Implementation child |
+| SSRF | Server Security Misconfiguration → Server-Side Request Forgery (SSRF) → Internal Secrets Exposure (P2) / Internal Data Exposure (P3) / Internal Port Service Scan (P3) | Internal Exposure of the Presence of Data/Secrets (P4) / Internal Port Scan Only (P4) / External - DNS Query Only (P5). "Internal High Impact" and "Internal Scan and/or Medium Impact" were removed in 1.19 |
+| Missing 2FA or lockout as a standalone gap | Insufficient Security Configurability → No 2FA Implementation (P5) / No Account Lockout (P5) | P5 alone: chain to ATO before filing |
+| LLM feature leaks another tenant's data | AI Application Security → Sensitive Information Disclosure → Cross-Tenant PII Leakage/Exposure (P1) | AI Application Security → Prompt Injection → System Prompt Leakage (P2); Improper Output Handling → Cross-Site Scripting (XSS) (P3) |
 
 ### 1.4 If no good VRT exists
 
@@ -280,6 +290,8 @@ When you have multiple findings from a single engagement, the order matters.
 2. **The chain consumer next** — fill in the real primitive UUIDs, then edit each primitive to backfill the consumer's UUID (Bugcrowd allows post-submission body edits).
 3. **Standalone P3 findings next.** Order by quality of evidence: best-evidenced first, riskier (OOS-adjacent) findings later.
 4. **OOS-risky findings last.** By the time these land, you've established a credible track record on this engagement.
+
+On MBB programs the 5-simultaneous-Open cap (see Platform changes at the top) counts every primitive and the consumer: a two-primitive chain uses 3 slots until triage moves them out of New/Triaged. Plan chain filing around free slots, and remember every N/A also lowers the 90-day accuracy that triggers the weekly cap.
 
 ### 8.2 Tracking submission IDs
 

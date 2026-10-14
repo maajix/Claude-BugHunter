@@ -25,7 +25,9 @@ Source map exposing TypeScript source = see all API routes, auth logic, secrets.
 
 ```bash
 # These 10 requests take <30 seconds and often yield Critical findings
-for PATH in \
+# Loop var is P, never PATH: assigning PATH clobbers the shell's command search
+# path and every later curl/python3 fails with "command not found".
+for P in \
   "/.env" \
   "/.env.production" \
   "/.env.local" \
@@ -36,9 +38,9 @@ for PATH in \
   "/openapi.json" \
   "/api/openapi.json" \
   "/api-docs"; do
-  STATUS=$(curl -s -o /tmp/sl_test -w "%{http_code}" "https://$TARGET$PATH")
+  STATUS=$(curl -s -o /tmp/sl_test -w "%{http_code}" "https://$TARGET$P")
   if [ "$STATUS" = "200" ]; then
-    echo "[+] HIT: https://$TARGET$PATH"
+    echo "[+] HIT: https://$TARGET$P"
     head -5 /tmp/sl_test
     echo "---"
   fi
@@ -132,10 +134,10 @@ SWAGGER_PATHS=(
   "/graphql/schema.json"
 )
 
-for PATH in "${SWAGGER_PATHS[@]}"; do
-  STATUS=$(curl -s -o /tmp/swagger_test -w "%{http_code}" "https://$TARGET$PATH")
+for P in "${SWAGGER_PATHS[@]}"; do
+  STATUS=$(curl -s -o /tmp/swagger_test -w "%{http_code}" "https://$TARGET$P")
   if [ "$STATUS" = "200" ]; then
-    echo "[+] Found: https://$TARGET$PATH"
+    echo "[+] Found: https://$TARGET$P"
     # Extract all API paths from swagger
     python3 -c "
 import sys, json
@@ -168,8 +170,8 @@ cd /tmp/dumped-repo && \
   git log --all --oneline 2>/dev/null | head -20
   git grep -i "password\|secret\|api_key\|token" $(git rev-list --all) 2>/dev/null | head -30
 
-# trufflehog on git history
-trufflehog git file:///tmp/dumped-repo/ 2>/dev/null | head -50
+# trufflehog on git history (verified = credential authenticated live)
+trufflehog git file:///tmp/dumped-repo/ --results=verified 2>/dev/null | head -50
 ```
 
 ---
@@ -194,10 +196,10 @@ DEBUG_PATHS=(
   "/Dockerfile" "/docker-compose.yml" "/.dockerenv"
 )
 
-for PATH in "${DEBUG_PATHS[@]}"; do
-  STATUS=$(curl -s -o /tmp/debug_test -w "%{http_code}" "https://$TARGET$PATH")
+for P in "${DEBUG_PATHS[@]}"; do
+  STATUS=$(curl -s -o /tmp/debug_test -w "%{http_code}" "https://$TARGET$P")
   if [ "$STATUS" = "200" ]; then
-    echo "[+] Found: https://$TARGET$PATH ($STATUS, $(wc -c < /tmp/debug_test) bytes)"
+    echo "[+] Found: https://$TARGET$P ($STATUS, $(wc -c < /tmp/debug_test) bytes)"
     head -3 /tmp/debug_test
     echo "---"
   fi
@@ -277,12 +279,20 @@ git-dumper "https://target.example/.git/" /tmp/repo/
 npm install -g source-map-explorer
 source-map-explorer main.js
 
-# unwebpack-sourcemap (extract all source files)
-npm install -g unwebpack-sourcemap
+# sourcemapper (Go, maintained; extract source tree from a .map or a JS URL)
+go install github.com/denandz/sourcemapper@latest
+sourcemapper -output /tmp/sm_src -url "https://target.example/static/js/main.abc123.js.map"
+sourcemapper -output /tmp/sm_src -jsurl "https://target.example/static/js/main.abc123.js"  # follows sourceMappingURL
 
-# trufflehog (secret scanning)
-trufflehog filesystem /tmp/repo/
+# unwebpack-sourcemap (Python, not npm; rarecoil repo is archived, PyPI carries a fork; needs Python 3.8-3.11)
+pipx install unwebpack-sourcemap
+unwebpack-sourcemap --make-directory --detect "https://target.example/" /tmp/uws_src/
+
+# trufflehog (secret scanning; report only what authenticated)
+trufflehog filesystem /tmp/repo/ --results=verified
 ```
+
+- **nuclei exposures sweep:** `nuclei -u https://target.example -t http/exposures/` runs the community templates for exposed configs, backups, logs, files, tokens and API specs in one pass; confirm every hit by hand before reporting.
 
 ---
 

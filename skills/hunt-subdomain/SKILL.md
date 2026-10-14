@@ -1,6 +1,6 @@
 ---
 name: hunt-subdomain
-description: Hunting skill for subdomain takeover vulnerabilities. Includes modern provider fingerprints — Microsoft Azure DevOps `cloudapp.azure.com` regional-pool re-issue (1-click OAuth ATO via wildcard `reply_to`, Binary Security), Zendesk help-desk takeover → email interception → password reset chain (0xprial writeup), Vercel `cname.vercel-dns.com` deleted-project takeover, plus general Fastly CDN service re-attach and S3 dangling-bucket cookie-scope techniques. Also covers broken-link hijacking of dead external references (lapsed domains, removed CDN assets, dead social handles) the target links to. Use when hunting subdomain takeover or broken-link hijacking — emphasis on ATO-chain primitives (OAuth `redirect_uri`, cookie-domain, email DNS).
+description: Hunting skill for subdomain takeover vulnerabilities. Includes modern provider fingerprints — Microsoft Azure DevOps `cloudapp.azure.com` regional-pool re-issue (1-click OAuth ATO via wildcard `reply_to`, Binary Security), Vercel `cname.vercel-dns.com` deleted-project takeover and S3 dangling-bucket cookie-scope techniques, plus the historical Zendesk email-interception and Fastly service re-attach chains (both now listed Not vulnerable on can-i-take-over-xyz; reference only, not claim targets). Also covers broken-link hijacking of dead external references (lapsed domains, removed CDN assets, dead social handles) the target links to. Use when hunting subdomain takeover or broken-link hijacking — emphasis on ATO-chain primitives (OAuth `redirect_uri`, cookie-domain, email DNS).
 sources: github, hackerone_public, binarysecurity_research, can-i-take-over-xyz_research
 report_count: 3
 ---
@@ -11,8 +11,8 @@ Subdomain takeover is high-value because it allows an attacker to serve content 
 
 **Highest payout contexts:**
 - Subdomains of major SaaS brands (Shopify, Snapchat, Mozilla, Yelp) where the trusted domain has user session context
-- CDN-backed subdomains (Fastly, CloudFront) where CNAME points to unclaimed origins
-- Third-party service integrations: UserVoice, WordPress.com, GitHub Pages, GitLab Pages, Heroku, Zendesk
+- CDN-backed subdomains where CNAME points to unclaimed origins (historical for Fastly and CloudFront: both now listed "Not vulnerable", see the provider status table)
+- Third-party service integrations: WordPress.com, S3, Azure (Vulnerable); GitHub Pages, Heroku, Shopify, Vercel, Netlify (Edge case, verify claim); UserVoice, GitLab Pages, Zendesk (Not vulnerable today, historical reports only)
 - Preview/staging/dev subdomains (`new.`, `preview.`, `course.`, `delivery.`, `addons-preview.`) — abandoned after feature launches
 - Subdomains used for OAuth redirect URIs or SSO endpoints — these pay highest
 
@@ -26,22 +26,44 @@ Subdomain takeover is high-value because it allows an attacker to serve content 
 
 ## Attack Surface Signals
 
+### Provider status (can-i-take-over-xyz README, checked 2026-10-13)
+
+Source: https://github.com/EdOverflow/can-i-take-over-xyz . Statuses change; re-check the README before filing.
+
+| Provider | Status | Fingerprint |
+|---|---|---|
+| AWS S3 | Vulnerable | `The specified bucket does not exist` |
+| AWS Elastic Beanstalk | Vulnerable | NXDOMAIN |
+| Microsoft Azure (cloudapp.net, cloudapp.azure.com, azurewebsites.net, blob.core.windows.net, ...) | Vulnerable | NXDOMAIN |
+| WordPress.com | Vulnerable | `Do you want to register *.wordpress.com?` |
+| Bitbucket | Vulnerable | `Repository not found` |
+| Surge.sh | Vulnerable | `project not found` |
+| GitHub Pages | Edge case, verify claim | `There isn't a GitHub Pages site here.` |
+| Heroku | Edge case, verify claim | `No such app` |
+| Shopify | Edge case, verify claim | `Sorry, this shop is currently unavailable.` |
+| Vercel | Edge case, verify claim | `DEPLOYMENT_NOT_FOUND` |
+| Netlify | Edge case, verify claim | `Not Found - Request ID:` |
+| Fastly | Not vulnerable | `Fastly error: unknown domain:` |
+| Zendesk | Not vulnerable | `Help Center Closed` |
+| UserVoice | Not vulnerable | `This UserVoice subdomain is currently available!` |
+| GitLab Pages | Not vulnerable | (none listed) |
+| CloudFront | Not vulnerable | `ViewerCertificateException` |
+
+"Edge case" = file only after you have actually claimed the resource and served your marker. "Not vulnerable" = the fingerprint alone is never a finding.
+
 **DNS signals:**
-- `CNAME` pointing to `*.github.io`, `*.gitlab.io`, `*.fastly.net`, `*.herokudns.com`, `*.wordpress.com`, `*.uservoice.com`, `*.zendesk.com`, `*.s3.amazonaws.com`, `*.azurewebsites.net`, `*.netlify.app`
+- `CNAME` pointing to `*.s3.amazonaws.com`, `*.azurewebsites.net`, `*.cloudapp.azure.com`, `*.wordpress.com`, `*.github.io`, `*.herokudns.com`, `*.netlify.app`, `cname.vercel-dns.com` (check each against the table; `*.gitlab.io`, `*.fastly.net`, `*.uservoice.com`, `*.zendesk.com` are Not vulnerable today)
 - NXDOMAIN or `SERVFAIL` on the CNAME target while the parent record still exists
 - NS records delegating to registrars where the zone is no longer registered
 
-**HTTP response signals:**
-- `"There isn't a GitHub Pages site here"`
-- `"NoSuchBucket"` (S3)
-- `"The specified bucket does not exist"`
-- `"No such app"` (Heroku)
-- `"Sorry, this shop is currently unavailable"` (Shopify)
-- `"This UserVoice subdomain is available"`
-- `"Do you want to register"` (any domain parking page)
+**HTTP response signals** (status per the table above):
+- `"The specified bucket does not exist"` / `"NoSuchBucket"` (S3, Vulnerable)
+- `"Do you want to register *.wordpress.com?"` (WordPress.com, Vulnerable; not a generic parking page)
+- `"404 Web Site not found"` (Azure App Service; the README fingerprint for Azure is NXDOMAIN on the CNAME target)
+- `"project not found"` (Surge.sh, Vulnerable)
+- `"There isn't a GitHub Pages site here"` (GitHub Pages), `"No such app"` (Heroku), `"Sorry, this shop is currently unavailable"` (Shopify), `DEPLOYMENT_NOT_FOUND` (Vercel): Edge case, verify claim
+- `"Fastly error: unknown domain"`, `"This UserVoice subdomain is currently available!"`, `"Help Center Closed"` (Zendesk): Not vulnerable, do not file on the string
 - HTTP 404 with provider-specific error templates
-- Fastly: `"Fastly error: unknown domain"`
-- `"404 Web Site not found"` (Azure App Service)
 
 **Tech stack signals:**
 - Response headers: `X-Served-By: cache-*` (Fastly), `X-GitHub-Request-Id`, `Server: Netlify`
@@ -67,8 +89,10 @@ Subdomain takeover is high-value because it allows an attacker to serve content 
 
 3. **Cross-reference CNAMEs** against known vulnerable provider fingerprints using `nuclei` or `subjack`:
    ```bash
-   subjack -w subdomains.txt -t 100 -timeout 30 -ssl -c fingerprints.json
-   nuclei -l subdomains.txt -t takeovers/
+   # subjack v3.x embeds its fingerprints (no -c file); -a probes every host, not only CNAME'd ones
+   subjack -w subdomains.txt -t 100 -timeout 30 -ssl -a -o subjack.json
+   # http/takeovers/ = HTTP fingerprints; dns/ holds the Azure + Elastic Beanstalk NXDOMAIN checks
+   nuclei -l subdomains.txt -tags takeover
    ```
 
 4. **Manual verification** for each flagged subdomain:
@@ -80,8 +104,8 @@ Subdomain takeover is high-value because it allows an attacker to serve content 
    - GitHub Pages: check if `<username>.github.io/<repo>` or org page is unclaimed
    - GitLab Pages: check project namespace
    - S3: attempt `aws s3api create-bucket --bucket <bucketname>`
-   - UserVoice/Zendesk/WordPress: visit registration URL
-   - Fastly: check if origin hostname is unregistered
+   - WordPress.com: visit registration URL (UserVoice and Zendesk are now listed Not vulnerable)
+   - Fastly: listed Not vulnerable; only report if the claim actually succeeds on a test service
 
 6. **Claim the resource** (only enough to prove control — do NOT serve malicious content):
    - Create a minimal index page with your HackerOne username and a timestamp
@@ -122,11 +146,14 @@ nuclei -l subdomains.txt -t ~/nuclei-templates/http/takeovers/ -severity medium,
 
 **subjack with SSL:**
 ```bash
-subjack -w subdomains.txt -t 100 -timeout 30 -ssl -c $GOPATH/src/github.com/haccer/subjack/fingerprints.json -v
+# go install github.com/haccer/subjack@latest -- fingerprints are compiled in (v3.x has no -c flag;
+# module-era installs have no $GOPATH/src tree to point at)
+subjack -w subdomains.txt -t 100 -timeout 30 -ssl -a -v
 ```
 
 **Provider fingerprint grep patterns:**
 ```bash
+# A hit is a lead: check the provider's row in the status table before claiming
 curl -sk "https://$subdomain" | grep -iE \
   "there isn't a github pages|no such bucket|no such app|this uservoice|fastly error: unknown domain|do you want to register|sorry, this shop|project not found|404 not found|unclaimed"
 ```
@@ -138,6 +165,7 @@ curl -Isk "https://target.example" | grep -i "set-cookie" | grep "domain=.target
 
 **Fastly-specific detection:**
 ```bash
+# Fastly is listed Not vulnerable: this identifies Fastly-fronted hosts, it does not prove a takeover
 curl -sI "https://subdomain.target.example" -H "Host: subdomain.target.example" | grep -i "fastly\|x-served-by\|x-cache"
 curl -sk "https://subdomain.target.example" | grep -i "fastly error"
 ```
@@ -151,7 +179,7 @@ aws s3api head-bucket --bucket <extracted-bucket-name> 2>&1 | grep -i "NoSuchBuc
 ```bash
 dig CNAME sub.target.example
 # If pointing to *.gitlab.io — visit the gitlab.io URL directly
-# 404 from gitlab.io project = claimable
+# GitLab Pages is listed Not vulnerable: a 404 from gitlab.io alone is NOT claimable
 ```
 
 ---
@@ -164,7 +192,7 @@ dig CNAME sub.target.example
 
 3. **Subdomain provisioned by a third-party team** — Marketing sets up a UserVoice or Zendesk subdomain via IT, product sunset kills it, but DNS is owned by engineering who doesn't know.
 
-4. **CDN misconfiguration without origin validation** — Fastly and similar CDNs historically allowed any domain to "claim" a backend hostname by creating a service pointing to it. Unregistered origin hostnames become claimable.
+4. **CDN misconfiguration without origin validation** — Fastly and similar CDNs historically allowed any domain to "claim" a backend hostname by creating a service pointing to it. Unregistered origin hostnames became claimable. Fastly and CloudFront are now listed Not vulnerable; treat this as a historical root cause unless the claim actually succeeds.
 
 5. **GitHub/GitLab Pages namespace not reserved** — Organization renames, user accounts deleted, or repos made private/deleted while the Pages CNAME still points to the old namespace.
 
@@ -188,8 +216,8 @@ dig CNAME sub.target.example
 **Defense: HTTPS certificate mismatch blocking proof**
 - Bypass: Some providers (GitHub Pages, Netlify) auto-provision TLS for claimed domains. Others don't — show HTTP takeover and note TLS would be resolved by provider on claim.
 
-**Defense: Provider-side validation (Fastly verifying domain ownership)**
-- Bypass: Some Fastly configurations don't validate origin hostnames. Check if the CNAME target is a generic Fastly backend hostname vs. a customer-verified one. Try claiming anyway and observe behavior.
+**Defense: Provider-side validation (Fastly, Zendesk, UserVoice, GitLab Pages, CloudFront)**
+- No reliable bypass: can-i-take-over-xyz lists all five as Not vulnerable. Do not file on the fingerprint. Report only if you actually complete the claim on a test resource and can show your marker served on the target hostname.
 
 **Defense: Rate limiting on subdomain enumeration**
 - Bypass: Use passive-only sources (SecurityTrails, Shodan, crt.sh, VirusTotal) to avoid triggering WAF/IDS. DNS resolution doesn't touch the web server.
@@ -225,7 +253,7 @@ A broken-link checker (`blc` / broken-link-checker, or an online dead-link check
 ## Gate 0 Validation
 
 1. **What can the attacker DO right now?**
-   Can you register the unclaimed resource (GitHub repo, S3 bucket, Heroku app, UserVoice account) and serve arbitrary content — including phishing pages, credential harvesters, or malicious scripts — under the target's trusted domain name?
+   Can you register the unclaimed resource (S3 bucket, Azure resource, WordPress.com site, GitHub repo, Heroku app) and serve arbitrary content — including phishing pages, credential harvesters, or malicious scripts — under the target's trusted domain name?
 
 2. **What does the victim LOSE?**
    Users lose trust and safety: they see a company-branded URL serving attacker content. The company loses brand integrity, potentially leaks session cookies if the subdomain is in `domain=.target.example` scope, and may have OAuth/SSO flows hijacked. Depending on CSP configuration, XSS against the main application may be possible.
@@ -242,10 +270,10 @@ If you cannot show the provider resource is *currently unclaimed and claimable*,
 
 ## Real Impact Examples
 
-**Scenario A — Trusted Brand Phishing via Abandoned SaaS (Snapchat/UserVoice)**
+**Scenario A — Trusted Brand Phishing via Abandoned SaaS (Snapchat/UserVoice; historical, UserVoice is now listed Not vulnerable)**
 An attacker finds `feedback.snapchat.com` CNAME pointing to a UserVoice subdomain. The UserVoice account was cancelled but the DNS record remained. The attacker registers the matching UserVoice subdomain for free, gaining control of `feedback.snapchat.com`. Any user navigating to that URL — perhaps from old bookmarks or Google results — sees attacker-controlled content on a Snapchat-branded domain. Since the domain is trusted by browsers, phishing campaigns sent from this subdomain bypass email security filters that check domain reputation.
 
-**Scenario B — CDN Origin Takeover Enabling Same-Origin Attacks (Mozilla/Fastly)**
+**Scenario B — CDN Origin Takeover Enabling Same-Origin Attacks (Mozilla/Fastly; historical, Fastly is now listed Not vulnerable)**
 `addons-preview-cdn.mozilla.net` had a CNAME pointing to a Fastly origin hostname that was no longer registered to Mozilla's Fastly account. An attacker could create a Fastly service claiming that origin hostname, causing all requests to `addons-preview-cdn.mozilla.net` to be routed to attacker-controlled Fastly infrastructure. Since the subdomain shares the `mozilla.net` domain, it could be leveraged to serve malicious CDN assets that appear to come from Mozilla's infrastructure, potentially bypassing CSP rules that allowlist `*.mozilla.net`.
 
 **Scenario C — Staging Subdomain Abandoned Post-Product Migration (Rails/GitHub Pages)**
@@ -268,6 +296,7 @@ The following coordinated-disclosure / writeup cases extend this skill with **mo
     - ATO chain: **YES** — researcher configured email forwarding on the hijacked Zendesk instance, intercepted `support@xyz.com` tickets containing payment info + password-reset emails, then triggered password resets on customer accounts that delivered reset links into the attacker's Zendesk inbox
     - Claim flow: `dig CNAME` returns `xyzdocs.zendesk.com` (unregistered) → register free Zendesk trial → add `xyzdocs` as subdomain → enable host-mapping for `admin-support.xyz.com`
     - Year: 2023 — payout per the 0xprial writeup (blog source; no public HackerOne report ID, treat as unverified)
+    - Status today: Zendesk is listed Not vulnerable on can-i-take-over-xyz (`Help Center Closed`); treat this as a historical chain pattern, not a current claim flow
 
 14. **Vercel deleted-project takeover** — a dangling `cname.vercel-dns.com` CNAME pointing to a removed Vercel project can be re-claimed by deploying a new project under that name.
     - Subclass: Vercel dangling CNAME (`cname.vercel-dns.com`) after project deletion
@@ -275,10 +304,9 @@ The following coordinated-disclosure / writeup cases extend this skill with **mo
     - Claim flow: subdomain returns Vercel 404 `DEPLOYMENT_NOT_FOUND` → create free Vercel project → Settings → Domains → add `proxies.sifchain.finance` — Vercel verifies the existing CNAME and auto-issues TLS without out-of-band ownership proof
     - Year: 2022 — Sifchain treated as Critical (web3 phishing vector)
 
-**Fastly CDN dangling-service technique (general, not a single disclosed report):**
+**Fastly CDN dangling-service technique (historical; can-i-take-over-xyz now lists Fastly as Not vulnerable, issue #22):**
 - Fingerprint: subdomain returns `Fastly error: unknown domain. Please check that this domain has been added to a service`
-- Claim flow: sign up for Fastly free trial → create new CDN service → attach the dangling hostname as the service domain
-- Root cause: Fastly historically does not verify CNAME ownership on service-creation; any CNAME pointing into Fastly's anycast can be attached to a fresh service
+- Historical claim flow: sign up for Fastly free trial → create new CDN service → attach the dangling hostname as the service domain. Expect this to fail today; file only if the attach actually succeeds and your marker is served
 - Potential ATO chain: chains to CSP-bypass + JS-injection if the parent domain trusts the `assets.`/CDN host for `script-src`
 
 ---
@@ -290,7 +318,7 @@ Subdomain takeover by itself is Low-Medium / Informational on most mature progra
 ### Chain 1 — Takeover + OAuth `redirect_uri` Whitelist → Auth-Code Theft → 1-Click ATO
 
 - **A.** Enumerate the OAuth `redirect_uri` allowlist via `/oauth/authorize` flow. Look for any wildcard `*.target.example` or any takeover-candidate hostname in the static list (e.g., `feedsprod.feeds.visualstudio.com`, `legacy.target.example`).
-- **B.** Find a takeover-able subdomain in that allowlist. Claim it via the provider's onboarding (Vercel project, Azure cloudapp regional pool, S3 bucket, Heroku app, Zendesk, Shopify storefront — see the Disclosed Report Citations above).
+- **B.** Find a takeover-able subdomain in that allowlist. Claim it via the provider's onboarding (Vercel project, Azure cloudapp regional pool, S3 bucket, Heroku app, Shopify storefront — see the Disclosed Report Citations above).
 - **C.** Host an OAuth callback receiver on the claimed subdomain. Send victim to `/oauth/authorize?redirect_uri=https://legacy.target.example/cb&response_type=code&client_id=<legit>`. Victim's browser already has session → auth happens transparently → auth code lands on attacker host. Exchange via token endpoint → ATO.
 - **Impact:** Persistent 1-click ATO across every user of the target. OAuth flow is implicit-to-the-user (no consent screen if previously consented), so requires only a single click on attacker's link.
 - **Real shape:** Microsoft Azure DevOps `cloudapp.azure.com` + wildcard `*.visualstudio.com` reply_to chain (Binary Security, Nov 2022 — Disclosed Report Citation #12). Multiple H1 disclosures on SaaS programs with permissive OAuth allowlists.

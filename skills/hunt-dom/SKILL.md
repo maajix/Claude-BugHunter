@@ -220,6 +220,9 @@ grep -rnE "dangerouslySetInnerHTML|v-html=|\[innerHTML\]=|\.html\(" recon/$TARGE
 curl -s "https://$TARGET/_next/static/chunks/pages/index.js" | grep -oP 'dangerouslySetInnerHTML.{0,120}'
 # Trace whether user data reaches it WITHOUT a sanitizer (DOMPurify/sanitize-html).
 # If DOMPurify IS present, check for clobbering/mXSS bypass (Bentkowski research) and version.
+# Version gates (DOMPurify.version): <3.1.3 mXSS/namespace confusion (Mizu); <3.2.4 CVE-2025-26791 (SAFE_FOR_TEMPLATES only);
+# 3.1.3-3.2.6 CVE-2025-15599 (SAFE_FOR_XML / textarea, fixed 3.2.7); 3.0.1-3.3.3 CVE-2026-41238 (prototype pollution
+# plants permissive custom-element checks, fixed 3.4.0). Details and sources: hunt-xss "Sanitizer Bypasses".
 ```
 
 ---
@@ -312,7 +315,9 @@ f.addEventListener('load', () =>
 ## Tools
 
 ```bash
-# DOM Invader (built into Burp browser) — sources→sinks, postMessage logger, clobbering scanner
+# DOM Invader (built into Burp browser) — sources→sinks, postMessage logger, clobbering scanner, and a
+#   prototype-pollution scanner (off by default; enable under Attack types): finds URL / JSON web-message
+#   sources and scans for gadgets. A hit there is the prerequisite for DOMPurify CVE-2026-41238.
 # postMessage-tracker — Chrome extension logging cross-window messages
 # Burp Collaborator / interactsh / request-bin — MANDATORY OOB sink for CSS-exfil & SW PoCs
 # Verify any tool URL before citing it in a report; do not paste unverified repo links.

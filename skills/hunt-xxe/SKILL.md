@@ -324,6 +324,8 @@ XXE classic payloads (`<!ENTITY xxe SYSTEM "file://...">`) are not universally e
 | Apache Struts (older) | Often expands | **YES** |
 | Embedded IoT / industrial XML processors (firmware) | Frequently vulnerable | **YES** |
 | Microsoft Office OOXML processors that re-parse user content | Vulnerable in some legacy paths | **YES** |
+| libxml2 2.11 < 2.11.9, 2.12 < 2.12.9, 2.13 < 2.13.3 behind a library with custom SAX handlers (CVE-2024-40896) | SAX still emits external-entity events even when the downstream code overrides entity content, re-enabling classic XXE in wrappers that relied on that protection | **YES** — version-gate the bundled libxml2 |
+| PHP SAML: `simplesamlphp/saml2` / `saml2-legacy` < 4.6.14 (CVE-2024-52806, GHSA-pxm4-r5ph-q2m2) | Loads with `LIBXML_DTDLOAD \| LIBXML_DTDATTR`; `php://filter` sidesteps `LIBXML_NONET` and the DOCTYPE check runs only after load | **YES** — any SAML ACS on these versions |
 
 **Fingerprint signals to look for:**
 

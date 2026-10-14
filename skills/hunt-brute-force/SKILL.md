@@ -1,6 +1,6 @@
 ---
 name: hunt-brute-force
-description: "Hunt Missing/Weak Rate Limiting — login brute force, OTP/2FA brute force (10^6 keyspace), password-reset-token brute, credential stuffing, username/email enumeration via error-string / status-code / timing differences, weak password policy, missing CAPTCHA (CAPTCHA token replay / single-use / concurrency-window bypass specifics → hunt-captcha-bypass), IP-based rate-limit bypass via X-Forwarded-For and friends, ReDoS. Distinguishes hard lockout vs soft IP-throttle vs CAPTCHA-injection vs silent shadow-throttling (avoids false-negative 'no rate limit' conclusions). Medium to Critical depending on what the brute reaches (OTP→ATO = Critical)."
+description: "Hunt Missing/Weak Rate Limiting — login brute force, OTP/2FA brute force (10^6 keyspace), password-reset-token brute, credential stuffing, username/email enumeration via error-string / status-code / timing differences, weak password policy, missing CAPTCHA (CAPTCHA token replay / single-use / concurrency-window bypass specifics → hunt-captcha-bypass), IP-based rate-limit bypass via X-Forwarded-For and friends, race-condition (single-packet) rate-limit bypass, ReDoS. Distinguishes hard lockout vs soft IP-throttle vs CAPTCHA-injection vs silent shadow-throttling (avoids false-negative 'no rate limit' conclusions). Medium to Critical depending on what the brute reaches (OTP→ATO = Critical)."
 sources: public_research
 report_count: 6
 ---
@@ -8,8 +8,8 @@ report_count: 6
 # HUNT-BRUTE-FORCE — Rate Limiting / Brute Force / Enumeration
 
 > Grounding note: this skill is built from published technique classes, not from a
-> curated set of named HackerOne reports. `report_count` is intentionally `0` — do
-> not cite an exact payout or report ID you cannot verify. Where a public case is
+> curated set of named HackerOne reports. `report_count: 6` in the frontmatter is not
+> a list of payout cases — do not cite an exact payout or report ID you cannot verify. Where a public case is
 > well-documented (e.g. Laxman Muthiyah's Instagram password-reset OTP race/rotation
 > research, 2019–2021), it is named below as a *technique reference*, not a payout claim.
 
@@ -185,6 +185,24 @@ done
 # CONFIRM the bypass: re-run Phase 1 WITHOUT rotation to show the 429 returns. The delta is the proof.
 ```
 
+### Phase 4b — Race-Condition Rate-Limit Bypass (guesses land before the counter moves)
+A per-account or per-session limit is only as good as its check-then-increment. If N guesses arrive
+together, all N read the counter before any of them writes it, so "3 attempts then lockout" becomes
+"N attempts in one burst". Reference lab: [PortSwigger, Bypassing rate limits via race conditions](https://portswigger.net/web-security/race-conditions/lab-race-conditions-bypassing-rate-limits).
+```
+1. Baseline (Phase 1): note the limit, e.g. lockout after 3 failed logins for YOUR test account.
+2. Build ~20 login requests for that account, each with a different candidate password, and include
+   the real password somewhere in the set (seeded, like the shadow-throttle test).
+3. Send them as ONE burst: Burp Repeater tab group → "Send group in parallel" (single-packet attack
+   over HTTP/2), or Turbo Intruder's single-packet attack template.
+4. Count responses that were evaluated (wrong-password message) vs locked-out. More evaluated attempts
+   than the limit allows, or the seeded password logging in inside the burst = race bypass.
+5. Reset: wait out / clear the lockout on your own account before the next burst.
+```
+Same pattern applies to OTP verify, reset-code verify and coupon-code endpoints. Mechanics of the
+single-packet attack and other race shapes → `hunt-race-condition`. Proof is the counter math (limit
+vs evaluated attempts per burst), not a single lucky login.
+
 ### Phase 5 — Token Entropy (measure it, don't eyeball it)
 ```bash
 # Collect reset/session/OTP tokens for YOUR OWN test account, then quantify entropy.
@@ -262,6 +280,7 @@ nuclei -u "https://$TARGET" -t http/fuzzing/ -t http/default-logins/ -severity m
 | Password-reset code brute + IP rotation | Reset → ATO (Instagram-2019 class) | Critical |
 | No rate limit on login + enumeration | Credential stuffing with breach corpus | High |
 | IP bypass via X-Forwarded-For et al. | Every per-IP limit on the app defeated | High |
+| Race past the attempt counter (single-packet burst) | Limit multiplied by burst size → OTP / password brute | High → Critical (with OTP reach) |
 | Predictable / low-entropy reset token | Token guess within validity window → ATO | High |
 | ReDoS on a public input field | Single-request CPU exhaustion → DoS | Medium–High |
 | Hard lockout triggerable by attacker | Targeted account DoS (lock victim out) | Medium |
@@ -282,6 +301,8 @@ Before writing the report, each must hold:
   message is NOT enumeration). For timing, compare medians of many samples, never single requests.
 - **IP-rotation bypass**: proven by toggling rotation off and showing the `429` returns. The delta IS
   the proof; one fast run alone is not.
+- **Race bypass**: evaluated-attempt count per burst exceeds the documented limit, reproduced on at
+  least two bursts against your own account; sequential sends of the same set must hit the limit.
 - **Token entropy**: backed by an actual measurement (Burp Sequencer effective-bits, `ent`, or a
   demonstrated counter/timestamp structure), not "looks short".
 - **ReDoS**: super-linear (doubling) latency growth with a benign-control comparison; linear ≠ ReDoS.

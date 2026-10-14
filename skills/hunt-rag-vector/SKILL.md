@@ -22,7 +22,8 @@ This document adds gates specific to the vector layer.
 ## Attack Surface Signals
 
 - Directly reachable vector-DB ports: Chroma `:8000`, Weaviate `:8080`, Qdrant `:6333`,
-  Milvus `:19530`, Elasticsearch/OpenSearch with `dense_vector`/kNN mappings, managed pgvector
+  Milvus `:19530` (gRPC + REST) and `:9091` (management: `/metrics`, `/healthz`, `/webui/`; before the
+  CVE-2026-26190 fix also the full `/api/v1/*` API), Elasticsearch/OpenSearch with `dense_vector`/kNN mappings, managed pgvector
   via an exposed Postgres port.
 - A "upload your documents, ask questions about them" feature shared across multiple users or
   tenants (support-ticket search, internal wiki chatbot, multi-tenant SaaS RAG product).
@@ -76,6 +77,11 @@ curl -s http://$TARGET:8000/api/v1/heartbeat                     # Chroma — co
 curl -s http://$TARGET:6333/collections                           # Qdrant — lists all collections, no auth check
 curl -s -X POST http://$TARGET:8080/v1/graphql \
   -d '{"query":"{Get{Document(limit:5){content _additional{id}}}}"}'  # Weaviate GraphQL, no tenant filter
+
+# Version fingerprint (read-only) — feeds the Known-CVE table below
+curl -s http://$TARGET:6333/                                      # Qdrant — root JSON carries "version"
+curl -s http://$TARGET:8080/v1/meta                               # Weaviate — version + enabled modules (backup-*?)
+curl -s http://$TARGET:9091/healthz                               # Milvus management port reachable from outside?
 ```
 A 200 with real document content back, with no credential supplied, is an unauthenticated full
 corpus read — Critical on its own, no chaining required.
@@ -89,6 +95,24 @@ POST /api/chat  {"query": "...", "namespace": "tenant-B-namespace"}   # attacker
 **Proof bar (per `hunt-llm-ai` Gate #3):** the returned content must contain a value you can
 independently verify belongs to a different, real tenant/account — not merely "different-looking
 content." Compare against a control query on your own account first.
+
+### Known CVEs (fingerprint the version, then match)
+
+| Product | CVE / advisory | Affected → fixed | Bug |
+|---|---|---|---|
+| Milvus | CVE-2025-64513 ([GHSA-mhjq-8c7m-3f7p](https://github.com/milvus-io/milvus/security/advisories/GHSA-mhjq-8c7m-3f7p)) | <2.4.24, 2.5.0–<2.5.21, 2.6.0–<2.6.5 → 2.4.24 / 2.5.21 / 2.6.5 | Proxy gRPC auth interceptor trusted a client-supplied `sourceId` metadata value equal to the hardcoded internal-member ID → any client on `:19530` is treated as cluster member = admin, no credentials. |
+| Milvus | CVE-2026-26190 ([GHSA-7ppg-37fh-vcr6](https://github.com/milvus-io/milvus/security/advisories/GHSA-7ppg-37fh-vcr6)) | <2.5.27, 2.6.0–<2.6.10 (2.4.x unpatched) → 2.5.27 / 2.6.10 | `:9091` served the business `/api/v1/*` REST API with no auth even when auth was enabled; the `/expr` debug endpoint's token defaults to `etcd.rootPath` (`by-dev`). Fix only adds auth when authorization is enabled. |
+| Qdrant | CVE-2026-25628 ([GHSA-f632-vm87-2m2f](https://github.com/qdrant/qdrant/security/advisories/GHSA-f632-vm87-2m2f)) | 1.9.3–1.15.5 → 1.16.0 (GHSA text says 1.15.6, but no such tag exists; the fix commit ships in 1.16.0) | `/logger` had no access check and accepted an attacker-set log-file path → a **read-only** API key appends to arbitrary files → RCE via config poisoning + restart. Qdrant Cloud not affected. |
+| Weaviate | CVE-2025-67818 ([GHSA-7v39-2hx7-7c43](https://github.com/advisories/GHSA-7v39-2hx7-7c43)) | <1.30.20, 1.31.x <1.31.19, 1.32.x <1.32.16, 1.33.x <1.33.4 | Backup-restore ZipSlip: entry names not validated → create/overwrite files outside the restore root. Needs data-insert rights + a `backup-*` module enabled. |
+| LangChain.js | CVE-2025-68665 ([GHSA-r399-636x-v7f6](https://github.com/langchain-ai/langchainjs/security/advisories/GHSA-r399-636x-v7f6)) | `@langchain/core` <0.3.80, 1.0.0–<1.1.8; `langchain` <0.3.37, 1.0.0–<1.2.3 | `toJSON()` did not escape user objects with an `lc` key inside kwargs/metadata → `load()` revives them as LangChain objects: env-secret read (when `secretsFromEnv` is on) or class instantiation. Prompt injection can plant the object in stored chunk metadata. |
+| LangChain (Python) | CVE-2025-68664 ([GHSA-c67j-w6g6-q2cm](https://github.com/langchain-ai/langchain/security/advisories/GHSA-c67j-w6g6-q2cm)) | `langchain-core` <0.3.81, 1.0.0–<1.2.5 | Same class in `dumps`/`dumpd`/`loads`. |
+
+Weaviate authorization: RBAC is GA only since **1.29**; older deployments have no per-collection
+roles, so any valid key reads every collection and tenant isolation lives entirely in the app layer.
+
+**Proof bar:** version-in-range plus port reachability is a lead. A forged `sourceId`, a `/logger`
+change, or a crafted backup changes target state or bypasses auth — get explicit program sign-off
+before sending any of them, and stop at the least-invasive read that proves access.
 
 ---
 

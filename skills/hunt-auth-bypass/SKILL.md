@@ -1,6 +1,6 @@
 ---
 name: hunt-auth-bypass
-description: Hunting skill for auth bypass vulnerabilities. Built from 12 public bug bounty reports across SAML XSW / parser-differential (GitHub Enterprise CVE-2025-25291/25292), SAML signature stripping (Uber, Rocket.Chat, samlify CVE-2025-47949), SAML domain enforcement bypass via control characters (HackerOne 2024), partner-portal cross-IdP assertion reuse (Slack), WordPress XMLRPC bypassing SSO (Uber), JWT alg-confusion HS256/RS256 (Jitsi), JWT signature-validation skip (Linktree, Newspack), and token-audience confusion (Argo CD CVE-2023-22482). For standalone JWT signature/crypto forging (alg:none, key confusion, kid/jku) see hunt-jwt-crypto; this skill covers JWT only inside SSO/SAML/token-trust bypass chains. SAML assertion-layer attacks (XSW, comment injection, signature stripping, XXE-in-assertion) are owned by hunt-saml; this skill owns the broader cross-protocol auth-bypass taxonomy. Use when hunting auth bypass — see the Legacy-Protocol Matrix for branded-UI vs legacy-endpoint patterns.
+description: Hunting skill for auth bypass vulnerabilities. Built from 12 public bug bounty reports across SAML XSW / parser-differential (ruby-saml CVE-2025-25291/25292), SAML signature stripping (Uber, Rocket.Chat, samlify CVE-2025-47949), SAML domain enforcement bypass via control characters (HackerOne 2024), partner-portal cross-IdP assertion reuse (Slack), WordPress XMLRPC bypassing SSO (Uber), JWT alg-confusion HS256/RS256 (Jitsi), JWT signature-validation skip (Linktree, Newspack), and token-audience confusion (Argo CD CVE-2023-22482). For standalone JWT signature/crypto forging (alg:none, key confusion, kid/jku) see hunt-jwt-crypto; this skill covers JWT only inside SSO/SAML/token-trust bypass chains. SAML assertion-layer attacks (XSW, comment injection, signature stripping, XXE-in-assertion) are owned by hunt-saml; this skill owns the broader cross-protocol auth-bypass taxonomy. Use when hunting auth bypass — see the Legacy-Protocol Matrix for branded-UI vs legacy-endpoint patterns.
 sources: github, hackerone_public, github_security_lab, projectdiscovery_research
 report_count: 12
 ---
@@ -142,6 +142,7 @@ When a target has a custom, branded login UI (e.g. `customlogin.aspx`, `/auth/si
 | **Apache Tomcat** | `/manager/html`, `/host-manager/html`, `/manager/text/list` | Native Tomcat realm credentials independent of any front auth |
 | **WebLogic** | `/console/login/LoginForm.jsp`, `/wls-wsat/*` | Native admin |
 | **Oracle EBS / PeopleSoft** | `/OA_HTML/AppsLogin`, `/psp/*/?cmd=login` | Native ERP credentials |
+| **Next.js (middleware-gated auth)** | any route protected only by `middleware.ts` / `middleware.js` | Not a native-cred path: CVE-2025-29927, the `x-middleware-subrequest` header makes the server skip middleware (fixed 12.3.5 / 13.5.9 / 14.2.25 / 15.2.3). Detection and proof live in `hunt-nextjs` |
 
 **How to use:**
 1. Identify the tech stack from headers + paths (use `hunt-misc` Attack Surface Signals).
@@ -320,11 +321,11 @@ An e-commerce platform's partner/reseller portal issued authentication tokens th
 
 ---
 
-## Disclosed Report Citations (Backfill +8 — 2016-2025)
+## Disclosed Report Citations (Backfill +10 — 2016-2025)
 
 The following real, verified bug-bounty / coordinated-disclosure cases extend this skill. Spans 4 SAML subclasses, 4 JWT subclasses, 1 legacy-protocol (XMLRPC), and 2 partner-portal cross-domain reuse patterns.
 
-5. **GitHub Enterprise Server — SAML XSW via parser differential (CVE-2025-25291/25292)** ([H1 #2579939](https://hackerone.com/reports/2579939) · [Blog](https://github.blog/security/sign-in-as-anyone-bypassing-saml-sso-authentication-with-parser-differentials/))
+5. **ruby-saml — SAML XSW via parser differential (CVE-2025-25291/25292; found by GitHub Security Lab, exploitable on GitLab, not a GitHub Enterprise bug)** ([H1 #2579939](https://hackerone.com/reports/2579939) · [Blog](https://github.blog/security/sign-in-as-anyone-bypassing-saml-sso-authentication-with-parser-differentials/))
     - Subclass: SAML signature stripping / XSW (parser-differential variant)
     - Payload: signed SAML response; inject a sibling `<Assertion>` so REXML (signature-checker) and Nokogiri (business-logic reader) resolve different nodes via the same XPath. Signature validates against benign node; SP consumes attacker-controlled `<NameID>admin@target</NameID>`
     - Root cause: two XML parsers used for verification vs consumption return different elements for the same XPath
@@ -372,6 +373,17 @@ The following real, verified bug-bounty / coordinated-disclosure cases extend th
     - Root cause: `aud` claim not enforced; signature-trust extended across audiences
     - Year: 2023 — **$2,400** via IBB
 
+13. **GitHub Enterprise Server — SAML signature bypass via libxml2 quirks (CVE-2025-23369)** ([Writeup, hakivvi](https://repzret.blogspot.com/2025/02/abusing-libxml2-quirks-to-bypass-saml.html))
+    - Subclass: SAML XSW / parser differential inside one parser (libxml2)
+    - Mechanism: libxml2's XPath value hash skips entity-reference nodes, so the `ID` lookup on a copied document resolves a different `Assertion` than the one schema-validated and signed
+    - Preconditions: SAML SSO enabled, attacker already holds an account on the instance
+    - Fixed in GHES 3.12.14, 3.13.10, 3.14.7, 3.15.2 — 2025. Mechanics and test shape → `hunt-saml` Attack 6
+
+14. **node-saml — assertion read from the unsigned document (CVE-2025-54419)** ([GHSA-4mxg-3p6v-xgq3](https://github.com/advisories/GHSA-4mxg-3p6v-xgq3))
+    - Subclass: SAML signature verified on one node, identity read from another
+    - Mechanism: `@node-saml/node-saml` validates the signature but loads the assertion from the original (unsigned) response document, so post-signature edits to the username survive
+    - Fixed in 5.1.0; the advisory lists `passport-saml` <= 3.2.4 without a patch — 2025. Mechanics → `hunt-saml` Attack 6
+
 ---
 
 ## Duende BFF — Token-Confusion & Session-Fixation (2024-2026 surface)
@@ -384,7 +396,7 @@ Duende BFF deployments expose two distinct auth-bypass families beyond the CSRF 
 
 **Payload shape:** identify a BFF route marked `TokenType.UserOrClient` (visible via 401-vs-200 differential when no session, or via leaked OpenAPI/NSwag spec). Hit it with no cookies → BFF forwards with M2M token granting admin-scope downstream. ([docs.duendesoftware.com/bff/fundamentals/apis/yarp](https://docs.duendesoftware.com/bff/fundamentals/apis/yarp/))
 
-**Adjacent confirmed CVE:** **CVE-2024-51987** in `Duende.AccessTokenManagement.OpenIdConnect` — *"HTTP client uses incorrect token after refresh"* — materially the same family of token-confusion at the proxy layer. Moderate severity, fixed 2024. ([GHSA-...51987](https://github.com/advisories?query=duende))
+**Adjacent confirmed CVE:** **CVE-2024-51987** in `Duende.AccessTokenManagement.OpenIdConnect` — *"HTTP client uses incorrect token after refresh"* — materially the same family of token-confusion at the proxy layer. Moderate severity, fixed 2024. ([GHSA-7mr7-4f54-vcx5](https://github.com/DuendeSoftware/Duende.AccessTokenManagement/security/advisories/GHSA-7mr7-4f54-vcx5), affects 3.0.0, fixed in 3.0.1)
 
 ### Attack class 2 — Cookie-domain wildcard + sliding expiration = persistent ATO
 

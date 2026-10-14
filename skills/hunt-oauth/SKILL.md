@@ -1,6 +1,6 @@
 ---
 name: hunt-oauth
-description: Hunting skill for oauth vulnerabilities. Built from 19 public bug bounty reports. Use when hunting oauth on any target.
+description: Hunting skill for oauth vulnerabilities. Built from 22 public bug bounty reports. Use when hunting oauth on any target.
 sources: github, hackerone_public, salt_labs, descope, detectify_labs, harel_research
 report_count: 22
 ---
@@ -70,6 +70,19 @@ intent://
 - Apps using Doorkeeper, OmniAuth, Devise (Ruby), Passport.js (Node), Spring Security OAuth
 - Social login buttons (Google, Facebook, Apple) = OAuth surface guaranteed
 - `.well-known/openid-configuration` present = full OIDC surface available
+
+---
+
+## Baseline: RFC 9700 (OAuth 2.0 Security BCP, BCP 240, Jan 2025)
+
+[RFC 9700](https://www.rfc-editor.org/rfc/rfc9700) is the current yardstick. Quote its section when a deviation is the finding, and remember a deviation alone is a hardening note until you show the attack it enables.
+- **PKCE:** public clients MUST use it; for confidential clients it is RECOMMENDED; authorization servers MUST support it and MUST mitigate PKCE downgrade (§2.1.1). Test: drop `code_challenge` and see if a code is still issued and redeemable.
+- **Implicit grant:** clients SHOULD NOT use `response_type=token` (§2.1.2). If the AS still serves it, the Dirty-Dancing response-type swaps below are in play.
+- **Resource owner password credentials:** MUST NOT be used (§2.4). An accepting `grant_type=password` endpoint is also a brute-force / MFA-skip surface (`hunt-brute-force`, `hunt-mfa-bypass`).
+- **Redirect URIs:** exact string matching, with the only exception being the port of localhost redirects for native apps (§2.1). Any prefix, wildcard or subdomain match is a deviation.
+- **Mix-up defence:** clients talking to more than one AS SHOULD check the `iss` parameter in the authorization response ([RFC 9207](https://www.rfc-editor.org/rfc/rfc9207)) (§2.1). Absent `iss` + multiple IdPs = test mix-up.
+- **PAR ([RFC 9126](https://www.rfc-editor.org/rfc/rfc9126)):** if metadata advertises `pushed_authorization_request_endpoint` with `require_pushed_authorization_requests: true`, send a classic front-channel `/authorize` with a tampered `redirect_uri`. Accepted = PAR is decorative and the redirect_uri tests below apply again.
+- **DPoP ([RFC 9449](https://www.rfc-editor.org/rfc/rfc9449)):** if tokens come back with `token_type: DPoP`, replay one as `Authorization: Bearer` with no `DPoP` proof header, then reuse an old proof (same `jti`, wrong `htm`/`htu`). Either accepted = the sender constraint is not enforced and a stolen token works anywhere.
 
 ---
 
@@ -240,6 +253,18 @@ curl https://api.app-b.com/admin -H "Authorization: Bearer $TOKEN"
 curl -v "https://idp/authorize?client_id=APP&redirect_uri=https://app/cb&response_type=code&state=XYZ&prompt=none"
 ```
 
+### Device Authorization Grant (Device Code) Exposure
+The device flow ([RFC 8628](https://www.rfc-editor.org/rfc/rfc8628)) lets whoever started it receive the tokens once *any* user types the code on the real sign-in page. That is what Storm-2372 abused at scale against Microsoft 365 users, later moving to the Microsoft Authentication Broker client ID to obtain refresh tokens and register devices ([Microsoft, Feb 2025](https://www.microsoft.com/en-us/security/blog/2025/02/13/storm-2372-conducts-device-code-phishing-campaign/)). Microsoft's own recommendation is to block the device flow wherever it is not needed.
+```bash
+# 1) Is the grant offered at all?
+curl -s https://idp/.well-known/openid-configuration | jq '{device_authorization_endpoint, grant_types_supported}'
+# 2) Which client IDs may start it? Try the target's first-party / high-scope client IDs
+#    (from JS bundles, mobile apps) against device_authorization_endpoint. Use YOUR test tenant/account.
+# 3) Walk the user-code page as your own test user: does it name the client and scopes clearly?
+#    Is the code lifetime long? Does a Conditional Access / policy block it for this client?
+```
+**Reportable shape:** device flow enabled for a high-privilege client that never needs it, with no policy blocking it and a consent page that hides who is asking. Social-engineering delivery is out of scope on many programs, so report the exposure (client ID, scopes, lifetime, missing block) and stop there; do not send codes to real users. Entra-specific depth → `m365-entra-attack`.
+
 ---
 
 ## Common Root Causes
@@ -365,6 +390,7 @@ The following real, verified bug-bounty / coordinated-disclosure cases extend th
     - Payload: attacker sets Azure AD admin profile `mail` attribute to victim's address → clicks "Log in with Microsoft" on relying party that keys users by email claim → instant ATO
     - Root cause: Microsoft `email` claim is mutable + unverified; RPs treated it as primary identifier
     - Disclosure: April 11 2023 reported, fixed June 20 2023 (mitigations + new `xms_edov` claim)
+    - **2025 follow-up (Semperis, public June 26 2025):** 9 of 104 Entra App Gallery apps with self-sign-up were still vulnerable. Preconditions: an unverified `mail` value in a tenant the attacker controls, an app registration that still emits the unverified email claim (newer registrations drop it by default; `authenticationBehaviors.removeUnverifiedEmailClaim` set to `false` re-enables it), and an RP keying users on email. `xms_edov` exists but Semperis reports it is no longer offered in the optional-claims UI. Test: log in through "Sign in with Microsoft" from your own tenant with a `mail` value you control and check whether the RP links you to the account with that email. Fix to recommend: key on `iss` + `sub`, never email. ([Semperis](https://www.semperis.com/blog/noauth-abuse-alert-full-account-takeover/))
 
 18. **Grammarly / Vidio / Bukalapak — "Pass-The-Token" social-login** ([Salt Labs writeup](https://salt.security/blog/oh-auth-abusing-oauth-to-take-over-millions-of-accounts))
     - Subclass: missing audience / `aud` validation on Facebook access_token → cross-client token replay → ATO

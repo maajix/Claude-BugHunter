@@ -60,7 +60,15 @@ curl -skL -o /dev/null -w "%{redirect_url}\n" "https://app.target.example/login"
 
 ## User enumeration
 
-### Method 1 — `/api/v1/authn` differential
+### First: Classic Engine or Identity Engine (OIE)?
+```bash
+curl -sk "https://<tenant>.okta.com/.well-known/okta-organization"
+# "pipeline":"v1"  → Classic Engine: the /api/v1/authn methods below are the live flow
+# "pipeline":"idx" → Identity Engine: the Sign-In Widget uses /idp/idx/introspect → /idp/idx/identify
+```
+On OIE orgs `/api/v1/authn` still answers for backward compatibility but runs the Classic pipeline: the `audience` parameter is unsupported, OIE-only authenticators and app sign-in policies need the IDX/Interaction Code flow, and `/api/v1/sessions/me` is deprecated ([OIE API changes](https://developer.okta.com/docs/guides/oie-upgrade-api-changes/main/)). OIE adds an org-wide **User Enumeration Prevention** setting (Security > General, separate Authentication and Recovery toggles) built to make the identify step answer identically for unknown users. Run the known-good vs known-bad differential (see the 2024+ anti-pattern below) against `/idp/idx/identify` as well as `/api/v1/authn`, and report which pipeline leaked. Okta's Classic sunset sets **2027-03-05** as end of support for the remaining Classic features (Self-Service Registration, Desktop SSO/IWA, Device Trust); it names no date for `/api/v1/authn` itself ([Okta developer blog, 2026-09-18](https://developer.okta.com/blog/2026/09/18/okta-classic-engine-deprecation)).
+
+### Method 1 — `/api/v1/authn` differential (Classic pipeline)
 The auth API returns different errors for invalid users vs invalid passwords. Slightly differential.
 
 ```bash
@@ -85,7 +93,7 @@ Some flows expose user existence via response time differential. Less reliable t
 ```bash
 curl -sk "https://<tenant>.okta.com/api/v1/sessions/me" \
   -H "Accept: application/json"
-# Response varies by tenant config
+# Response varies by tenant config (deprecated on Identity Engine orgs)
 ```
 
 ### Method 4 — Org-specific identifier probing
@@ -285,7 +293,7 @@ Okta FastPass is push-based + device-bound. Bypasses:
 
 ## Tooling
 
-- **`OktaTerrify`** (github.com/silverhack/OktaTerrify) — post-compromise Okta device-trust / FastPass enumeration. The only verifiable public Okta-specific offensive tool; no other named, maintained "okta-attacker"/"okta-toolkit" utility is verifiable — build engagement-specific scripts against `/api/v1/*` instead of citing unverified tool names.
+- **`OktaTerrify`** (github.com/CCob/okta-terrify, Ceri Coburn, BSides Cymru 2024 "Okta Terrify - Persistence in a Passwordless World") — post-endpoint-compromise Okta Verify / FastPass abuse: signs FastPass challenges with the victim device's keys and can enroll an attacker-held user-verification key for persistence. The only verifiable public Okta-specific offensive tool; no other named, maintained "okta-attacker"/"okta-toolkit" utility is verifiable — build engagement-specific scripts against `/api/v1/*` instead of citing unverified tool names.
 
 ---
 
@@ -351,9 +359,9 @@ These are the canonical public references that justify the techniques in this sk
 - Root cause: Cross-origin auth permitted on all tenants by default with no origin allowlist enforced at the auth-API edge; credential-stuffing throttling applied per-endpoint not per-tenant.
 - Year: 2024. Severity: High (mass-scale ATO via reused creds).
 
-### 5. CVE-2024-0981 — Okta AD/LDAP DelAuth bcrypt cache-key auth bypass (Oct 2024)
+### 5. Okta AD/LDAP DelAuth bcrypt cache-key auth bypass (no CVE; advisory Nov 1 2024)
 
-- Refs: <https://trust.okta.com/security-advisories/okta-ad-ldap-delegated-authentication-username/>, <https://www.theregister.com/2024/11/04/why_the_long_name_okta/>, <https://www.nodejs-security.com/blog/okta-bcrypt-security-incident-bun-nodejs>
+- Refs: <https://trust.okta.com/security-advisories/okta-ad-ldap-delegated-authentication-username/> (Okta assigned no CVE; CVE-2024-0981 is an unrelated Okta Browser Plugin XSS), <https://www.theregister.com/2024/11/04/why_the_long_name_okta/>, <https://www.nodejs-security.com/blog/okta-bcrypt-security-incident-bun-nodejs>
 - Flow: Okta cached AD/LDAP DelAuth results keyed by `bcrypt(userId + username + password)`. Bcrypt silently truncates input at 72 bytes. When username length ≥ 52 chars, the password bytes fall past the 72-byte boundary → cache key collapses to be password-independent. If the user had a prior successful login (cache populated) AND the AD/LDAP agent was unreachable AND MFA was disabled → any password authenticated.
 - Root cause: Using bcrypt as a general-purpose hash without accounting for the algorithm's 72-byte input limit + cache fallback path inverted the security model (cache trusted over live auth).
 - Year: 2024. Severity: High. Bug introduced Jul 23 2024, internally found and fixed Oct 30 2024 (~3 months exposure window).
@@ -379,10 +387,32 @@ These are the canonical public references that justify the techniques in this sk
 - Root cause: Okta session cookies (until DPoP / Device Bound Session Cookies / asymmetric session keys are enforced) are bearer tokens — anyone holding the cookie is the user.
 - Year: 2022-2024 (ongoing class). Severity: Critical when admin sessions stolen.
 
+### 9. Okta Classic application sign-on policy bypass via "unknown" user-agent (Jul-Oct 2024, no CVE)
+
+- Refs: <https://trust.okta.com/security-advisories/okta-classic-application-sign-on-policy-bypass-2024/>
+- Flow: Okta Classic orgs, from a release on Jul 17 2024 until the fix on Oct 4 2024: with a valid username and password, a sign-in from a user-agent Okta classifies as an **unknown device type** (Python scripts, uncommon browsers) skipped the conditions in **application-specific sign-on policies**: network zones, device-type restrictions, and authentication requirements set outside the Global Session Policy.
+- Hunt angle: fixed server-side, but it shows that app-level policy can hinge on UA classification. With one valid credential (engagement-supplied), make the same sign-in once with a browser UA and once with `python-requests`, and compare the policy outcome. For a client's own IR, the advisory's System Log query is `outcome.result eq "SUCCESS" and (client.device eq "Unknown" OR client.device eq "unknown")` with `eventType eq "user.authentication.sso"` over Jul 17 - Oct 4 2024.
+- Year: 2024. Severity: High (MFA and network-zone requirements silently skipped for anyone holding a password).
+
+### 10. 2025-2026 Okta / Auth0 advisories worth a version check
+
+Source: <https://trust.okta.com/security-advisories/>. Most are SDK or agent bugs: they matter when recon shows the target **runs** the component, not because the target uses Okta.
+
+| CVE | Component | Issue | Affected → fixed |
+|---|---|---|---|
+| CVE-2025-46572 | `passport-wsfed-saml2` (Auth0, Node SP library) | SAML signature wrapping → impersonate any user; needs one IdP-signed SAML document | 3.0.5-4.6.3 → 4.6.4 |
+| CVE-2025-46573 | `passport-wsfed-saml2` | SAML attribute smuggling: added attributes in a valid signed response → impersonation | 3.0.5-4.6.3 → 4.6.4 |
+| CVE-2025-7371 | Okta On-Prem Provisioning (OPP) agent | Agent logs user data and temporary passwords from admin-initiated resets; needs local access to the agent host | 2.2.1-2.3.0 → (verify) |
+| CVE-2025-65945 | `auth0/node-jws` | HS256 verification bypass when the HMAC secret lookup uses attacker-supplied header/payload data | ≤3.2.2, 4.0.0 → 3.2.3 / 4.0.1 |
+| CVE-2026-78560 | Okta Access Gateway | Optional pass-through auth source trusts an identity from a client-supplied header; unauthenticated session as any user when no upstream proxy strips it | < 2026.9.1 → 2026.9.1 |
+| CVE-2026-85981 | Auth0 AD/LDAP Connector | Unauthenticated admin panel on loopback exposes plaintext AD service-account credentials to any local user | ≤6.5.0 → 8.0.0 |
+
+The two SAML library bugs are SP-side: chain them through `hunt-saml` on apps built on `passport-wsfed-saml2`. The Access Gateway header trust is the only pre-auth remote entry in the table. Confirm the pass-through source is enabled before claiming it.
+
 ### Take-aways for hunters
 
 - The 2022 LAPSUS$, 2023 HAR-file, and 2023 Scattered Spider campaigns share a pattern: **the attack rarely hits Okta's product code — it hits the trust relationships around Okta** (third-party support, help-desk verification, customer-uploaded artifacts, federated IdPs). Recon should map these trust edges first.
-- CVE-2024-0981 (bcrypt 72-byte truncation) is the rare pure-product Okta CVE — most disclosed Okta bugs are configuration or operational.
+- The DelAuth bcrypt 72-byte truncation bug (no CVE) and the 2024 Classic app sign-on policy bypass are the rare pure-product Okta auth flaws. Most disclosed Okta incidents are configuration or operational.
 - Push fatigue is not just social engineering — the Okta Verify iOS bug shows the platform itself can silently approve a denied push. Treat any Okta push factor as bypassable in 2024+.
 - For red-team scoping: HAR-file replay, inbound-federation IdP injection, and stealer-cookie replay are the three highest-yield post-recon primitives observed in the wild.
 

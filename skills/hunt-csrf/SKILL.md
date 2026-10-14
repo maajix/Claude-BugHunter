@@ -1,6 +1,6 @@
 ---
 name: hunt-csrf
-description: Hunting skill for csrf vulnerabilities. Built from 15 public bug bounty reports including modern variants — SameSite=Lax sibling-subdomain bypass (Argo CD CVE-2024-22424), GraphQL mutations-via-GET (GitLab $3,370), framework-wide CSRF middleware disabled (Stripe Dashboard $5,000), path-traversal CSRF-token bypass (GitHub Enterprise CVE-2022-23732 $10k), Origin-omission bypass (TikTok $2,500), OAuth-state null-byte (Streamlabs), WebSocket CSRF / CSWSH (Coda), default-SameSite email-change → ATO (YoYo Games $400), social-account-link CSRF (HackerOne), JSON-CSRF via text/plain on email-change (TikTok $500). Use when hunting modern CSRF — heavy emphasis on chain-to-ATO patterns.
+description: Hunting skill for csrf vulnerabilities. Built from 18 public bug bounty reports including modern variants — SameSite=Lax sibling-subdomain bypass (Argo CD CVE-2024-22424), GraphQL mutations-via-GET (GitLab $3,370), framework-wide CSRF middleware disabled (Stripe Dashboard $5,000), path-traversal CSRF-token bypass (GitHub Enterprise CVE-2022-23732 $10k), Origin-omission bypass (TikTok $2,500), OAuth-state null-byte (Streamlabs), WebSocket CSRF / CSWSH (Coda), default-SameSite email-change → ATO (YoYo Games $400), social-account-link CSRF (HackerOne), JSON-CSRF via text/plain on email-change (TikTok $500). Use when hunting modern CSRF — heavy emphasis on chain-to-ATO patterns.
 sources: github, hackerone_public, bugcrowd_public, github_security_advisories
 report_count: 18
 ---
@@ -84,7 +84,9 @@ CSRF becomes high-value when it touches **state-changing actions with account-le
 ### Response Header Signals
 ```
 # Missing or weak SameSite cookie attributes
-Set-Cookie: session=abc123; HttpOnly        # no SameSite = vulnerable
+Set-Cookie: session=abc123; HttpOnly        # no SameSite: Chrome treats it as Lax (since Chrome 80) -
+                                            # exploitable via a state-changing top-level GET, the
+                                            # 120 s Lax+POST window, or a Firefox/Safari victim
 Set-Cookie: session=abc123; SameSite=None   # explicitly allows cross-site
 
 # Missing CSRF headers
@@ -119,7 +121,7 @@ fetch('/api/heartbeat', {method: 'POST', body: JSON.stringify(data)})
 
 1. **Map all state-changing endpoints** — Spider authenticated session, filter for POST/PUT/DELETE/PATCH. Note every form and AJAX call.
 
-2. **Check cookie SameSite attributes** — In DevTools → Application → Cookies. Flag any session cookie without `SameSite=Strict` or `Lax`.
+2. **Check cookie SameSite attributes** — In DevTools → Application → Cookies. Record per session cookie: `None` = every cross-site request carries it; **absent** = Lax in Chrome (minus the 120 s Lax+POST window), no default restriction in Firefox/Safari; explicit `Lax` = top-level GET navigations only; `Strict` = none. Note whether the name carries the `__Host-` prefix.
 
 3. **Test token staticness** — Log in twice (different sessions or incognito). Compare `authenticity_token` / `csrfmiddlewaretoken` / `csrf-token` values across:
    - Same session, different page loads (should be different)
@@ -240,7 +242,9 @@ curl -s https://monitoring.target.example/api/health | jq '.version'
 ## Bypass Techniques
 
 ### Defense: SameSite=Lax cookies
-**Bypass:** Top-level navigation GET requests still work. If the sensitive action can be triggered via GET (or if a redirect chain converts POST→GET), Lax doesn't protect it. Also: subdomains can still set cookies for parent domain.
+**Bypass:** Top-level navigation GET requests still work. If the sensitive action can be triggered via GET (or if a redirect chain converts POST→GET), Lax doesn't protect it. Also: subdomains can still set cookies for parent domain. Reference: https://portswigger.net/web-security/csrf/bypassing-samesite-restrictions
+- **Method override.** If the framework honours an override parameter (Symfony's `_method`; other frameworks have similar ones), a Lax-allowed top-level GET such as `GET /my-account/change-email?_method=POST&email=...` is routed as the state-changing POST. Lab: [SameSite Lax bypass via method override](https://portswigger.net/web-security/csrf/bypassing-samesite-restrictions/lab-samesite-lax-bypass-via-method-override).
+- **Lax+POST window (Chrome, attribute-less cookies only).** To avoid breaking SSO, Chrome does not enforce Lax on top-level cross-site POSTs for the first 120 seconds after a cookie without a `SameSite` attribute is set. It does not apply to cookies explicitly set `SameSite=Lax`. If the victim's session cookie can be re-issued on demand (an OAuth/SSO login that completes without a prompt), trigger that refresh first, then auto-submit the cross-site POST within two minutes. Lab: "SameSite Lax bypass via cookie refresh".
 
 ### Defense: CSRF token present
 **Bypasses:**
@@ -256,11 +260,14 @@ curl -s https://monitoring.target.example/api/health | jq '.version'
 **Bypasses:**
 - Null Origin: use sandboxed iframe (`<iframe sandbox="allow-scripts allow-forms">`)
 - Subdomain bypass: if `*.target.example` is trusted and you have XSS on any subdomain
-- Referer stripping: HTTPS→HTTP transitions strip Referer header
-- Weak matching: `target.example.evil.example` passes naive string matching
+- Referer suppression: if validation only runs when a Referer is present, drop it from the attacker page with `<meta name="referrer" content="no-referrer">` (the target is HTTPS, so an HTTPS→HTTP downgrade does not help, and the default policy is `strict-origin-when-cross-origin`)
+- Weak matching: `target.example.evil.example` passes naive string matching; for a "Referer contains target.example" check, put the domain in your page's query string and serve the page with `Referrer-Policy: unsafe-url` so the browser sends the full URL instead of only your origin
 
 ### Defense: Double-submit cookie pattern
-**Bypass:** If attacker can set cookies (subdomain takeover, cookie injection via HTTP), they can set both the cookie and the form field to matching attacker-controlled values.
+**Bypass:** If attacker can set cookies (subdomain takeover, cookie injection via HTTP), they can set both the cookie and the form field to matching attacker-controlled values. Check the cookie name first: a `__Host-` prefixed cookie must be `Secure`, `Path=/` and carry no `Domain`, so a sibling subdomain cannot set or overwrite it. Its absence is what makes cookie tossing from a subdomain viable.
+
+### Defense: Fetch Metadata (`Sec-Fetch-Site`)
+The server rejects state-changing requests whose `Sec-Fetch-Site` is `cross-site`. **Probe it** in Repeater: replay the authenticated request with `Sec-Fetch-Site: cross-site` and then `same-origin` — identical acceptance means no policy is enforced (a raw client can set the header; a browser cannot, so a rejection here is a real control). **Bypasses:** a same-site sibling origin (`same-site` is often allowed), and whatever the policy exempts for compatibility (requests with no `Sec-Fetch-*` headers, top-level `navigate` GETs — pair with method override above).
 
 ### Defense: Custom request header (e.g., `X-Requested-With`)
 **Bypass:** Simple requests (form POST, `text/plain`) don't trigger preflight and can't set custom headers — but some servers only check for header *presence*, not value, and some frameworks accept requests without it.

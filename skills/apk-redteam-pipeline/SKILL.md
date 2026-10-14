@@ -107,8 +107,8 @@ done
 ```bash
 # Install
 brew install jadx          # macOS
-# or
-wget https://github.com/skylot/jadx/releases/latest/download/jadx-1.5.x.zip
+# or grab the zip from https://github.com/skylot/jadx/releases (v1.5.6 as of 2026-07):
+wget https://github.com/skylot/jadx/releases/download/v1.5.6/jadx-1.5.6.zip
 
 # Decompile
 jadx -d decompiled_<package>/ <package>.apk
@@ -207,6 +207,9 @@ AndroidManifest.xml lists components. Exported ones (especially with `android:ex
 ```bash
 # Decode binary AndroidManifest if needed
 apktool d <package>.apk -o decoded_<package>/    # apktool decodes binary manifest
+# Apktool 3.x (3.0.3 as of 2026-07) reworked the CLI: advanced options are long-only, `-api` is gone,
+# `empty-framework-dir` became `clean-frameworks`, `--only-main-classes` became `-a/--all-src`.
+# Re-check flags in any 2.x-era script against `apktool d -h`.
 
 # Or read directly from jadx output
 cat decompiled_<package>/resources/AndroidManifest.xml | grep -E '<(activity|service|receiver|provider)' | head -50
@@ -256,6 +259,20 @@ adb devices  # ensure device/emulator connected
 # Push frida-server to device (root required, or use rooted emulator like Genymotion / x86_64 AVD)
 ```
 
+**Play Integrity caveat (May 2025):** on Android 13+ the device verdict is hardware-backed and needs a
+locked bootloader running a certified OEM image; rooted phones get at most the basic verdict (only
+with key attestation) and emulator images cannot meet the device verdict ([Google](https://developer.android.com/google/play/integrity/improvements)). Apps
+that gate on Play Integrity may refuse to launch or log in on a rooted AVD/Genymotion — plan for a
+real test device, or treat the integrity check as its own surface before blaming your hooks.
+
+**Frida 17 (May 2025):** the Java/ObjC/Swift bridges are no longer bundled in GumJS. The `frida` REPL
+and `frida-trace` (frida-tools ≥14) still bundle them, so `frida -l script.js` below works unchanged;
+a custom agent built with `frida-compile` must `import Java from "frida-java-bridge"` after
+`npm install frida-java-bridge` (or `frida-pm install frida-java-bridge`, frida-tools ≥14.2)
+([bridges docs](https://frida.re/docs/bridges/), [17.0 release](https://frida.re/news/2025/05/17/frida-17-0-0-released/)).
+objection supports Frida 17 from 1.12.0, but its bundled java-bridge failed on newer ART / Play
+Services until **1.12.5** ([objection #800](https://github.com/sensepost/objection/issues/800)) — use ≥1.12.5.
+
 ### Cert-pinning bypass (universal)
 ```javascript
 // frida-script-pinning-bypass.js
@@ -279,7 +296,8 @@ Java.perform(function() {
 });
 ```
 ```bash
-frida -U -l frida-script-pinning-bypass.js -f <package_id> --no-pause
+frida -U -l frida-script-pinning-bypass.js -f <package_id>
+# spawned apps resume by default since frida-tools 12 (`--no-pause` was removed); add `--pause` to stay suspended
 ```
 
 ### Hook HTTP requests
@@ -318,8 +336,13 @@ mitmproxy --listen-port 8080
 
 # Configure Android device proxy to host:8080
 # Install mitmproxy CA cert on device:
-#   - Pull from http://mitm.it on the device, or
-#   - Push to /system/etc/security/cacerts/ on rooted device
+#   - Pull from http://mitm.it on the device (user store — most apps ignore user CAs since Android 7), or
+#   - Android <=13, rooted: push to /system/etc/security/cacerts/
+#   - Android 14+: the system store lives in /apex/com.android.conscrypt/cacerts; writes to
+#     /system/etc/security/cacerts/ are ignored. Install the CA as a user cert, then use NCC Group's
+#     ConscryptTrustUserCerts Magisk module (copies user CAs into the APEX store), see
+#     https://httptoolkit.com/blog/android-14-install-system-ca-certificate/ and
+#     https://www.nccgroup.com/research/tool-release-magisk-module-conscrypt-trust-user-certs/
 
 # Use the Frida pinning bypass script while traffic flows through mitmproxy
 # All API calls visible in mitmproxy UI
@@ -359,8 +382,10 @@ mitmproxy --listen-port 8080
 
 ```bash
 brew install jadx p7zip
-pip install --break-system-packages frida-tools objection
-# Genymotion or AVD for rooted Android emulator
+pip install --break-system-packages frida-tools 'objection>=1.12.5'
+# Genymotion or AVD for rooted Android emulator (see Play Integrity caveat in Stage 7)
+# MobSF (v4.5.3 as of 2026-09) for an automated static pass:
+docker run -it --rm -p 8000:8000 opensecurity/mobile-security-framework-mobsf:latest
 ```
 
 For APK download convenience, can add a `download-apk` shell function:

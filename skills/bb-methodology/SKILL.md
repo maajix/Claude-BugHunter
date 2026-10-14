@@ -317,11 +317,11 @@ The reproduction commands MUST be paste-into-shell ready in the report — a tri
 ```
 Run /report
 +-- Platform-specific format (H1/Bugcrowd/Intigriti/Immunefi)
-+-- Title: [Bug Class] in [Endpoint] allows [role] to [impact]
++-- Title: <asset> | <bug class> | <impact>
 +-- Impact-first summary (sentence 1 = what attacker CAN do)
 +-- Exact HTTP requests in Steps to Reproduce
 +-- Under 600 words
-+-- CVSS 3.1 score that MATCHES actual impact
++-- Program-selected CVSS (3.1 / 4.0) score that MATCHES actual impact
 ```
 
 **After submission:**
@@ -367,13 +367,15 @@ Before pushing back with "I think we're done because X," do this:
 
 **Lesson from an authorized engagement:** After a first-pass of 5 weak findings the user said "I have 10+, find them." Loading `hunt-auth-bypass` (which had been loaded but not walked through end-to-end) immediately surfaced the `/_vti_bin/Authentication.asmx` legacy SOAP login — the highest-impact bug in the engagement. The user was right; pushback would have been wrong.
 
+**Counterweight: platform AI rules.** "Find more" means more coverage, never more submissions. The HackerOne Code of Conduct (https://www.hackerone.com/policies/code-of-conduct) permits AI-assisted research but holds the hacker fully responsible for every submission: reports that are speculative, missing a proof of concept, not reproducible or lacking demonstrated impact are closed N/A, and relying on AI output with hallucinated details (invented endpoints, unsupported impact claims) is prohibited. Large-scale submission of low-quality or unverified reports, including misuse of AI tools and automation, is listed under Spam, Noise and Automation and escalates from final warning to a 12-month ban to a permanent platform ban. Hackbots must not operate fully autonomously. Every extra finding the pushback surfaces still goes through `/validate` before it is filed.
+
 ### Tool Routing by Phase
 
 | Phase | Tools | Why this order |
 |-------|-------|----------------|
 | Recon: Subdomains | `subfinder` -> `amass` -> `puredns` -> `httpx` | Passive first (no detection) -> resolve DNS -> probe HTTP + tech stack |
 | Recon: URLs | `gau` + `waymore` -> `katana` -> `uro` | Archive (forgotten endpoints) -> active crawl (JS-rendered) -> deduplicate |
-| Recon: JS | `jsluice` + `mantra` + `trufflehog --only-verified` | Extract URLs/secrets -> find API keys -> verify keys actually work |
+| Recon: JS | `jsluice` + `mantra` + `trufflehog --results=verified` | Extract URLs/secrets -> find API keys -> verify keys actually work |
 | Recon: Ports | `naabu` (wide) -> `rustscan` (deep) | Fast top-1000 sweep -> full 65535 on interesting targets |
 | Recon: Scan | `nuclei -tags cve` -> `nuclei -tags takeover` | Known CVEs first -> then takeover (act immediately) |
 | Mapping: Params | `arjun` + `paramspider` + ParamMiner | Brute-force hidden params + mine archives + cache headers |
@@ -387,7 +389,7 @@ Before pushing back with "I think we're done because X," do this:
 | Exploit: 403 | `byp4xx` or `nomore403` | 20+ bypass techniques automated |
 | Exploit: Takeover | `subzy` | Checks CNAME against 70+ vulnerable services |
 | Exploit: Cloud | `s3scanner` + `aws` CLI | Scan bucket permissions -> extract metadata credentials |
-| Exploit: Secrets | `trufflehog --only-verified` | Only verified working keys (no false positives) |
+| Exploit: Secrets | `trufflehog --results=verified` | Only verified working keys (no false positives) |
 
 ### Session End Checklist
 

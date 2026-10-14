@@ -56,12 +56,12 @@ No invented CVE/report IDs below. These are the *named, publicly-documented* pat
 - **Session fixation, login-CSRF, no-regeneration-on-auth** — OWASP WSTG-SESS-03 / WSTG-SESS-01; the classic ACROS / Mitja Kolšek session-fixation paper. Highest-impact variant: fixing the session of an SSO/admin user.
 - **SameSite=Lax sibling-subdomain CSRF reaching session state** — Argo CD **CVE-2024-22424** (Lax cookies sent on top-level cross-site navigations from a sibling subdomain). Use this when a session cookie relies on `SameSite=Lax` as its only CSRF defence.
 - **Refresh-token rotation & automatic reuse-detection** — the Auth0/IETF OAuth-Security-BCP model: a rotated refresh token, if replayed, must invalidate the *entire token family*. Absence = the core bug to prove.
-- **Device Bound Session Credentials (DBSC)** — the W3C/Chrome DBSC draft binds a session to a TPM/device key. Test the *downgrade*: does the server still accept a non-bound cookie when the DBSC challenge is stripped?
+- **Device Bound Session Credentials (DBSC)** — binds a session to a TPM/device key; specified in the W3C WebAppSec WG ([w3c.github.io/webappsec-dbsc](https://w3c.github.io/webappsec-dbsc/)). No longer just a draft in practice: [public availability on Chrome 146 for Windows](https://blog.google/security/protecting-cookies-with-device-bound-session-credentials/) (Apr 2026, macOS announced as upcoming) and [GA, on by default for Google Workspace](https://workspaceupdates.googleblog.com/2026/05/prevent-account-takeovers-with-DBSC-now-generally-available-in-the-Chrome-browser-for-Windows.html) (rollout from May 25 2026). Third-party RPs still opt in, so most targets accept plain cookies. Test the *downgrade*: does the server still accept a non-bound cookie when the DBSC challenge is stripped, or from a non-Windows / non-Chrome client?
 - **Cookie attribute hardening** — OWASP WSTG-SESS-02; `__Host-`/`__Secure-` prefixes per RFC 6265bis. Missing `HttpOnly` is only a finding when a real XSS/DOM sink exists (chain with `hunt-xss`/`hunt-dom`).
 - **Entropy** — NIST SP 800-63B requires ≥64 bits of entropy in a session identifier. Treat anything decodable to a counter/timestamp/userId as a finding regardless of length.
 - **Cookie integrity (tossing, prefixes, parser differentials, jar limits)** — RFC 6265bis sections 4.1.3 (prefixes), 4.2.2 (serialization order is not a guarantee), 5.6 (no percent-decoding, WSP trimming) and 5.7 (Secure-cookie protection, nameless-prefix rule); the per-domain eviction constants read from Chromium `cookie_monster.cc` and Firefox `CookieStorage.cpp`; PortSwigger's cookie-sandwich research for the quoted-value HttpOnly bypass. Phases 9-11 below; depth in `references/cookie-integrity.md`.
 
-Cross-refs: ATO chaining → `hunt-ato`; JWT alg/kid tampering → `hunt-api-misconfig`; OAuth code/state flaws → `hunt-oauth`; CSRF mechanics → `hunt-csrf`; cookie-theft sinks → `hunt-xss` / `hunt-dom`.
+Cross-refs: ATO chaining → `hunt-ato`; JWT alg/kid/key-confusion tampering → `hunt-jwt-crypto`; OAuth code/state flaws → `hunt-oauth`; CSRF mechanics → `hunt-csrf`; cookie-theft sinks → `hunt-xss` / `hunt-dom`.
 
 ---
 
@@ -229,7 +229,7 @@ b64url "$(cut -d. -f2 <<<"$JWT")" | jq .   # claims: exp, iat, sub, jti
 ```
 - **`exp` missing or years out** → no expiry. **`jti` missing** → server cannot maintain a revocation list → logout can't truly revoke.
 - **Revocation test:** logout, then replay the *same* JWT against `/api/me`. If it still returns the user → tokens are not server-revocable; this is the JWT-session persistence finding. Body-diff to avoid a cached 200.
-- **Tampering (alg/kid/key-confusion) is owned by `hunt-api-misconfig`** — hand off `jwt_tool $JWT -T` / `-X a` there rather than duplicating it.
+- **Tampering (alg/kid/key-confusion) is owned by `hunt-jwt-crypto`** — hand off `jwt_tool $JWT -T` / `-X a` there rather than duplicating it.
 
 ### Phase 7 — Refresh-Token Rotation & Reuse-Detection
 ```bash

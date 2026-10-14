@@ -1,6 +1,6 @@
 ---
 name: hunt-cache-poison
-description: Hunting skill for cache poison vulnerabilities. Built from 10 public bug bounty reports including X-Forwarded-Host poisoning, X-HTTP-Method-Override / GCS cache, reflected→stored XSS via cache, classic Omer-Gil Web Cache Deception, Cloudflare Cache Deception Armor bypass, session-token cache deception, Akamai hop-by-hop smuggling → server-side edge poisoning, and Kettle's 2024 path-normalization WCD against Cloudflare/Fastly/GCP. Host/X-Forwarded-Host injection that reaches app logic (reset-link poisoning, routing SSRF, OAuth issuer) is owned by hunt-host-header; this skill owns the case where the poisoned response is CACHED and served to other users. Use when hunting cache poisoning, Web Cache Deception, CDN-fronted apps.
+description: Hunting skill for cache poison vulnerabilities. Built from 8 public bug bounty reports including X-Forwarded-Host poisoning, X-HTTP-Method-Override / GCS cache, reflected→stored XSS via cache, classic Omer-Gil Web Cache Deception, Cloudflare Cache Deception Armor bypass, session-token cache deception, Akamai hop-by-hop smuggling → server-side edge poisoning, Doyhenard's 2024 delimiter/normalization WCD and Cache-What-Where (Gotta cache 'em all), and Next.js internal cache poisoning (CVE-2024-46982). Host/X-Forwarded-Host injection that reaches app logic (reset-link poisoning, routing SSRF, OAuth issuer) is owned by hunt-host-header; this skill owns the case where the poisoned response is CACHED and served to other users. Use when hunting cache poisoning, Web Cache Deception, CDN-fronted apps.
 sources: github, hackerone_public, portswigger_research, omergil_research, youstin_research
 report_count: 8
 ---
@@ -23,33 +23,15 @@ Cache poisoning is high-value because a single poisoned cache entry can affect t
 
 ## Autonomous Testing Priority
 
-**Two distinct attacks live under this skill — target the simpler one first.**
+**Password-reset poisoning is not this skill's attack.** A poisoned reset link goes to one inbox and nothing is cached; it is owned by `hunt-host-header` (Phase 1 there, including the own-test-account rule and the Collaborator-host proof). Come back here only when the injected host lands in a **cacheable** response.
 
-**Attack 1 — Password Reset Poisoning (Host header injection):**
-
-The app uses the `Host` header to construct the password reset link in the email. Inject an attacker-controlled hostname; the victim's reset email contains a link to your server.
-
-```
-POST /forgot-password
-Host: attacker.example
-X-Forwarded-Host: attacker.example
-X-Host: attacker.example
-
-email=victim@target.example
-Content-Type: application/x-www-form-urlencoded
-```
-
-Use a distinctive hostname you control or can identify in the response. **Proof:** the injected hostname appears in the response body (some apps reflect the generated reset link), or the action succeeds (2xx with a "reset email sent" message) after injection — confirming the poisoned link would be sent to the victim.
-
-Try multiple host headers — apps vary in which one they trust (`X-Forwarded-Host` is most common, but `Host` itself also works when the proxy passes it through).
-
-**Attack 2 — Web Cache Poisoning:**
+**Web Cache Poisoning:**
 
 Inject the attacker-controlled hostname into `X-Forwarded-Host` on a GET request for a cacheable page. If the hostname is reflected in the response body AND the response gets cached, subsequent visitors receive the poisoned response.
 
 Check for cache signals in the response: `X-Cache: HIT`, `CF-Cache-Status: HIT`, `Age: <nonzero>`, or `Via: cloudfront/varnish/fastly`.
 
-**Proof for both:** injected value reflected in response body, or action completed successfully despite the manipulated header.
+**Proof:** the injected value is reflected in the response body AND a clean request (no injected header) on the same cache key returns it (see Gate 0).
 
 ---
 
@@ -104,7 +86,7 @@ X-HTTP-Method-Override
    - `GET /account/profile.css`
    - `GET /dashboard/settings.jpg`
    - `GET /affiliate-link/target.js`
-   Check if the server returns dynamic content AND the cache stores it.
+   Check if the server returns dynamic content AND the cache stores it. If plain suffixes fail, map delimiter and normalization discrepancies (see **Web Cache Deception — parser discrepancies** below).
 
 5. **Test for DoS via cache poisoning.** Send a request with a header that causes a 4xx/5xx error and check if that error response gets cached:
    - Malformed `Host` header
@@ -153,7 +135,7 @@ curl -s "https://target.example/account/profile.css"
 **Force cache miss to test poison without hitting cached version:**
 ```bash
 # Use a unique cache-busting query param to land on a fresh key — do NOT rely on
-# client-sent "Cache-Control: no-cache" (per RFC 7234 it requests revalidation, not
+# client-sent "Cache-Control: no-cache" (per RFC 9111 it requests revalidation, not
 # skip-storage, and Cloudflare/Fastly/Akamai generally ignore it on cacheable assets).
 curl -s -H "X-Forwarded-Host: canary.attacker.example" \
      "https://target.example/page?cb=$RANDOM"
@@ -205,6 +187,35 @@ True-Client-IP
 ```
 
 ---
+
+## Web Cache Deception — parser discrepancies (Doyhenard 2024)
+
+Source: Martin Doyhenard (PortSwigger), "Gotta cache 'em all: bending the rules of web cache exploitation", 8 Aug 2024, presented at Black Hat USA 2024 and DEF CON 32 — https://portswigger.net/research/gotta-cache-em-all . Practise each shape in the Web Security Academy WCD labs (path mapping, path delimiters, origin-server normalization, cache-server normalization, exact-match cache rules): https://portswigger.net/web-security/web-cache-deception . The bug is any disagreement between how the cache and the origin map one URL to a resource.
+
+**Map the discrepancy first** (your own authenticated account, cachebuster on every probe):
+1. **Origin delimiters** — baseline `GET /my-account`, then `GET /my-account<D>abc` for each candidate `<D>`. A body identical to the baseline means the origin truncates at `<D>`. Seen in the wild: `;` (Spring matrix variables), `.` (Rails format suffix), `%00` (OpenLiteSpeed), `%0a` (nginx rewrite rules), plus `?`, `%23`, `%3f`. Fuzz raw and URL-encoded (Burp Intruder).
+2. **Cache delimiters** — caches usually split only on `?`. A raw `#` never leaves the browser, so test it as `%23`.
+3. **Normalisation** — compare `GET /static/x?cb=1` with `GET /aaa/..%2fstatic/x?cb=1` (and a `%5c` backslash variant). Identical response = that hop decoded and resolved the dot-segment. Test once on a known-cached path (cache side) and once on a dynamic path (origin side).
+
+**Exploit shapes** (victim opens the link while logged in; you re-fetch it unauthenticated):
+
+| Cache rule | Discrepancy | URL shape |
+|---|---|---|
+| Static extension (`.js`, `.css`) | origin delimiter the cache ignores | `/my-account;wcd.js`, `/my-account%00wcd.css` |
+| Static directory prefix (`/static`, `/assets`, `/wp-content`) | origin resolves an encoded dot-segment, cache does not | `/static/..%2fmy-account` |
+| Static directory prefix | cache resolves the dot-segment, origin truncates at a delimiter | `/my-account%23%2f%2e%2e%2fstatic` |
+| Exact static file (`/robots.txt`, `/favicon.ico`, `/index.html`) | cache resolves the dot-segment, origin truncates at a delimiter | `/my-account;%2f%2e%2e%2frobots.txt?cb=1` |
+
+Keep dot-segments encoded (`%2f%2e%2e%2f`) so the victim's browser does not resolve them before sending.
+
+**Cache-What-Where** — chain an "unexploitable" header-driven open redirect with a cache discrepancy. If `GET /home` with `X-Forwarded-Host: evil.example` returns `Location: http://evil.example/index.html`, use a discrepancy so the origin serves `/home` while the cache stores that redirect under a key such as `/main.js`: every visitor loading `/main.js` is sent to attacker JavaScript. A redirect carrying `Cache-Control: public, max-age=...` can be stored under arbitrary paths without a static-extension rule.
+
+### Framework-internal cache poisoning — Next.js (CVE-2024-46982)
+
+Some frameworks keep their own response cache behind the CDN. Next.js **pages router** 13.5.1 to before 14.2.10 (fixed in 13.5.7 / 14.2.10; app router and Vercel-hosted deployments not affected; GHSA-gp8f-8m3g-qvj9, CVSS 7.5): the internal `__nextDataReq` query parameter plus the internal `x-now-route-matches` header make a non-dynamic SSR route cacheable (`Cache-Control: s-maxage=1, stale-while-revalidate`). The route's `pageProps` JSON is then stored in place of its HTML (DoS), or a request value the page reflects (User-Agent, cookie, locale) is stored and served as `text/html` to every visitor (stored XSS). Research: Rachid Allam (zhero), "Next.js, cache, and chains: the stale elixir" (Jan 2025), https://zhero-web-sec.github.io/research-and-things/nextjs-cache-and-chains-the-stale-elixir — entry 7 of PortSwigger's Top 10 web hacking techniques of 2025.
+
+- **Stage A (read-only):** confirm Next.js with the pages router (`__NEXT_DATA__` in the HTML, `/_next/data/<buildId>/` requests) and pin the version (`window.next.version` in the browser console where exposed). Out of range = stop.
+- **Stage B (written sign-off):** the poisoning request (`GET /<route>?__nextDataReq=1` with `x-now-route-matches: 1`) writes into the framework cache every visitor shares. Do not assume a cachebuster query parameter isolates that cache; use a route and window the program agreed to, then re-fetch clean from a second client to confirm the entry expired. Framework depth lives in `hunt-nextjs`.
 
 ### Origin header → ACAO cache poisoning
 Add `Origin` to the unkeyed-header set. Test whether it is reflected into `Access-Control-Allow-Origin` and then cached: `curl -H "Origin: evil.example" URL -I` on two consecutive hits. A cached attacker/`*` ACAO breaks CORS for legit users (cache-DoS); a cached permissive ACAO enables cross-user data reads. Disclosed: reports/591302.
@@ -321,11 +332,11 @@ The following real, verified bug-bounty / coordinated-disclosure cases extend th
     - Root cause: inconsistent handling of hop-by-hop headers across Akamai proxy tiers caused desync; smuggled responses were server-side cached globally
     - Year: 2022 — **>$50K total** across affected programs (PayPal $25,200 + Airbnb $14,875 + Goldman Sachs $100), PortSwigger Top-10 Web Hacking Techniques 2022 nominee
 
-7. **James Kettle (PortSwigger) — "Gotta cache 'em all": path-normalization & WCD against Cloudflare/Fastly/GCP** ([PortSwigger Research](https://portswigger.net/research/gotta-cache-em-all))
-    - Subclass: cache-key path normalization discrepancies and Web Cache Deception across major CDNs (Cloudflare, Fastly, GCP/Google Cloud) — the 2024 research named in this skill's description
-    - Payload: origin-vs-cache delimiter/normalization disagreements (e.g. encoded path segments and static-suffix tricks) that cause the cache to store a dynamic/authenticated response under a static-looking key
-    - Root cause: cache and origin disagree on how to normalize/parse the URL path, so the cache key does not match the resource the origin actually served
-    - Year: 2024 — coordinated CDN-vendor disclosure; methodology research (no single bounty), PortSwigger Top-10 Web Hacking Techniques 2024 entry
+7. **Martin Doyhenard (PortSwigger) — "Gotta cache 'em all: bending the rules of web cache exploitation"** ([PortSwigger Research](https://portswigger.net/research/gotta-cache-em-all))
+    - Subclass: origin-vs-cache delimiter and normalization discrepancies → Web Cache Deception (static extension, static directory, exact static file) and Cache-What-Where — the 2024 research named in this skill's description
+    - Payload: origin delimiters the cache ignores (`;`, `%00`, `%0a`, `%23`), encoded dot-segments one hop resolves and the other does not (`/static/..%2fmy-account`) — see the WCD section above
+    - Root cause: cache and origin disagree on how to parse/normalize the URL path, so the cache key does not match the resource the origin actually served
+    - Year: 2024 (8 Aug, Black Hat USA 2024 / DEF CON 32) — methodology research (no single bounty); on the Top 10 2024 community shortlist (PortSwigger's own research is excluded from the panel vote)
 
 ---
 

@@ -12,20 +12,10 @@ report_count: 0
 User.update(req.body)  // body has {"role": "admin"} → privilege escalation
 ```
 
-### JWT None Algorithm
-```python
-header = {"alg": "none", "typ": "JWT"}
-payload = {"sub": 1, "role": "admin"}
-token = base64(header) + "." + base64(payload) + "."  # no signature
-```
-
-### JWT RS256 → HS256 Algorithm Confusion
-```python
-# Get server's public key from /.well-known/jwks.json
-# Sign token with public key as HMAC secret
-token = jwt.encode({"sub": "admin", "role": "admin"}, pub_key, algorithm="HS256")
-# Server uses RS256 key as HS256 secret → accepts it
-```
+### JWT and CORS — owned by other skills
+- **JWT signature/crypto forgery** (`alg:none`, RS256→HS256 key confusion, `kid`/`jku`/`jwk` header injection, weak-secret cracking) → **`hunt-jwt-crypto`**. JWT-as-session expiry/revocation → **`hunt-session`** Phase 6.
+- **Non-crypto JWT handling stays here:** decode every JWT the API hands out and treat it as an API response — sensitive data in the readable payload (PII, internal IDs, internal hostnames), and JWTs carried in URLs where they leak through logs and `Referer`.
+- **CORS misconfiguration** (reflected origin + credentials, `null` origin, subdomain-regex bypass, postMessage) → **`hunt-cors`**.
 
 ### Prototype Pollution
 ```javascript
@@ -118,14 +108,6 @@ username=administrator/field/email%23
 username=administrator/field/id%23
 username=administrator/field/passwordResetToken%23
 username=administrator%2ffield%2fpasswordResetToken%23
-```
-
-### CORS Exploitation
-```bash
-# Test: reflected origin + credentials
-curl -s -I -H "Origin: https://evil.example" https://target.example/api/user/me
-# If: Access-Control-Allow-Origin: https://evil.example + Access-Control-Allow-Credentials: true
-# → CRITICAL: attacker reads credentialed responses
 ```
 
 ---
@@ -277,8 +259,8 @@ Tools: `kiterunner` natively eats OpenAPI; `sj` (Swagger Jacker), `apidetector`,
 ## Related Skills & Chains
 
 - **`hunt-ato`** — Mass assignment on signup/profile is the fastest path to admin. Chain primitive: API mass assignment + `hunt-ato` → `role=admin` set on signup → ATO via privileged role on first login.
-- **`hunt-auth-bypass`** — JWT flaws collapse the entire auth layer. Chain primitive: JWT `alg=none` + `hunt-auth-bypass` → impersonate any user by setting `sub` to victim ID, no signature required.
+- **`hunt-auth-bypass`** — JWT flaws collapse the entire auth layer. Chain primitive: a token forged via `hunt-jwt-crypto` (`alg=none`, key confusion) + `hunt-auth-bypass` → impersonate any user by setting `sub` to victim ID. The forging mechanics live in `hunt-jwt-crypto`, not here.
 - **`hunt-rce`** — Prototype pollution gadgets in Node.js dependencies (lodash, mongoose, jQuery) reach `child_process.spawn`. Chain primitive: Prototype pollution (`__proto__.shell=true`) + `hunt-rce` (Node.js gadget chain) → RCE on the API node.
-- **`hunt-subdomain`** — CORS regex with wildcard subdomain trusts a takeoverable host. Chain primitive: CORS allowlist `*.target.example` + subdomain takeover → attacker-controlled origin reads credentialed API responses.
-- **`security-arsenal`** — Load the JWT Attack Payloads section (alg=none, kid path traversal, JWK injection, embedded JWK) and the Mass-Assignment Field Wordlist (`is_admin`, `role`, `verified`, `permissions`, `org_id`, `tenant_id`).
+- **`hunt-subdomain`** — CORS regex with wildcard subdomain trusts a takeoverable host. Chain primitive: CORS allowlist `*.target.example` (tested via `hunt-cors`) + subdomain takeover → attacker-controlled origin reads credentialed API responses.
+- **`security-arsenal`** — Load the Mass-Assignment Field Wordlist (`is_admin`, `role`, `verified`, `permissions`, `org_id`, `tenant_id`). Its JWT Attack Payloads section pairs with `hunt-jwt-crypto`, not this skill.
 - **`triage-validation`** — Apply the Server-Policy-vs-State gate: a permissive CORS header alone is informational; demonstrate actual cross-origin credentialed read of sensitive data before reporting.

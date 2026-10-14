@@ -28,16 +28,18 @@ GOOD: "An attacker can access any user's order history by changing the user_id
 ## TITLE FORMULA
 
 ```
-[Bug Class] in [Exact Endpoint/Feature] allows [attacker role] to [impact] [victim scope]
+<asset> | <bug class> | <impact>
 ```
+
+Asset = exact host + endpoint/feature. Bug class = include the attacker role (unauthenticated / authenticated). Impact = what the attacker gets and whose. Same format as the Operator Notes below.
 
 **Good titles (specific, impact-first):**
 ```
-IDOR in /api/v2/invoices/{id} allows authenticated user to read any customer's invoice data
-Missing auth on POST /api/admin/users allows unauthenticated attacker to create admin accounts
-Stored XSS in profile bio field executes in admin panel — allows privilege escalation
-SSRF via image import URL parameter reaches AWS EC2 metadata service
-Race condition in coupon redemption allows same code to be used unlimited times
+/api/v2/invoices/{id} | Authenticated IDOR | any user reads every customer's invoice data
+POST /api/admin/users | Missing auth (unauthenticated) | attacker creates admin accounts
+Profile bio field | Stored XSS executing in admin panel | privilege escalation to admin
+Image import URL parameter | SSRF | AWS EC2 metadata service reachable
+Coupon redemption | Race condition | same code redeemed unlimited times
 ```
 
 **Bad titles (vague, useless to triager):**
@@ -206,7 +208,7 @@ Content-Type: application/json
 
 [Specific, quantified impact. What data, how many users, what can attacker do.]
 
-CVSS 3.1 Score: X.X ([Severity]) — AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N
+CVSS 3.0 (default) / 4.0 Score: X.X ([Severity]) — AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N
 
 ## Remediation
 
@@ -220,7 +222,7 @@ CVSS 3.1 Score: X.X ([Severity]) — AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N
 **Intigriti-specific notes:**
 - Title format: `[Bug Class]: [One-line impact]` (no formula required, but keep it specific)
 - Severity is set by you: Critical/High/Medium/Low/Exceptional
-- CVSS 3.1 is standard (CVSS 4.0 also accepted on newer programs)
+- The built-in calculator is CVSS 3.0; companies can switch to CVSS 4.0 at company level (opt-in). Score with whatever the submission form shows (see Platform policy below)
 - PoC video is valued much more than screenshot alone — record with Loom
 - Safe harbor: Intigriti enforces it, be comfortable going slightly aggressive with testing
 
@@ -372,7 +374,7 @@ Each YES raises severity:
 ## THE 60-SECOND PRE-SUBMIT CHECKLIST
 
 ```
-[ ] Title follows formula: [Class] in [endpoint] allows [actor] to [impact]
+[ ] Title follows formula: <asset> | <bug class> | <impact>
 [ ] First sentence states exact impact in plain English
 [ ] Steps to Reproduce has exact HTTP request (copy-paste ready)
 [ ] Response showing the bug is included (screenshot or JSON body)
@@ -388,9 +390,9 @@ Each YES raises severity:
 
 ---
 
-## CVSS 4.0 QUICK REFERENCE (newer programs)
+## CVSS 4.0 QUICK REFERENCE (program-selected)
 
-CVSS 4.0 replaced CVSS 3.1 in November 2023. Some newer programs require it.
+FIRST published CVSS 4.0 on 1 November 2023 as the successor to 3.1. 3.1 remains in wide use, but HackerOne, Bugcrowd and Intigriti now all offer 4.0 as a program-selected method (see Platform policy below). Score with the version the program's submission form uses; on HackerOne a severity is mandatory from 2026-09-21 unless the program has switched the requirement off.
 
 ### Key Differences from CVSS 3.1
 
@@ -424,6 +426,18 @@ Key fields:
 ```
 
 **Practical rule**: If program uses CVSS 4.0 and you don't know the vector, use the calculator and include the full string starting with `CVSS:4.0/AV:...`. Programs cannot dispute a valid vector string.
+
+---
+
+## PLATFORM POLICY (2025-2026)
+
+| Platform | Severity method | Source |
+|---|---|---|
+| HackerOne | CVSS 4.0 supported since March 2025, alongside 3.0 and 3.1 (optional for customers). From **2026-09-21** severity is mandatory on submission for bug bounty, VDP and challenge programs; programs choose the method (CVSS 3.1, CVSS 3.0, CVSS 4.0 or manual) and can switch the requirement off | https://docs.hackerone.com/en/articles/10761053-march-2025-changelog , https://docs.hackerone.com/en/articles/16886667-september-2026-changelog |
+| Bugcrowd | VRT drives the default priority (P1-P5). CVSS 4.0 support added April 2026 alongside 3.1: program admins enable it, after which new submissions default to 4.0 | https://docs.bugcrowd.com/changelog/ (entry "CVSS v4.0 Support Added", Apr 29 2026) |
+| Intigriti | Built-in calculator is CVSS 3.0 by default; companies can switch to CVSS 4.0 at company level, affecting future submissions | https://www.intigriti.com/blog/business-insights/adoption-of-cvss-v4-vulnerability-assessment-calculator (the KB article kb.intigriti.com/en/articles/11463887 returned 404 on 2026-10-13) |
+
+Rule: read the method on the program's submission form, score with that version, and paste the full vector string. Do not convert a 3.1 score to 4.0 by hand.
 
 ---
 
@@ -506,8 +520,8 @@ Authorization: Bearer ACCOUNT_A_TOKEN
 
 - BAD: "Interesting finding on /api/users"
 - BAD: "IDOR vulnerability in API"
-- GOOD: "Authenticated IDOR on /api/users/{uid} -> admin email + role disclosure"
-- GOOD: "Unauthenticated SSRF on /preview?url= -> AWS metadata 169.254.169.254 reachable"
+- GOOD: "/api/users/{uid} | Authenticated IDOR | admin email + role disclosure"
+- GOOD: "/preview?url= | Unauthenticated SSRF | AWS metadata 169.254.169.254 reachable"
 
 The bad titles get opened last. The good titles get opened first. Same finding, different queue position, different triage day, different payout speed.
 
@@ -548,7 +562,7 @@ Cross-link `evidence-hygiene` for the full capture-and-redact protocol.
 
 | Platform | Tone | Required Structure | Severity Mechanism |
 |---|---|---|---|
-| HackerOne | Narrative | Summary -> Steps -> Impact -> Suggested fix | Triager-set, contestable |
+| HackerOne | Narrative | Summary -> Steps -> Impact -> Suggested fix | Researcher-set with the program's method (mandatory from 2026-09-21 unless switched off), triager-adjusted, contestable |
 | Bugcrowd | Structured | Severity request -> VRT category -> Title -> Body -> Remediation | VRT-default + manual override paragraph |
 | Intigriti | Between | Summary -> PoC -> Impact -> Recommendation | Researcher-proposed, triager-confirmed |
 | Immunefi | PoC-first | Working PoC code -> Walkthrough -> Impact -> Severity | Foundry/Hardhat code is the primary deliverable |

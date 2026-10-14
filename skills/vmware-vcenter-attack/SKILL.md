@@ -1,6 +1,6 @@
 ---
 name: vmware-vcenter-attack
-description: VMware vSphere / vCenter Server external attack matrix — version fingerprinting, the high-impact CVE chain (CVE-2021-21972 vRealize unauth file upload, CVE-2021-21985 vSAN plugin RCE, CVE-2022-22954 Workspace ONE SSTI, CVE-2023-20887 Aria RCE, CVE-2024-37085 ESXi AD bypass, CVE-2023-34048 vCenter DCERPC OOB write APT-exploited), default credentials, SSO configuration disclosure, vmdir LDAP enumeration, ESXi Open SLP RCE history. ONLY for vCenter / Workspace ONE / Aria instances exposed to the internet — internal-network vCenter is out of scope per the external-only boundary. Use when recon shows port 443 with vCenter banner, `/ui` redirect, `/websso/SAML2/Metadata`, or VMware product fingerprints.
+description: VMware vSphere / vCenter Server external attack matrix — version fingerprinting, the high-impact CVE chain (CVE-2021-21972 vRealize unauth file upload, CVE-2021-21985 vSAN plugin RCE, CVE-2022-22954 Workspace ONE SSTI, CVE-2023-20887 Aria RCE, CVE-2024-37085 ESXi AD bypass, CVE-2023-34048 vCenter DCERPC OOB write APT-exploited, CVE-2024-38812/38813 DCERPC RCE + privesc, 2025 ESXi guest-escape zero-days), default credentials, SSO configuration disclosure, vmdir LDAP enumeration, ESXi Open SLP RCE history. ONLY for vCenter / Workspace ONE / Aria instances exposed to the internet — internal-network vCenter is out of scope per the external-only boundary. Use when recon shows port 443 with vCenter banner, `/ui` redirect, `/websso/SAML2/Metadata`, or VMware product fingerprints.
 sources: vmware-security-advisories, public-cve-databases, redteam-knowledge, disclosed-cves, cisa-kev, mandiant-zdi-writeups
 report_count: 10
 ---
@@ -42,9 +42,15 @@ echo | openssl s_client -connect "$TARGET:443" -servername "$TARGET" 2>/dev/null
 # SSO Admin Service (info disclosure)
 curl -sk "https://$TARGET/sso-adminserver/sdk/vsphere.local"
 curl -sk "https://$TARGET/websso/SAML2/Metadata/vsphere.local"
+
+# Exact build, vCenter AND standalone ESXi: unauthenticated RetrieveServiceContent
+# (the same read-only call nmap's vmware-version script makes)
+curl -sk "https://$TARGET/sdk" -H 'Content-Type: text/xml' -H 'SOAPAction: urn:vim25/5.0' \
+  -d '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><RetrieveServiceContent xmlns="urn:vim25"><_this type="ServiceInstance">ServiceInstance</_this></RetrieveServiceContent></soap:Body></soap:Envelope>' \
+  | grep -oE '<(fullName|build)>[^<]+'
 ```
 
-Map build → version → CVE applicability via VMware advisories (vmware.com/security/advisories).
+Map build → version → CVE applicability via the Broadcom VMSA index (https://support.broadcom.com/web/ecx/security-advisory?segment=VC; the legacy vmware.com/security/advisories URL now redirects away). Compare against the fixed builds in the matrix below.
 
 ---
 
@@ -52,7 +58,11 @@ Map build → version → CVE applicability via VMware advisories (vmware.com/se
 
 | CVE | Affected | Vector | Status |
 |---|---|---|---|
-| **CVE-2024-37085** | ESXi 7.0/8.0 < specific patch | AD group "ESX Admins" auto-admin bypass | High — Domain takeover→ESXi RCE, exploited in ransomware ops |
+| **CVE-2025-41244** | VMware Tools / open-vm-tools < 13.0.5 (12.x/11.x < 12.5.4); Aria Operations < 8.18.5 with SDMP | Local non-admin → root inside a guest VM (VMSA-2025-0015) | Not external; KEV 2025-10-30, UNC5174 zero-day since Oct 2024 |
+| **CVE-2025-41236/41237/41238/41239** | ESXi 8.0 < ESXi80U3f-24784735, 7.0 < ESXi70U3w-24784741; Workstation < 17.6.4; Fusion < 13.6.4 | Guest-admin → VMX code exec (VMXNET3 / VMCI / PVSCSI) + vSockets memory leak; Pwn2Own Berlin 2025 (VMSA-2025-0013) | Critical 9.3, not external pre-auth |
+| **CVE-2025-22224/22225/22226** | ESXi 8.0 < ESXi80U3d-24585383 (U2: < ESXi80U2d-24585300), 7.0 < ESXi70U3s-24585291; Workstation 17.x / Fusion 13.x (fixed build: verify) | Guest-admin VM escape: VMCI TOCTOU OOB write → VMX code exec, VMX → kernel arbitrary write, HGFS leak (VMSA-2025-0004) | Critical 9.3, ITW zero-day chain, KEV 2025-03-04 |
+| **CVE-2024-38812 / 38813** | vCenter 8.0 < 8.0 U3d / 8.0 U2e, 7.0 < 7.0 U3t (the Sep 2024 builds 8.0 U3b / 7.0 U3s did NOT fully fix 38812) | DCERPC pre-auth heap overflow → RCE (9.8) + network priv-esc to root (VMSA-2024-0019) | Critical, ITW, KEV 2024-11-20 |
+| **CVE-2024-37085** | ESXi 8.0 < ESXi80U3-24022510; ESXi 7.0: no patch planned (KB369707 workaround) | AD group "ESX Admins" auto-admin bypass | High — Domain takeover→ESXi RCE, exploited in ransomware ops, KEV 2024-07-30 |
 | **CVE-2024-22273** | ESXi/Workstation/Fusion/vCenter storage controller | OOB read/write — requires VM-local access (NOT a pre-auth network SSRF; see Section 9) | Important (CVSS 8.1), not external pre-auth |
 | **CVE-2024-22252/53** | Workstation/Fusion (not vCenter) | Sandbox escape | Not external |
 | **CVE-2023-34048** | vCenter 7/8 < specific build | DCE/RPC pre-auth heap OOB write → RCE | Critical, patched 2023-10 |
@@ -331,7 +341,7 @@ These are the load-bearing public references for every CVE called out in the mat
 - **References:** https://www.vmware.com/security/advisories/VMSA-2023-0023.html ; https://www.zerodayinitiative.com/advisories/ZDI-23-1623/ ; https://cloud.google.com/blog/topics/threat-intelligence/chinese-vmware-exploitation-since-2021/ (Mandiant) ; https://www.bleepingcomputer.com/news/security/chinese-hackers-exploit-vmware-bug-as-zero-day-for-two-years/
 
 ### 8. CVE-2024-37085 — ESXi Active Directory integration "ESX Admins" auth bypass (ransomware-favorite)
-- **Affected:** ESXi 7.0 < ESXi70U3q-24585291, ESXi 8.0 < ESXi80U3-24022510; vCenter-managed clusters where ESXi is joined to AD.
+- **Affected:** ESXi 8.0 < ESXi80U3-24022510; ESXi 7.0 any build, **no patch planned** (VMSA-2024-0013 matrix, KB369707 workaround; build 24585291 is the Mar 2025 ESXi70U3s release, not a 37085 fix); vCenter-managed clusters where ESXi is joined to AD.
 - **Attack flow:** Attacker with sufficient AD rights creates (or re-creates after deletion) a group literally named `ESX Admins` and adds an account. ESXi auto-grants every member full admin rights without checking that the group existed at join time. End-to-end: AD foothold → group create → SSH/API root on every domain-joined ESXi host → mass VM encryption.
 - **Root cause:** Hard-coded trust of group name `ESX Admins` with no domain-scoped identity validation.
 - **Disclosure:** Reported by Microsoft Threat Intelligence; advisory VMSA-2024-0013 published 2024-06-25. **Microsoft Security Blog** documents pre-patch exploitation by **Storm-0506 (Black Basta), Storm-1175, Octo Tempest, and Manatee Tempest** ransomware operators — including a confirmed Black Basta deployment at a North American engineering firm. **CISA KEV:** added 2024-07-30. Year discovered 2024 (exploited as 0-day), patched 2024.
@@ -353,6 +363,24 @@ These are the load-bearing public references for every CVE called out in the mat
 - **Disclosure:** CVE-2020-3992 reported by Lucas Leong of Trend Micro ZDI (ZDI-20-1376, paid ZDI submission). CVE-2021-21974 reported by Lucas Leong of Trend Micro ZDI as well. **CISA KEV:** CVE-2020-3992 added 2021-11-03; CVE-2021-21974 added 2023-02-08. **ESXiArgs ransomware campaign** (Feb 2023) hit ~3,800 internet-exposed hosts via CVE-2021-21974 — two years after patch was available. VMware disabled SLP by default in subsequent releases. Year discovered 2020/2021, patched 2020/2021, mass-exploited 2023.
 - **References:** https://www.vmware.com/security/advisories/VMSA-2020-0023.html ; https://www.vmware.com/security/advisories/VMSA-2021-0002.html ; https://www.zerodayinitiative.com/advisories/ZDI-20-1376/ ; https://www.cisa.gov/known-exploited-vulnerabilities-catalog ; https://www.bleepingcomputer.com/news/security/massive-esxiargs-ransomware-attack-targets-vmware-esxi-servers-worldwide/ ; https://www.recordedfuture.com/blog/esxiargs-ransomware-targets-vmware-esxi-openslp-servers
 
+### 11. CVE-2024-38812 + CVE-2024-38813 — vCenter DCERPC heap overflow + privilege escalation (incomplete first patch, exploited)
+- **Affected:** vCenter Server 8.0 < 8.0 U3d (or U2e on the U2 line), 7.0 < 7.0 U3t; Cloud Foundation 4.x/5.x bundles. Builds from the first fix on 2024-09-17 (8.0 U3b, 7.0 U3s) are **still vulnerable** to CVE-2024-38812.
+- **Attack flow:** Network actor sends a crafted DCERPC packet → heap overflow → RCE (CVSS 9.8). CVE-2024-38813 is the companion network privilege escalation to root.
+- **Disclosure:** VMSA-2024-0019, published 2024-09-17, re-issued 2024-10-21 with complete patches; Broadcom confirmed in-the-wild exploitation in Nov 2024. **CISA KEV:** both added 2024-11-20.
+- **Detection:** build from Step 1 vs the fixed builds above. 8.0 U3b / 7.0 U3s reported as "patched" is the common miss. Never send DCERPC test packets: a crash takes down vCenter (compare CVE-2023-34048's `vmdird` crash tell).
+- **References:** https://support.broadcom.com/web/ecx/support-content-notification/-/external/content/SecurityAdvisories/0/24968 ; https://nvd.nist.gov/vuln/detail/CVE-2024-38812
+
+### 12. CVE-2025-22224/22225/22226 (+ Pwn2Own CVE-2025-41236-41239) — ESXi guest-to-host escape
+- **Affected / fixed:** see matrix (VMSA-2025-0004, 2025-03-04; VMSA-2025-0013, 2025-07-15).
+- **Attack flow:** Not external. An actor with **admin inside a guest VM** chains VMCI TOCTOU OOB write (22224) → code exec in the VMX process, VMX → kernel arbitrary write (22225) → hypervisor escape, with HGFS memory leak (22226) for addresses. Broadcom confirmed in-the-wild exploitation; all three in **CISA KEV 2025-03-04**. The Jul 2025 Pwn2Own Berlin bugs (VMXNET3, VMCI, PVSCSI, vSockets; STARLabs SG, REverse Tactics, Synacktiv) are the same class with no ITW report.
+- **Why it matters externally:** an internet-exposed ESXi or vCenter whose `/sdk` build (Step 1) predates ESXi80U3d-24585383 / ESXi70U3s-24585291 means any compromised guest, such as a breached web VM, is one chain away from every VM on the host. Report as a Critical patch gap with that blast radius. No exploitation is needed or allowed.
+- **References:** https://www.rapid7.com/blog/post/2025/03/04/etr-multiple-zero-day-vulnerabilities-in-broadcom-vmware-esxi-and-other-products/ ; https://blogs.vmware.com/security/2025/05/vmware-and-pwn2own-2025-berlin.html
+
+### 13. CVE-2025-41244 — VMware Tools / Aria Operations SDMP local privilege escalation (exploited since 2024)
+- **Affected / fixed:** VMware Tools and open-vm-tools 13.x < 13.0.5, 12.x/11.x < 12.5.4; Aria Operations 8.x < 8.18.5; VCF Operations 9.x < 9.0.1.0 (VMSA-2025-0015 / -0016).
+- **Attack flow:** Non-admin local user in a guest VM managed by Aria Operations with Service Discovery Management Pack (SDMP) enabled escalates to root in that guest. NVISO (Maxime Thiebaut) reported it; NVISO attributes zero-day exploitation since mid-Oct 2024 to UNC5174. **CISA KEV:** 2025-10-30. CVSS 7.8.
+- **Use:** post-foothold only. Pair with a web-to-shell finding on a VM to show root-on-guest, then the guest-escape gap in #12.
+
 ### Bonus: CVE-2022-31656 — Workspace ONE Access / Identity Manager / vRealize Automation auth bypass (post-22972 follow-up)
 - **Affected:** Same product matrix as 22954/22972. Workspace ONE Access 21.08.x; Identity Manager 3.3.3–3.3.6; vRealize Automation 7.6.
 - **Attack flow:** Network-only actor obtains admin without authenticating; chained with CVE-2022-31659 (auth'd RCE) the pair yields pre-auth admin RCE — the spiritual successor to the 22954+22972 pair.
@@ -365,7 +393,7 @@ These are the load-bearing public references for every CVE called out in the mat
 ## Key meta-references (cross-CVE)
 
 - **CISA KEV catalog (VMware filter):** https://www.cisa.gov/known-exploited-vulnerabilities-catalog?search_api_fulltext=vmware — VMware is one of the most-represented vendors; cross-check any vCenter/ESXi/Workspace finding here before grading severity.
-- **Broadcom (formerly VMware) advisories index:** https://support.broadcom.com/security-advisories (legacy https://www.vmware.com/security/advisories.html). Search by VMSA-YYYY-NNNN.
+- **Broadcom (formerly VMware) advisories index:** https://support.broadcom.com/web/ecx/security-advisory?segment=VC (legacy https://www.vmware.com/security/advisories.html now 302s to broadcom.com). Search by VMSA-YYYY-NNNN.
 - **ZDI published advisories:** https://www.zerodayinitiative.com/advisories/published/ — filter "VMware" for the canonical paid-bounty disclosures (CVE-2020-3992, CVE-2023-34048, multiple Aria Operations and vRNI).
 - **Mandiant UNC3886 reporting:** Google Cloud Threat Intelligence has the deepest published forensic trail on long-tail vCenter zero-day exploitation. Pair with the `mid-engagement-ir-detection` skill when working a target where vCenter is reachable.
 

@@ -1,6 +1,6 @@
 ---
 name: hunt-race-condition
-description: Hunting skill for race condition vulnerabilities. Built from 12 public bug bounty reports including modern HTTP/2 single-packet attack cases (James Kettle DEF CON 2023 "Smashing the State Machine"; RyotaK / Flatt Security 10,000-request first-sequence-sync expansion 2024). Covers coupon double-redemption, gift-card double-spend, MFA-OTP-validate race, account-create race, faucet/crypto token double-mint, email-activation race, vote/upvote inflation, password-reset token race, rate-limit bypass via concurrent requests. Use when hunting race conditions, TOCTOU bugs, MFA-bypass-via-timing.
+description: Hunting skill for race condition vulnerabilities. Built from 10 public bug bounty reports including modern HTTP/2 single-packet attack cases (James Kettle DEF CON 2023 "Smashing the State Machine"; RyotaK / Flatt Security 10,000-request first-sequence-sync expansion 2024). Covers coupon double-redemption, gift-card double-spend, MFA-OTP-validate race, account-create race, faucet/crypto token double-mint, email-activation race, vote/upvote inflation, password-reset token race, rate-limit bypass via concurrent requests. Use when hunting race conditions, TOCTOU bugs, MFA-bypass-via-timing.
 sources: github, hackerone_public, portswigger_research, flatt_security
 report_count: 10
 ---
@@ -9,8 +9,10 @@ report_count: 10
 
 Winning a race needs requests that arrive in the *same* narrow window — sequential sends never
 work. Use a single-packet / synchronized-send tool: **Burp Repeater** "Send group in parallel"
-(HTTP/2 single-packet attack), **Turbo Intruder** (`engine=Engine.BURP2`, `gate` sync), or any
-client that can flush N requests simultaneously. Two shapes:
+(since Burp 2023.9.1: single-packet attack over HTTP/2, last-byte synchronisation over HTTP/1),
+**Turbo Intruder** (`engine=Engine.BURP2`, `gate` sync), **PacketSprinter** (Route Zero Security
+Burp extension, Nov 2024: duplicates and fires a request group via the HTTP/2 single-packet attack
+and diffs the responses), or any client that can flush N requests simultaneously. Two shapes:
 
 - **Identical-copies race** — fire N IDENTICAL copies of one request at once (limit-overrun:
   double-spend a coupon/gift-card, exceed a one-per-user quota). Success = ≥2 of the N return 2xx.
@@ -94,8 +96,9 @@ await useVoucher(); await deductBalance();
 3. **Capture a clean baseline request** — Perform the action once legitimately with Burp Suite intercepting. Confirm you get the expected single-use behavior (e.g., coupon marked used, vote counted once).
 
 4. **Set up parallel request tooling** — Use one of:
-   - Burp Suite Repeater → "Send group in parallel" (Turbo Intruder for HTTP/2 single-packet attacks)
-   - Turbo Intruder with `engine=Engine.BURP2` for last-byte sync
+   - Burp Suite Repeater → "Send group in parallel" (single-packet attack on HTTP/2, last-byte sync on HTTP/1; Burp 2023.9.1+)
+   - Turbo Intruder with `engine=Engine.BURP2` + `gate` for the HTTP/2 single-packet attack
+   - PacketSprinter (Burp extension, single-packet attack with response diffing)
    - `curl` with `&` backgrounding
    - Python `threading` or `asyncio` with pre-built connections
 
@@ -316,8 +319,8 @@ The following real, verified bug-bounty / coordinated-disclosure cases extend th
 
 11. **RyotaK / Flatt Security — "First Sequence Sync" PIN-bruteforce (10,000-req single-packet expansion)** ([Flatt Security Research](https://flatt.tech/research/posts/beyond-the-limit-expanding-single-packet-race-condition-with-first-sequence-sync/))
     - Subclass: rate-limit bypass via race / MFA-OTP-validate race (6-digit PIN with 5-attempt cap)
-    - Single-packet HTTP/2: **YES** — extends Kettle's single-packet from ~30 requests to 10,000 requests in 166 ms by splitting across IP fragments with synchronized TCP first-sequence
-    - Payload: ~10,000 concurrent `POST /verify-pin` requests in 166 ms, each with a different 4-6 digit guess, all landing inside the rate-limit window
+    - Single-packet HTTP/2: **YES** — extends Kettle's single-packet from ~30 requests to 10,000 requests in ~166 ms on ONE connection: the withheld final bytes travel in one IP-fragmented TCP segment, and the segment carrying the first sequence number is sent last
+    - Payload: PIN-bypass demo fired ~1,000 different guesses at the verify endpoint inside a 5-attempt rate-limit window (vs ~10 with last-byte sync); the 10,000 / 166 ms figure is the separate benchmark
     - Root cause: rate-limit counter incremented per-request asynchronously; "5 attempts" gate read stale counter for the entire batch
     - Year: 2024 — **must-reference modern single-packet example**
 
@@ -375,14 +378,16 @@ To confirm your attack tool is genuinely producing one-packet sync (vs accidenta
 
 The Turbo Intruder `engine=Engine.BURP2` implementation guarantees single-packet delivery on HTTP/2 targets when the request body fits in MTU. For larger bodies, see the "Race-window estimation" subsection below.
 
-### h2.0 single-frame vs h2.cl multi-frame race
+### HTTP/2 single-packet vs HTTP/1 last-byte sync
 
-Two variants depending on what protocol the target speaks:
+Two synchronisation primitives depending on what protocol the target speaks:
 
-- **h2.0 single-frame** (the standard Kettle attack): pure HTTP/2 end-to-end. N requests in one TLS record. Works against any modern HTTPS-fronted target where the front-end advertises `h2` in ALPN. **Default approach.**
-- **h2.cl multi-frame**: front-end speaks HTTP/2 to the client, downgrades to HTTP/1.1 to the back-end. Smuggling-adjacent — you craft an HTTP/2 request whose `Content-Length` confuses the front-end into emitting two HTTP/1.1 requests to the back-end on the same connection. Pairs with HTTP request smuggling (see `hunt-http-smuggling`). Useful when single-packet HTTP/2 is filtered at the front-end but the back-end is reachable in HTTP/1.1.
+- **HTTP/2 single-packet attack** (the standard Kettle attack): N streams on one connection, final frames released in one TCP packet. Works against any HTTPS target whose edge negotiates `h2` in ALPN. **Default approach.**
+- **HTTP/1 last-byte synchronisation**: one connection per request, each request's final byte withheld and then released on every connection together. Repeater's parallel group and Turbo Intruder's `gate` do this automatically on HTTP/1. Wider window than single-packet, but it beats sequential sends.
 
-Detect h2.0 viability via `curl -sI --http2 https://target.example | grep -i HTTP/2`. If the server doesn't speak h2, single-packet is not directly applicable — fall back to "parallel-pipelining" over HTTP/1.1 (much wider race window; usually loses the race against modern backends, but still useful for naive ones).
+H2.CL (HTTP/2 front-end, `Content-Length` confusion on the HTTP/1.1 back-end hop) is a request-smuggling bug, not a race primitive; route it to `hunt-http-smuggling`.
+
+Detect h2 viability via `curl -sI --http2 https://target.example | grep -i HTTP/2`. If the server doesn't speak h2, single-packet is not directly applicable — fall back to last-byte sync over HTTP/1 (wider race window; usually loses against fast modern backends, still useful for naive ones).
 
 ### Race-window estimation methodology
 
@@ -402,7 +407,7 @@ A decision tree for picking the right shape:
 
 - **Single connection, N streams** (default Kettle / Turbo Intruder BURP2 engine): N concurrent HTTP/2 streams on one TCP connection. **Use when:** target speaks HTTP/2; request body fits in MTU (~1400 bytes after TLS overhead); you need N ≤ ~30.
 - **Multiple connections, one stream each** (older parallel HTTP/1.1): N TCP connections, one request per connection. **Use when:** target doesn't speak HTTP/2 OR the request body is large (> MTU). Race window widens significantly (5–50 ms TCP-handshake spread) — only viable on slow servers.
-- **Multiple connections, multiple streams** (Flatt's first-sequence-sync, 2024): N TCP connections each carrying M streams. Total = N×M requests. Uses synchronized TCP first-sequence numbers across multiple connections to land all packets at the server in the same processing window. **Use when:** you need N > 30 (e.g., brute-forcing a 6-digit PIN within a 5-attempt rate-limit window — Flatt demonstrated 10,000 requests in 166 ms by splitting across IP fragments with synchronized SEQ numbers).
+- **Single connection, N streams, First Sequence Sync** (Flatt, 2024): still ONE TCP connection, but the withheld final bytes travel in one oversized TCP segment split into IP fragments, and segments go out of order with the first-sequence segment sent last. **Use when:** you need N > 30 (e.g., an OTP endpoint with a 5-attempt rate-limit window). The per-connection ceiling is the server's `SETTINGS_MAX_CONCURRENT_STREAMS`, not the technique.
 
 ### Turbo Intruder `Engine.BURP2` template — explained
 
@@ -420,7 +425,7 @@ def queueRequests(target, wordlists):
     # 6. Build N requests. Each is identical here — racing the same endpoint.
     #    For PIN brute-force, vary the body across requests.
     for i in range(30):
-        engine.queue(target.req)
+        engine.queue(target.req, gate='race1')   # without gate=, openGate() releases nothing
 
     # 7. openGate(...).complete(...) is the API call that performs last-byte-sync:
     #    - Buffer all 30 requests up to "last byte not sent"
@@ -431,7 +436,7 @@ def queueRequests(target, wordlists):
 ```
 
 The `Engine.BURP2` import does the heavy lifting. Behind the scenes:
-- Each `engine.queue(req)` adds a HEADERS frame to the connection's send buffer but withholds the last DATA frame byte.
+- Each `engine.queue(req, gate='race1')` adds a HEADERS frame to the connection's send buffer but withholds the last DATA frame byte. A request queued without the `gate` argument is sent immediately and is not part of the race.
 - `openGate("race1")` blocks until all 30 are buffered, then issues a single `socket.send(...)` containing 30 × 1-byte DATA frames with END_STREAM. All 30 cross the wire in one IP packet (assuming < MTU).
 - `complete(timeout=10)` collects responses and times.
 
@@ -439,15 +444,16 @@ Inspect each response object: `req.code`, `req.length`, `req.time`. The race is 
 
 ### Flatt's first-sequence-sync extension (when N > 30 is needed)
 
-Kettle's original single-packet caps at roughly N=30 due to MTU + TLS record limits. Flatt Security's RyotaK published the extension in August 2024:
+Kettle's original single-packet caps at roughly N=30 because the final frames must fit in one ~1,500-byte packet. Flatt Security's RyotaK published the extension on 2 August 2024. It is a **single-connection** technique:
 
-- Take advantage of IP fragmentation: a single "logical" packet at the IP layer can be split across multiple physical IP fragments.
-- Force synchronized TCP SEQ numbers across multiple connections by completing the TLS handshakes in lockstep and aligning the SYN/SYN-ACK timing.
-- Result: 10,000 concurrent requests delivered to the server in 166 ms, all landing inside a rate-limit window that the server thought was atomic.
+- Open one TCP connection, open N HTTP/2 streams, and send every request except its final byte (exactly as in last-byte sync).
+- Put the withheld final bytes into TCP segments larger than the MTU, sent as IP fragments. The server's IP layer does not hand a segment to TCP until all of its fragments have arrived.
+- Send those segments **out of order, holding back the segment that carries the first sequence number and sending it last**. TCP cannot deliver anything past the gap, so when the first-sequence segment lands, every buffered request reaches the application at once.
+- Result: 10,000 requests in ~166 ms in Flatt's benchmark. That benchmark raised Go's `MaxConcurrentStreams` to 10,000; defaults are 250 (Go), 100 (Apache) and 128 (nginx), and that stream cap is the real per-connection ceiling against a target.
 
-Use case: brute-forcing 6-digit PINs (max 10^6 candidates) inside a 5-attempts-per-window cap. Without first-sequence-sync, you'd need ~200,000 windows. With it, ~100 windows.
+Use case: OTP / PIN endpoints with a small attempt cap. Flatt's demo landed ~1,000 attempts inside a 5-attempt rate-limit window, versus ~10 with last-byte sync.
 
-Implementation: [flatt.tech/research/posts/beyond-the-limit-...](https://flatt.tech/research/posts/beyond-the-limit-expanding-single-packet-race-condition-with-first-sequence-sync/) includes a working PoC.
+Implementation: [flatt.tech/research/posts/beyond-the-limit-...](https://flatt.tech/research/posts/beyond-the-limit-expanding-single-packet-race-condition-with-first-sequence-sync/); PoC in `Ry0taK/first-sequence-sync` (`rc-benchmark`, `rc-pin-bypass`).
 
 ### Operator playbook (when to reach for what)
 
@@ -455,20 +461,20 @@ Implementation: [flatt.tech/research/posts/beyond-the-limit-...](https://flatt.t
 |---|---|
 | Modern HTTPS target, ALPN advertises `h2`, body < 1400 bytes, need N ≤ 30 | Turbo Intruder `Engine.BURP2` single-packet — **default** |
 | Same as above but body > MTU | Multi-connection HTTP/2; widen window estimate by ~5 ms |
-| Target speaks HTTP/1.1 only (no h2 ALPN) | `curl --next` parallel pipeline; race window is wide; only viable on slow servers |
-| Need N > 30 (PIN brute-force, OTP exhaustion within rate-limit window) | Flatt first-sequence-sync extension; manual implementation per the writeup |
-| Front-end h2, back-end h1 (CDN+origin) | h2.cl smuggling variant — pairs with `hunt-http-smuggling` |
-| Quick reproducibility test on a single endpoint | `curl --next --next --next --next` (4-shot parallel HTTP/1.1) — wide window but no setup |
+| Target speaks HTTP/1.1 only (no h2 ALPN) | Repeater parallel group or Turbo Intruder `gate` (last-byte sync); race window is wider; best on slow servers |
+| Need N > 30 (PIN brute-force, OTP exhaustion within rate-limit window) | Flatt first-sequence-sync extension; `Ry0taK/first-sequence-sync` PoC |
+| Front-end h2, back-end h1 (CDN+origin) | Single-packet still syncs arrival at the edge; the edge's upstream fan-out adds jitter you cannot remove. H2.CL there is a smuggling bug → `hunt-http-smuggling` |
+| Quick reproducibility test on a single endpoint | `curl -Z` (`--parallel`) with N copies of the URL — wide window but no setup |
 
 ### Anti-patterns
 
-- **Don't claim "race condition" from observing two near-simultaneous successes in Burp Repeater "Send group in parallel" mode** — that mode pipelines over HTTP/1.1 with millisecond-spread, not single-packet. Triagers know this and downgrade.
+- **Don't treat two 2xx responses from Repeater "Send group in parallel" as the finding.** Since Burp 2023.9.1 that mode uses the single-packet attack over HTTP/2 and last-byte synchronisation over HTTP/1 (separate connections, wider window). Record which protocol it used and prove the duplicate effect server-side (balance, counter, redemption record).
 - **Don't submit without Wireshark confirmation** for high-value race claims. The deliverable that pays best: PoC video showing Turbo Intruder firing + Wireshark capture showing all N END_STREAM frames in one TCP segment + N successful responses that should have been mutually exclusive.
 - **Don't use single-packet against endpoints that genuinely don't race** (e.g., endpoints with row-level locks and transactions). The window estimation step exists to filter these out before you spend 2 hours building the PoC.
 
 ### Cross-references
 
-- `hunt-http-smuggling` — h2.cl multi-frame variant
+- `hunt-http-smuggling` — H2.CL and other downgrade desyncs (a smuggling class, not a race primitive)
 - `hunt-mfa-bypass` — OTP rate-limit window single-packet bypass (Flatt PIN-bruteforce class)
 - `hunt-business-logic` — coupon / wallet / promo state-machine races where single-packet is the enabling primitive
 - Disclosed Report Citations above — citations #4, #11, #12 are the canonical single-packet exemplars (GitLab/Devise CVE-2022-4037, Flatt 10k-req PIN brute-force, nopCommerce CVE-2024-58248)
@@ -481,5 +487,5 @@ Implementation: [flatt.tech/research/posts/beyond-the-limit-...](https://flatt.t
 - **`hunt-mfa-bypass`** — OTP-expiry windows and replay protection are classic race targets. Chain primitive: race + MFA-validate endpoint → bypass OTP expiry by submitting N concurrent validations within the validity window.
 - **`hunt-ato`** — Race conditions on password reset, email change, and account creation enable persistent ATO. Chain primitive: race on email-change endpoint + atomic-update missing → swap victim email + read reset token before user notice.
 - **`hunt-api-misconfig`** — Wallet/balance/credit endpoints without atomic UPDATE are double-spend candidates. Chain primitive: race + atomic-update missing → double-spend balance → withdraw N× user balance.
-- **`security-arsenal`** — Load the Turbo Intruder single-packet template, h2.cl smuggling for atomic submit, and `curl --next` parallel multi-request patterns.
+- **`security-arsenal`** — Load the Turbo Intruder single-packet template and `curl -Z` parallel multi-request patterns.
 - **`triage-validation`** — Apply the Statistical-Sampling gate: a single anomalous response is noise; require 1 successful + N duplicate / over-quota / stale-state demonstrations with response screenshots before reporting.

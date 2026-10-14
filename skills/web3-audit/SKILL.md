@@ -577,19 +577,28 @@ Reentrancy IS still paying because new protocols keep shipping with ERC-777 / ho
 
 Oracle manipulation: still paid heavily but harder. Most projects use Chainlink price feeds now; the attack target is the SECONDARY oracle most projects also use (TWAP from a low-liquidity Uniswap V2 pair, the protocol's own internal oracle, a stale fallback path). Audit the failover chain, not just the primary feed.
 
+### 2025 exploit patterns (checklist items)
+
+- **Uniswap v4 hooks** — Cork (2025-05-28, 3,761 wstETH ≈ $11–12M): the hook's `beforeSwap` bypassed authorization checks on `hookData`, so forged data reached the FlashSwapRouter ([post-mortem](https://www.cork.tech/blog/post-mortem)). Check every hook that trusts `hookData`/`sender` without pinning the caller. Bunni (2025-09-02, ~$8.4M): wrong rounding direction in the idle-balance update in `withdraw()`; each rounding was safe alone, many tiny withdrawals compounded it ([The Block](https://www.theblock.co/post/369564/bunni-smart-contract-rounding-error)).
+- **Balancer V2** (2025-11-03, $94.8M per Balancer's post-mortem, ~$128M in other tallies): in Composable Stable Pools `_upscale` rounded down in `_swapGivenOut` where it should round up; `batchSwap` drove balances tiny and repeated swaps until the gap paid ([Check Point](https://research.checkpoint.com/2025/how-an-attacker-drained-128m-from-balancer-through-rounding-error-exploitation/)). Early "`manageUserBalance` access-control" reports were wrong. Check rounding direction per path in scaling helpers, at near-zero balances.
+- **Cetus** (2025-05-22, ~$223M, Sui/Move): `checked_shlw` in integer-mate compared against the wrong bound, so an overflowing shift passed the check ([fix commit](https://github.com/CetusProtocol/integer-mate/commit/ffb2292d4)). Check hand-rolled overflow guards in Move/Rust math libs.
+
+Year overview: [Halborn 2025 review](https://www.halborn.com/blog/post/year-in-review-the-biggest-defi-hacks-of-2025).
+
 ### What's new since the vendored content was written
 
 - **EIP-1153 (transient storage)** — introduced in 2024. New reentrancy classes: transient-storage reads cached across the same transaction can desync from persistent storage. Audit any `tload`/`tstore` usage for read-after-external-call.
-- **EIP-7702 (Pectra hard fork 2025)** — added EOA-to-smart-account upgrades. New ATO-like primitives via re-delegation: an EOA signed-once can delegate to a contract that the attacker controls, then signature replay across delegations.
+- **EIP-7702 (Pectra, mainnet 2025-05-07)** — EOAs delegate code via a signed authorization tuple. 2025 abuse: delegation phishing to sweeper contracts (one signature = persistent control until revoked, [arXiv:2512.12174](https://arxiv.org/abs/2512.12174)); authorizations with `chain_id = 0` valid on every chain (replay); insecure delegate contracts (front-runnable initialization, storage collisions on re-delegation) ([Zealynx](https://www.zealynx.io/research/smart-contracts/eip-7702-wallet-security)). Audit delegate contracts for init front-running and wallets for `chain_id = 0` signing.
+- **Intent-bridge solver liquidity exhaustion** — [arXiv:2602.17805](https://arxiv.org/abs/2602.17805) (Feb 2026) found deBridge vulnerable (210 historical instances) across Mayan Swift / Across / deBridge data. Audit what happens to intents when solver liquidity on a route is drained.
 - **Account abstraction (ERC-4337 bundlers)** — paymaster sponsorship abuse and bundler griefing. Paymaster contracts that don't enforce strict sender allowlists drain on first call.
 - **ZK-rollup bridge bugs** — proof-replay across rollups, off-chain prover compromise, sequencer censorship leading to forced-inclusion edge cases.
 - **LST/LRT depeg dynamics** — liquid-staking and liquid-restaking tokens that assume 1:1 peg under loss conditions; oracle assumes peg, market reflects depeg, liquidation logic breaks.
 
 ### Tool stack for 2026
 
-Foundry remains the test framework. `forge test --gas-report --debug` for invariant testing; `forge fuzz` for property-based testing; `forge inspect` for storage-layout audits. Slither + Echidna for static + fuzz. Mythril for symbolic execution on smaller contracts. tenderly.co for forking + simulation (best UX for replicating attacks against mainnet state).
+Foundry remains the test framework. Fuzz tests (test functions with parameters) and invariant tests (`invariant_*` functions, tuned under `[invariant]` in foundry.toml) both run via `forge test` ([docs](https://getfoundry.sh/forge/invariant-testing)); Foundry ≥1.8.0 adds `forge fuzz run` (fuzz/invariant only) plus corpus tools (`replay`, `cmin`, `tmin`). `forge test --debug --match-test <one_test>` opens the step debugger on a single test; `--gas-report` has nothing to do with invariants. `forge inspect <Contract> storageLayout` for storage-layout audits. Slither + Echidna for static + fuzz; Medusa (crytic, parallel coverage-guided fuzzer), Halmos (a16z, symbolic execution of Foundry-style tests), Certora Prover (open-sourced Feb 2025) for formal specs, Aderyn (Cyfrin, Rust static analyzer) as a second static pass. Mythril is legacy (last release v0.24.8, Mar 2024; MythX sunset 2024). tenderly.co for forking + simulation (best UX for replicating attacks against mainnet state).
 
-For Solana: anchor framework, sealevel-attacks corpus (curated PoCs by anchor maintainers), soteria-sec / sec3 scanner. For Move (Aptos, Sui): move-prover, aptos-cli `aptos move test`.
+For Solana: anchor framework, sealevel-attacks corpus (curated PoCs by anchor maintainers), sec3 X-Ray (open-source static analyzer for Solana Rust programs), Trident (Ackee, fuzzer for Solana/Anchor programs, formerly Trdelník). For Move (Aptos, Sui): move-prover, aptos-cli `aptos move test`.
 
 For cross-chain: hyperlane and LayerZero each have audit-tooling repos; bridge bugs require simulating both endpoints, not just one.
 

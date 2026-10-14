@@ -1,6 +1,6 @@
 ---
 name: hunt-clickjacking
-description: "Hunt Clickjacking — missing X-Frame-Options / CSP frame-ancestors lets an attacker embed the target page in an invisible iframe and trick victims into clicking buttons they cannot see (UI redressing). Targets: login flows, money transfers, account settings, OAuth confirmation pages. Confirm by fetching the page, then PROVE it frames in a real browser and a sensitive state-changing action survives the cross-site context (SameSite cookies / framebusting JS can defeat it) — header-absence alone is not a finding."
+description: "Hunt Clickjacking — missing X-Frame-Options / CSP frame-ancestors lets an attacker embed the target page in an invisible iframe and trick victims into clicking buttons they cannot see (UI redressing). Targets: login flows, money transfers, account settings, OAuth confirmation pages. Confirm by fetching the page, then PROVE it frames in a real browser and a sensitive state-changing action survives the cross-site context (SameSite cookies / framebusting JS can defeat it) — header-absence alone is not a finding. Also covers DoubleClickjacking (top-level window swap during a double-click, which XFO, frame-ancestors and SameSite do not stop)."
 sources: hackerone_public, public_research
 report_count: 6
 ---
@@ -15,6 +15,14 @@ Clickjacking (UI Redressing) lets an attacker load a target page inside a transp
 - Account settings (email change, password change, 2FA disable)
 - OAuth / social-login "Authorize app" confirmation dialogs
 - Admin actions (delete, promote user, change role)
+
+## Scope Gate (read before testing)
+
+Both major platforms exclude the low end of this class outright:
+- **HackerOne** — Core Ineligible Findings lists "Clickjacking on pages with no sensitive actions" (https://docs.hackerone.com/en/articles/8494488-core-ineligible-findings).
+- **Bugcrowd** — the VRT's only clickjacking entry is *Server Security Misconfiguration > Clickjacking > Sensitive Click-Based Action* (P4 baseline, VRT release 2026-07-08). A framed page with no sensitive click-based action has no category to file under.
+
+So the gate is: name the sensitive state-changing action a victim's click performs **before** building a PoC. No such action = do not file. Then check the program's own exclusions, which often go further.
 
 ## Protection Headers
 
@@ -40,7 +48,7 @@ Header-absence is the **trigger for investigation, not the finding**. Two steps:
 ```
 curl -sI https://target.example/account/transfer | grep -iE 'x-frame-options|content-security-policy'
 ```
-If BOTH `X-Frame-Options` and CSP `frame-ancestors` are absent, the page is a *candidate*. If either is present and restrictive (`DENY`/`SAMEORIGIN`/`frame-ancestors 'none'|'self'`), stop — it's protected.
+If BOTH `X-Frame-Options` and CSP `frame-ancestors` are absent, the page is a *candidate*. If either is present and restrictive (`DENY`/`SAMEORIGIN`/`frame-ancestors 'none'|'self'`), stop — it's protected against **iframe** clickjacking. It is not protected against DoubleClickjacking (below), which never frames the page.
 
 **Step 2 — Prove it actually frames and clicks (required for a real finding).** Build a minimal PoC and load it in a real browser:
 
@@ -57,6 +65,16 @@ Confirm ALL of the following, or it is not exploitable:
 
 **Strategy:** target the most sensitive action pages first — severity scales directly with what the victim is tricked into doing.
 
+## DoubleClickjacking (no iframe)
+
+Paulos Yibelo, "DoubleClickjacking: A New Era of UI Redressing", December 2024 — https://www.paulosyibelo.com/2024/12/doubleclickjacking-what.html (PortSwigger Top 10 web hacking techniques of 2024, entry 6). The attacker page opens a new window that asks the victim to double-click (a fake CAPTCHA, for example). Between the two clicks, the attacker uses `window.opener` to navigate the original tab to the sensitive page, and the first click's `mousedown` closes the top window, so the second click lands on the real target button. It exploits the timing gap between `mousedown` and `click`.
+
+The target page loads **top-level**, not framed, so `X-Frame-Options`, CSP `frame-ancestors` and SameSite cookies do not apply: the victim's own first-party session is used.
+
+- **Best targets:** one-click sensitive actions — OAuth "Authorize / Allow" consent screens (approve an app you control → account access), account-setting confirmations, browser-extension or wallet confirmation prompts.
+- **Defence to look for:** the button stays disabled until a real gesture on the page (mouse movement or key press), which is the mitigation Yibelo proposed. A button that is live the moment the page loads is a candidate.
+- **Proof (required):** a screen recording in a current browser, version noted, showing the double-click lure and the sensitive action completing on the victim test account. OAuth consent granting your own app is the strongest case. A missing gesture check alone is not a finding.
+
 ## False Positives
 
 - Public, read-only pages (home/marketing) lacking frame protection are low/informational — no sensitive action to redress.
@@ -65,4 +83,4 @@ Confirm ALL of the following, or it is not exploitable:
 
 ## Proof Requirements
 
-A valid clickjacking report shows: (1) the target page rendered inside an attacker-controlled iframe in a real browser, (2) a sensitive state-changing action reachable by a framed click while the victim is authenticated (cookies survive the cross-site context), and (3) a screenshot/recording of the overlay. Reporting missing headers with no working frame PoC is a documentation-quality issue, not a vulnerability.
+A valid clickjacking report shows: (1) the target page rendered inside an attacker-controlled iframe in a real browser, (2) a sensitive state-changing action reachable by a framed click while the victim is authenticated (cookies survive the cross-site context), and (3) a screenshot/recording of the overlay. Reporting missing headers with no working frame PoC is a documentation-quality issue, not a vulnerability. For DoubleClickjacking, the recording requirement in its section replaces (1) and the cross-site cookie condition in (2), because the target is loaded top-level.

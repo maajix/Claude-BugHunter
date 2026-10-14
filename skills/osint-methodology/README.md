@@ -5,7 +5,7 @@ The "how to think" reference for external red-team OSINT and bug-bounty reconnai
 | Field | Value |
 |---|---|
 | Name | `osint-methodology` |
-| Version | 2.1 |
+| Version | 2.3 |
 | Lines | ~1,700 |
 | Top-level sections | 33 |
 | Subsections | ~125 |

@@ -1,6 +1,6 @@
 ---
 name: hunt-graphql
-description: Hunting skill for graphql vulnerabilities. Built from 12 public bug bounty reports across IDOR via node() / GID, mutation IDOR including AI/LLM features, cross-tenant IDOR, SSRF via argument, batching-DoS, query-cost-bypass, SQLi via argument, broken-object-level-authz, auth-bypass via unscoped mutations, and PII exposure from missing field-level authz. Use when hunting graphql on any target.
+description: Hunting skill for graphql vulnerabilities. Built from 26 public bug bounty reports across IDOR via node() / GID, mutation IDOR including AI/LLM features, cross-tenant IDOR, SSRF via argument, batching-DoS, query-cost-bypass, SQLi via argument, broken-object-level-authz, auth-bypass via unscoped mutations, and PII exposure from missing field-level authz. Use when hunting graphql on any target.
 sources: hackerone_public, github, gitlab_security
 report_count: 26
 ---
@@ -69,7 +69,7 @@ X-Request-Id + no REST-style path params = likely GraphQL
 
 ## Step-by-Step Hunting Methodology
 
-1. **Discover the endpoint** — spider JS bundles, check `/graphql`, `/api/graphql`, review Burp passive scan hits for `application/json` POST with query fields
+1. **Discover the endpoint** — spider JS bundles, check `/graphql`, `/api/graphql`, review Burp passive scan hits for `application/json` POST with query fields. Then fingerprint the engine with graphw00f (`python3 main.py -d -f -t https://target.example/graphql`): it names the implementation (Apollo, Graphene, graphql-ruby, Hasura, ...) and links that engine's threat-matrix page (introspection, field-suggestion, depth/cost-limit defaults, known CVEs). Choose bypasses and DoS checks from that page rather than from a generic list.
 
 2. **Test introspection** — send the full introspection query. Even if blocked, try field-level enumeration:
    ```graphql
@@ -94,7 +94,7 @@ X-Request-Id + no REST-style path params = likely GraphQL
 
 8. **Probe for IDOR in node IDs** — GraphQL global IDs often encode object type + ID. Swap IDs across object boundaries and across account contexts.
 
-9. **Check batch query abuse** — send arrays of operations to bypass rate limiting or amplify enumeration.
+9. **Check batch query abuse** — send arrays of operations to bypass rate limiting or amplify enumeration. BatchQL detects JSON-list and query-name batching support; CrackQL drives alias-batched login/OTP guessing from a CSV. Both are below in the tooling block.
 
 10. **Document the exact reproduction chain** — for RC bugs, time-based steps must be reproducible deterministically.
 
@@ -164,6 +164,21 @@ mutation {
 ```
 A single GraphQL request aliases the same mutation with different OTP codes. Combined with parallel HTTP, this defeats per-request rate limiting and compresses brute-force attempts into fewer network round-trips.
 
+**CSRF (cookie-authenticated endpoints only):**
+
+A GraphQL endpoint is CSRF-able when it executes an operation from a request a browser sends cross-site without a preflight: a `GET`, or a `POST` with `application/x-www-form-urlencoded`, `multipart/form-data` or `text/plain`. Apollo Server's `csrfPrevention` was added in **3.7.0** as opt-in (the v3 docs say it "will be enabled by default in Apollo Server 4") and is **on by default in v4+**; it lets a request through only with `Content-Type: application/json` or a non-empty `X-Apollo-Operation-Name` / `Apollo-Require-Preflight` header, else 400. So Apollo 3 without the flag, or v4+ with `csrfPrevention: false`, is the target. Apollo Server 2 also executed multipart operations through its bundled graphql-upload even with uploads unused (GHSA-2p3c-p3qw-69r4, `apollo-server >= 2.0.0 < 2.25.4`). Probe with only the session cookie and a harmless operation:
+
+```bash
+C="session=YOUR_COOKIE"; U=https://target.example/graphql
+curl -s -G "$U" -b "$C" --data-urlencode 'query={__typename}'                        # GET query
+curl -s -G "$U" -b "$C" --data-urlencode 'query=mutation{__typename}'               # GET mutation (should be refused)
+curl -s "$U" -b "$C" -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'query={__typename}'
+curl -s "$U" -b "$C" -F 'operations={"query":"{__typename}"}' -F 'map={}'            # multipart (graphql-upload path)
+curl -s "$U" -b "$C" -H 'Content-Type: text/plain' -d '{"query":"{__typename}"}'
+```
+
+Any `data` response means a cross-site page can send that shape. Confirm with a real state-changing mutation against your own second test account, fired from an auto-submitting form on another origin, and check the cookie's `SameSite` (Lax still rides top-level `GET` navigations, so a `GET` mutation is the strongest case). graphql-cop's three CSRF checks ("GET based Queries", "POST based Queries using urlencoded payloads", "Mutation support over GET methods") and BatchQL's "potential CSRF" output automate the first pass; treat their hits as leads. Report framing: `hunt-csrf`.
+
 **RC desync test pattern (pseudo-sequence):**
 ```bash
 # Step 1: Grant access via REST
@@ -199,8 +214,17 @@ inql -t https://target/graphql --generate-queries
 # Clairvoyance — brute-force field names when introspection is disabled
 python3 clairvoyance.py -u https://target/graphql -H "Authorization: Bearer TOKEN" -w wordlist.txt -o schema.json
 
-# GraphQL Cop — scan for common misconfigurations (introspection enabled, no depth limits, etc.)
+# GraphQL Cop — scan for common misconfigurations (introspection enabled, no depth limits, CSRF shapes, etc.)
 graphql-cop -t https://target/graphql
+
+# graphw00f: fingerprint the engine, then read its threat-matrix page before picking bypasses
+python3 main.py -d -f -t https://target/graphql
+
+# BatchQL: detect batching, introspection, suggestions and potential CSRF
+python batch.py -e https://target/graphql
+
+# CrackQL: alias-batched credential/OTP guessing from a CSV (test accounts only, respect rate rules)
+python3 CrackQL.py -t https://target/graphql -q login.graphql -i inputs.csv
 ```
 
 ---
@@ -253,6 +277,15 @@ fragment F on User { repos { teams { members { ...F } } } }
 **Defense: Operation whitelisting (persisted queries)**
 - Check if the server falls back to ad-hoc queries when the `extensions.persistedQuery` hash mismatches
 - Look for a non-whitelisted endpoint (dev, staging, internal proxy)
+- **Register-then-execute test.** Automatic persisted queries (APQ) are a cache, not an allowlist: a client registers a new operation by sending its text plus its hash. If the program claims operations are allowlisted, send a hash-only request for an operation the app never uses (the unique alias below guarantees that), then the same hash with the query text, then hash-only again:
+```bash
+Q='{apqprobe1: __typename}'; H=$(printf '%s' "$Q" | sha256sum | cut -d' ' -f1)
+EXT="{\"persistedQuery\":{\"version\":1,\"sha256Hash\":\"$H\"}}"
+curl -s https://target/graphql -H 'Content-Type: application/json' -d "{\"extensions\":$EXT}"                  # expect PERSISTED_QUERY_NOT_FOUND
+curl -s https://target/graphql -H 'Content-Type: application/json' -d "{\"query\":\"$Q\",\"extensions\":$EXT}"  # registers + runs
+curl -s -G https://target/graphql -H 'Apollo-Require-Preflight: true' --data-urlencode "extensions=$EXT"        # hash-only now runs
+```
+  `PERSISTED_QUERY_NOT_FOUND` on the first call followed by `data` on the third means arbitrary operations are accepted and the "allowlist" is only APQ. A server enforcing a real safelist rejects the registration call.
 
 ### Alias batching: when it wins races vs when it doesn't
 

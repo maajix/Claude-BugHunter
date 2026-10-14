@@ -32,7 +32,7 @@ Take a known-good request and break ONE assumption at a time:
 
 - **Wrong type:** a field the app expects to be a number/string is sent as an
   array or object — `{"rating":"x","comment":[1,2,3]}`, `{"quantity":{}}`.
-- **Malformed body:** truncated/!invalid JSON, an unterminated string, a stray
+- **Malformed body:** truncated/invalid JSON, an unterminated string, a stray
   brace, a wrong/missing Content-Type.
 - **Boundary/oversized:** a very long string, a huge/negative/overflow number.
 - **Null byte / control chars** embedded in a value.
@@ -58,6 +58,37 @@ A finding is confirmed when the response body contains a cross-framework error-d
 
 A clean JSON error (`{"error":"Invalid input"}`) with no internals is NOT a
 finding — that's correct handling. Disclosure of internal structure is.
+
+## Fail-open on exception (auth decided inside a try block)
+
+The higher-paying variant: the exception happens **inside** an authentication or
+authorization check, and the handler's default is "allow". Typical shapes: a
+`try/except` around token parsing that falls through to the handler, an external
+authz / policy service that times out and is treated as approved, a permission
+lookup that throws on an unexpected type and skips the deny branch.
+
+```
+Baseline 1: protected endpoint, no credentials          → expect 401/403
+Baseline 2: protected endpoint, valid low-priv session  → expect 403 on admin routes
+Probe:      same request, auth input made malformed     → truncated token, wrong type
+            in a role/permission parameter, invalid encoding in the auth header,
+            oversized cookie, duplicate auth headers
+```
+
+A finding is a probe that gets **more** access than Baseline 1 or 2 (a 200 with
+protected data, or an admin action that completes). Body-diff against both
+baselines; a 500 alone is the verbose-error finding above, not fail-open.
+Signature/claim forgery is a different bug class: route it to `hunt-jwt-crypto`.
+
+## Chain targets the error path opens
+
+- **Error-based blind SSTI.** When template output is never reflected, an error
+  page that changes with the injected expression becomes an oracle. That was the
+  #1 entry in PortSwigger's [Top 10 web hacking techniques of 2025](https://portswigger.net/research/top-10-web-hacking-techniques-of-2025)
+  ("Successful Errors", Vladislav Korchagin). If a template-looking input produces
+  an engine-specific error here, stop and hand the field to `hunt-ssti`; do not
+  escalate from this skill.
+- **SQL error text** → `hunt-sqli`; **absolute paths** → `hunt-lfi`.
 
 ## Validation discipline
 

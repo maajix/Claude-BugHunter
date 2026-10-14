@@ -128,6 +128,8 @@ curl -s "http://$TARGET:10255/metrics" | head
 
 **CVE-2020-8558** (host-network trust): on affected kube-proxy, services bound to the node's `127.0.0.1` (incl. the read-only kubelet and other localhost-only services) become reachable from other pods/adjacent hosts via the node IP, defeating the localhost trust boundary — a lateral path to kubelet/etcd that were assumed loopback-only.
 
+**CVE-2026-35469** (`moby/spdystream` ≤0.5.0, fixed 0.5.1; GHSA-pc3f-x583-g7j2 "DOS on CRI"): the SPDY/3 frame parser allocates from attacker-controlled counts and lengths, so one crafted, zlib-inflated control frame can OOM a process that accepts SPDY, including the exec/attach/port-forward streaming path above. DoS only: report it from component versions (which Kubernetes/CRI releases vendor 0.5.1: verify per distro, Red Hat tracks it at <https://access.redhat.com/security/cve/CVE-2026-35469>). **Never send the frame**; a killed kubelet or runtime takes down every pod on the node.
+
 ---
 
 ## Phase 4 — API-Server-Mediated Kubelet RCE (`nodes/proxy`)
@@ -151,6 +153,9 @@ curl -sk -H "Authorization: Bearer $TOKEN" "$SRV/api/v1/nodes/$NODE/proxy/pods"
 
 ## Phase 4b — Ingress-NGINX "IngressNightmare" (CVE-2025-1974)
 An unauthenticated attacker who can reach the ingress-nginx admission controller (`:8443`, usually cluster-internal but sometimes exposed) injects arbitrary NGINX config via a crafted `AdmissionReview` for an Ingress object -> RCE in the controller pod, whose service account is powerful -> full cluster compromise. Fingerprint controller version (`/healthz`, pod image tag) and map to <1.11.5 / <1.12.1. (CVE-2025-1974 with CVE-2025-1097/1098/24513/24514.)
+
+- **Retired, unpatchable by design.** Kubernetes SIG Network and the SRC retired ingress-nginx in March 2026: no further releases, bugfixes or security fixes after best-effort maintenance ended ([announcement](https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/), [statement](https://www.kubernetes.io/blog/2026/01/29/ingress-nginx-statement/)). The `kubernetes/ingress-nginx` repo is archived (last push 2026-03-23). Any ingress-nginx controller still running is end-of-life; every CVE published after retirement stays open. Report that as its own finding, with Gateway API or a maintained controller as the fix.
+- **CVE-2026-24514** (admission controller DoS, CVSS 6.5 `AV:N/PR:L`): oversized requests to the validating admission webhook exhaust controller memory, killing the pod or OOMing the node. Affects < 1.13.7 and 1.14.0 - < 1.14.3, fixed in v1.13.7 / v1.14.3 ([kubernetes#136680](https://github.com/kubernetes/kubernetes/issues/136680)). Version finding only. Do not send oversized AdmissionReviews; a dead controller drops ingress for the whole cluster.
 
 ## Phase 5 — etcd Unauth (Port 2379)
 
@@ -223,6 +228,7 @@ curl -s --unix-socket /var/run/docker.sock "http://localhost/v1.41/containers/po
 **Container-escape CVEs (gate on runc/version):**
 - **CVE-2024-21626 — "Leaky Vessels" (runc ≤ 1.1.11):** a leaked host file descriptor via `/proc/self/fd/<n>` lets a malicious image (`WORKDIR /proc/self/fd/N`) or `runc exec` cwd escape to the host filesystem → host RCE. Test only with an image you control on a build/registry surface where you can influence the Dockerfile.
 - **CVE-2019-5736 (runc):** overwrite the host `/proc/self/exe` (the runc binary) from inside a container you can exec into → host root on next runc invocation. Applies to very old runc.
+- **CVE-2025-31133 / CVE-2025-52565 / CVE-2025-52881 (runc, Nov 2025):** `/dev/null` mask-source and `/dev/console` bind-mount races, plus procfs write redirection through shared mounts. A malicious image or container config can make runc write to host `/proc` files: container escape or host DoS. CVE-2025-52881 is reachable from a plain Dockerfile under `docker buildx build`. Affects runc ≤1.2.7, 1.3.0-rc.1 to 1.3.2 (≤1.3.1 for -31133), 1.4.0-rc.1/rc.2; fixed in **1.2.8 / 1.3.3 / 1.4.0-rc.3** ([GHSA-qw9x-cqr3-wc7r](https://github.com/advisories/GHSA-qw9x-cqr3-wc7r), [GHSA-cgrx-mc8f-2prm](https://github.com/advisories/GHSA-cgrx-mc8f-2prm), [RHSA-2025:20957](https://access.redhat.com/errata/RHSA-2025:20957)). Same test gate as Leaky Vessels: only on a build surface where you control the image.
 - **CVE-2022-0492 (cgroups v1 `release_agent`):** a container with `CAP_SYS_ADMIN` (or able to mount cgroupfs) writes a `release_agent` that executes on the host → escape. Check container caps first.
 
 ---
@@ -259,6 +265,8 @@ curl -sk "$SRV/apis/admissionregistration.k8s.io/v1/validatingwebhookconfigurati
 | etcd 2379 unauth | dump all Secrets (if unencrypted) → replay token | Full credential dump |
 | docker.sock | privileged container + host bind-mount | Host root |
 | CVE-2024-21626 (runc) | malicious image/exec → host FD escape | Container → host root |
+| runc < 1.2.8 / 1.3.3 (CVE-2025-31133/52565/52881) | malicious image → procfs write redirect | Container → host root |
+| ingress-nginx in any version (retired 2026-03) | unpatched admission controller CVEs | EOL finding; RCE if IngressNightmare-range |
 | EphemeralContainers / pods create | privileged/hostPID debug container | Pod → node escape |
 | Projected SA token (aud matches) | API access scoped to its real RBAC | Depends on RBAC — verify first |
 | Tiller 44134 exposed | helm install as Tiller SA | Cluster-admin if Tiller is privileged |

@@ -13,6 +13,13 @@ report_count: 0
 > (WSTG-INPV-06)**, **PortSwigger Web Security Academy (LDAP injection)**, and
 > the **RFC 4515** filter grammar — all publicly verifiable references rather
 > than invented HackerOne IDs. Do not cite a report you cannot link.
+>
+> Recent advisories with the same root cause (verified on GitHub advisories):
+> Parse Server CVE-2026-31828 (GHSA-7m6r-fhh7-r47c) put `authData.id` unescaped
+> into the LDAP bind DN and group-search filter, bypassing group checks for a user
+> with valid LDAP creds (fixed 8.6.26 / 9.5.2-alpha.13); WeKan CVE-2026-25560
+> (GHSA-gmrw-vh4q-4fvv) allowed filter injection through the login username
+> (fixed 8.19). Both are the filter- and DN-injection shapes above, in an auth adapter.
 
 ## Crown Jewel Targets
 
@@ -251,11 +258,11 @@ ldapsearch -x -H ldap://$AD_HOST -D "CORP\\user" -w "$PW" \
 
 # Burp: Intruder over the char set for blind exfil; the Web Security Academy
 # "Blind LDAP injection" labs mirror the Phase-3 oracle exactly.
-# OOB (rare but decisive): some JNDI/LDAP stacks resolve a referral. If you can
-# inject a referral/URL the server dereferences, point it at Collaborator:
-#   (uid=*))(referral=ldap://<COLLAB>/x)   — a DNS/LDAP hit at Collaborator
-# is server-side proof with zero ambiguity. Treat any Collaborator interaction
-# as the gold-standard confirmation for otherwise-blind cases.
+# No in-filter OOB primitive: an equality term like (referral=ldap://<COLLAB>/x)
+# is just a match on an attribute named "referral"; it makes nothing dereference
+# a URL. Referral chasing (RFC 4511 4.1.10) acts only on referrals the SERVER
+# returns, so an OOB hit needs a separate primitive (an injectable bind/server
+# URL, a JNDI lookup string). Blind LDAPi is proven by the Phase-3 oracle.
 ```
 
 ---
@@ -269,7 +276,6 @@ ldapsearch -x -H ldap://$AD_HOST -D "CORP\\user" -w "$PW" \
 | `memberOf` enumeration | Identify Domain Admins → targeted phishing/spray | Targeted compromise |
 | `description`/`info` field read | Plaintext creds admins stashed there | Direct credential leak |
 | Blind exfil of `userPassword` **(non-AD only)** | `{SSHA}` (salted SHA-1) → hashcat `-m 111` (`{SSHA256}`=1411, `{SSHA512}`=1711); `{CRYPT}` → mode depends on the `$id$` prefix (`$1$`=500, `$6$`=1800) → offline crack | High |
-| LDAP referral → Collaborator | Server-side request / internal directory reach | SSRF-class, confirms blind |
 
 > AD has no readable password attribute — do not list "extract AD hashes" as a
 > chain. Against AD, the credential win comes from `description`/`info` misuse or
@@ -295,8 +301,9 @@ WAF-block, and length-jitter explanations.
       a direct lookup or by the auth-bypass payload that uses it.
 - [ ] **XPath:** quotes/brackets remained balanced (no 500), and the bypass logged
       in to a real account context — not just a different error page.
-- [ ] **OOB where possible:** a Collaborator DNS/LDAP interaction from a referral
-      payload is decisive for blind cases — prefer it over length-only inference.
+- [ ] **Blind without OOB:** an injected filter term cannot trigger a referral
+      fetch, so do not wait on Collaborator for LDAPi; the controlled TRUE/FALSE
+      oracle above is the proof.
 - [ ] **AD claim discipline:** if you say "AD", you enumerated AD-specific attrs
       (`sAMAccountName`/`memberOf`); never claim AD hash exfil.
 

@@ -1,6 +1,6 @@
 ---
 name: hunt-grpc
-description: "Hunt gRPC vulnerabilities — server reflection enabled (enumerate all services/methods), missing authentication / metadata-stripping on internal endpoints, plaintext gRPC over HTTP/2, internal endpoint disclosure, proto file leakage, gRPC-Web/grpc-gateway transcoding injection, and HTTP/2 Rapid Reset DoS (CVE-2023-44487). Use when target exposes port 50051 / 443 / 8443 / 9090 with HTTP/2, when grpcurl/grpcui detects reflection, when an Envoy or grpc-gateway proxy is fronting a microservice, or when recon reveals a microservice architecture."
+description: "Hunt gRPC vulnerabilities — server reflection enabled (enumerate all services/methods), missing authentication / metadata-stripping on internal endpoints, plaintext gRPC over HTTP/2, internal endpoint disclosure, proto file leakage, gRPC-Web/grpc-gateway transcoding injection, and HTTP/2 DoS classes (Rapid Reset CVE-2023-44487, CONTINUATION flood, MadeYouReset CVE-2025-8671) gated to version-matching. Use when target exposes port 50051 / 443 / 8443 / 9090 with HTTP/2, when grpcurl/grpcui detects reflection, when an Envoy or grpc-gateway proxy is fronting a microservice, or when recon reveals a microservice architecture."
 sources: hackerone_public, grpc_security_research, cert_cc_advisory
 report_count: 6
 ---
@@ -178,7 +178,17 @@ curl -s "https://$TARGET/user.UserService/GetUser" \
 curl -s "https://$TARGET/user.UserService/GetUser" \
   -H 'content-type: application/json' -H 'connect-protocol-version: 1' \
   -d '{"user_id": 1}'
+
+# (e) buf curl speaks gRPC-Web for you (JSON in, protobuf framing handled). Uses server
+#     reflection by default; pass --schema when reflection is off (see `buf curl --help`).
+buf curl --protocol grpcweb -d '{"user_id": 1}' "https://$TARGET/user.UserService/GetUser"
 ```
+
+Burp-side tooling for transcoded traffic, so you can edit and replay protobuf instead of hex:
+- **bRPC-Web** (Compass Security, Oct 2025, https://blog.compass-security.com/2025/10/brpc-web-a-burp-suite-extension-for-grpc-web/, repo `CompassSecurity/bRPC-Web`) — gRPC-Web tab that decodes binary or base64 bodies to Protoscope and re-encodes edits in Repeater, no `.proto` needed (heuristic decoding, can misparse). Plain gRPC is not supported.
+- **gRPC-Web Coder** (`nxenon/grpc-pentest-suite`, BApp) — encodes/decodes gRPC-Web without the `.proto` and maps services from the app's JavaScript; the repo still carries the older Python gRPC-Pentest-Suite tools.
+- **ProtoBurp++** (`Doyensec/ProtoBurp`, an extended fork of Dillon Franke's ProtoBurp) — JSON ↔ protobuf with a `.proto`, so Intruder and Active Scanner can fuzz message fields.
+- **blackboxprotobuf** (`nccgroup/blackboxprotobuf`) — decode/edit protobuf without a schema; useful when no `.proto` leaked.
 
 Why this matters: the browser-facing transcoder commonly forwards to the SAME backend as the internal gRPC plane. If the transcoder route exposes `AdminService` or fails to require the auth the gRPC client would have sent, you have a real, externally-reachable authz bug. Confirm each transcoded route returns `OK` with sensitive data, and verify it is reachable as an unauthenticated/low-priv user (not just from inside the mesh).
 
@@ -192,8 +202,7 @@ The attack is NOT a load test. It opens streams (HEADERS) and immediately cancel
 
 **Correct tooling — author-sanctioned PoCs that actually emit the frame pattern:**
 ```bash
-# CERT/CC + community tracking and PoCs for CVE-2023-44487:
-#   https://kb.cert.org/vuls/id/421644
+# Writeup for CVE-2023-44487 (CERT/CC VU#421644 is the CONTINUATION advisory, not this one):
 #   https://blog.cloudflare.com/technical-breakdown-http2-rapid-reset-ddos-attack/  (Cloudflare writeup)
 # Go PoC that sends HEADERS then immediate RST_STREAM in a tight loop:
 git clone https://github.com/secengjeff/rapidresetclient
@@ -215,6 +224,13 @@ curl -sI --http2 https://$TARGET/ | grep -i '^server:'
 ```
 Report the *version-confirmed* mitigation gap rather than a benchmark slowdown. "Server got slower under load" is not proof of CVE-2023-44487 — it produces false positives on slow/under-provisioned servers and false negatives on patched ones that throttle resets gracefully.
 
+### Related HTTP/2 DoS classes — version-match only, same authorization gate
+
+- **CONTINUATION flood** (April 2024; CERT/CC VU#421644, https://kb.cert.org/vuls/id/421644): a HEADERS frame without END_HEADERS followed by an endless run of CONTINUATION frames makes the server keep buffering or parsing header data → memory/CPU exhaustion. One CVE per implementation, e.g. **CVE-2024-27316** (Apache httpd: nghttp2 buffers headers over the limit to build a 413 → memory exhaustion) and **CVE-2023-45288** (Go `net/http` / `x/net/http2`, the stack under grpc-go). Check the fingerprinted stack against the VU#421644 vendor table.
+- **MadeYouReset — CVE-2025-8671** (disclosed 13 Aug 2025; CERT/CC VU#767506, https://kb.cert.org/vuls/id/767506; Gal Bar Nahum, Anat Bremler-Barr, Yaniv Harel, Tel Aviv University, with Imperva): the client sends malformed-but-valid control frames (flow-control errors and the like) that make the **server** reset the stream. Server-reset streams count as closed while back-end work continues, so the client drives unbounded concurrent work past `MAX_CONCURRENT_STREAMS` — and past Rapid Reset mitigations that only count client-sent resets. Vendor IDs include **CVE-2025-55163** (Netty before 4.1.124.Final / 4.2.4.Final — the transport under grpc-java) and CVE-2025-48989 (Apache Tomcat).
+
+For both: fingerprint the implementation and version, compare against the advisory, and report the version gap. Do not send a CONTINUATION run or a reset-provoking frame sequence without the written authorization described at the top of Phase 7.
+
 ---
 
 ## Tools
@@ -224,6 +240,9 @@ grpcurl   # primary CLI client (list/describe/call, -protoset for reflection-off
 grpcui    # web UI for interactive exploration:  grpcui -plaintext $TARGET:50051
 protoc + protoscope   # build/inspect raw protobuf and gRPC-Web frames (Phase 6)
 buf       # lint/inspect proto, drive Connect endpoints
+# gRPC-Web in Burp: bRPC-Web (CompassSecurity), gRPC-Web Coder (nxenon/grpc-pentest-suite),
+#   ProtoBurp++ (Doyensec/ProtoBurp), blackboxprotobuf (nccgroup) — see Phase 6.
+# buf curl --protocol grpcweb|grpc|connect — schema-aware client for transcoded endpoints.
 # DoS-only, AUTHORIZED engagements: secengjeff/rapidresetclient (true rapid-reset PoC).
 #   NOTE: ghz and h2load are LOAD benchmarkers, NOT rapid-reset testers — do not
 #   use them to "prove" CVE-2023-44487.

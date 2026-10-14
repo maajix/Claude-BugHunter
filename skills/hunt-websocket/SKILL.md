@@ -71,6 +71,14 @@ In Burp Pro, use `get_proxy_websocket_history` (and the WebSockets tab) after br
 
 CSWSH requires THREE conditions together: (a) the handshake authenticates via an **ambient credential** (cookie sent automatically), (b) there is **no unpredictable per-connection token** in the handshake (no CSRF token / no token in URL/body), and (c) the server **does not enforce Origin**. Missing any one breaks the attack.
 
+**Browser precondition for (a) — check it first.** A WebSocket handshake is a cross-site *subresource* request, not a top-level navigation, so the session cookie is often not sent at all:
+- **Chrome** — a cookie with no `SameSite` attribute is Lax by default and is **not** sent on a cross-site handshake. Cross-site CSWSH needs the session cookie set `SameSite=None; Secure`.
+- **Firefox** — Total Cookie Protection partitions third-party cookies, so the victim's session is not sent on a cross-site handshake; Include Security calls it a complete mitigation for CSWSH ("Cross-Site WebSocket Hijacking Exploitation in 2025", Apr 2025, https://blog.includesecurity.com/2025/04/cross-site-websocket-hijacking-exploitation-in-2025/).
+- **Safari** — blocks third-party cookies by default; CSWSH-specific behaviour unverified, test it.
+- **What survives all three:** an attacker page on a **same-site** origin (a sibling subdomain you took over or have XSS on). SameSite does not apply to same-site requests, so the server's Origin allowlist is the only control left.
+
+Record the session cookie's `SameSite` value, the browser and its version, and the attacker origin (cross-site vs same-site) with every CSWSH result.
+
 ```bash
 # Step 1 — Confirm handshake auth model in DevTools → Network → WS → Headers.
 #   Look for: Cookie: session=...  AND  the ABSENCE of any per-request token
@@ -198,7 +206,7 @@ wscat -c "wss://$TARGET/socket.io/?EIO=4&transport=websocket" \
 
 Important: once a WebSocket is established, your payloads are wrapped in WS frames and are **never re-parsed as HTTP** by the proxy. Typing `GET /admin HTTP/1.1` into an open `wscat` session does nothing. WebSocket-related smuggling lives at the **handshake**, before any frames exist.
 
-The real technique: send a WebSocket Upgrade request that the **front proxy** and the **origin** interpret differently — e.g. a bad `Sec-WebSocket-Version` that makes the origin reply `426 Upgrade Required` (or `400`) while the proxy has already decided the connection is "upgraded" and stops parsing HTTP. The proxy then tunnels subsequent bytes straight to the origin as an opaque stream, letting you smuggle arbitrary HTTP requests past front-end controls (WAF/authz).
+The real technique: send a WebSocket Upgrade request that the **front proxy** and the **origin** interpret differently — e.g. a bad `Sec-WebSocket-Version` that makes the origin reply `426 Upgrade Required` (or `400`) while the proxy has already decided the connection is "upgraded" and stops parsing HTTP. The proxy then tunnels subsequent bytes straight to the origin as an opaque stream, letting you smuggle arbitrary HTTP requests past front-end controls (WAF/authz). Credit: 0ang3el, `websocket-smuggle` (2019, https://github.com/0ang3el/websocket-smuggle). That write-up names Varnish and Envoy 1.8.0 or older for the bad-version case, and adds a second variant for proxies such as nginx that only check the back-end's status code: make the back-end itself return `101` (through an SSRF-able health-check endpoint that fetches your server) so the proxy keeps the tunnel open.
 
 ```bash
 # Detection is HTTP-layer, not frame-layer. Use Burp Repeater / send_http1_request
@@ -215,7 +223,7 @@ The real technique: send a WebSocket Upgrade request that the **front proxy** an
 #     follow-up request on the same connection and watch for a desynced response.
 ```
 
-Drive this with Burp Pro's **HTTP Request Smuggler** extension (it has WebSocket-upgrade test cases) rather than by hand. **Validate** exactly like classic smuggling: prove desync via a timing/differential probe AND show real impact (reach an internal/forbidden path, poison a cached response, or capture another user's request) — confirmed against **Burp Collaborator / OAST**, never on a single ambiguous response.
+Drive this by hand in Burp Repeater over HTTP/1.1, one handshake variable at a time, using the two `websocket-smuggle` scenarios as templates. HTTP Request Smuggler has no WebSocket-upgrade checks (none in its source as of 2026-10), so a clean run of that extension says nothing about this class. Apply `hunt-http-smuggling`'s Stage A / Stage B rules: a probe that leaves a second request in the tunnel is Stage B. **Validate** exactly like classic smuggling: prove desync via a timing/differential probe AND show real impact (reach an internal/forbidden path, poison a cached response, or capture another user's request) — confirmed against **Burp Collaborator / OAST**, never on a single ambiguous response.
 
 ---
 
@@ -246,8 +254,13 @@ curl -s "https://$TARGET/socket.io/?EIO=4&transport=polling&sid=FAKE_OR_VICTIM_S
 ```bash
 npm install -g wscat                 # CLI WS client (raw + socket.io)
 brew install websocat                # alt client; supports text/binary + autoreconnect
-# Burp Suite Pro: WebSockets history (intercept/edit/replay), HTTP Request
-#   Smuggler extension (handshake-upgrade smuggling), Collaborator for OAST proof.
+# Burp Suite Pro: WebSockets history (intercept/edit/replay), Collaborator for OAST proof.
+# WebSocket Turbo Intruder (BApp; PortSwigger research by Zakhar Fedotkin, 17 Sep 2025,
+#   https://portswigger.net/research/websocket-turbo-intruder-nbsp-unearthing-the-websocket-goldmine):
+#   Python-scripted WS message fuzzing at thousands of messages/s, an HTTP adapter so Burp
+#   Scanner can test a socket, and a THREADED engine for WS race conditions. Its high-rate
+#   and "Ping of Death" examples are DoS: not without written sign-off.
+# 0ang3el/websocket-smuggle — reference setups for handshake-upgrade smuggling (Phase 6).
 # Burp MCP: get_proxy_websocket_history / get_proxy_websocket_history_regex to
 #   enumerate frames; generate_collaborator_payload + get_collaborator_interactions
 #   to prove out-of-band receipt from a CSWSH/smuggling PoC.
@@ -270,7 +283,7 @@ brew install websocat                # alt client; supports text/binary + autore
 
 ## Validation (mandatory before reporting)
 
-- ✅ **CSWSH:** attacker-origin PoC HTML, opened with a *different* victim account logged in, must **receive that victim's data** (verified by a unique planted marker / distinct PII) and exfil it to **Collaborator/OAST**. A bare `101` from a foreign Origin is NOT a finding.
+- ✅ **CSWSH:** attacker-origin PoC HTML (state cross-site or same-site, plus the cookie's `SameSite` value and browser version), opened with a *different* victim account logged in, must **receive that victim's data** (verified by a unique planted marker / distinct PII) and exfil it to **Collaborator/OAST**. A bare `101` from a foreign Origin is NOT a finding.
 - ✅ **No per-message auth:** privileged frame produces a **verifiable server-side effect** (state change confirmed via a second channel / REST API), not merely "accepted".
 - ✅ **Message tampering:** tampered value **persists server-side** (confirmed via order/balance API), not just echoed in the UI.
 - ✅ **Namespace/room bypass:** received **`42` event frames with another user's data**, not just a `40` namespace ack.

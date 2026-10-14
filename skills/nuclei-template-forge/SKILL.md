@@ -1,7 +1,7 @@
 ---
 name: nuclei-template-forge
 description: "Forge and validate custom Nuclei templates so a finding you confirmed once by hand becomes a repeatable, estate-wide check. Covers the current Nuclei template schema (top-level id/info/http keys, the seven matcher types, the five extractor types, the six severity values), matcher discipline that kills false positives, syntax validation with `nuclei -validate`, the mandatory known-bad / known-good host pair before any fleet run, rate-limit posture for production targets, and the Stage A / Stage B split that keeps a template read-only unless an active payload is signed off in writing. Use when turning a CVE advisory, a disclosed report, or your own manual finding into a scan across the operator's own estate; when building a private CVE-monitor corpus to re-run on a schedule; or when someone says 'write a nuclei template', 'validate this template', or 'scan our estate for this CVE'. NOT for spraying the default community template set at a target, and NOT a discovery tool for unknown bugs."
-sources: projectdiscovery-nuclei-docs, nuclei-engine-v3.8.0, community-fork-draft
+sources: projectdiscovery-nuclei-docs, nuclei-engine-v3.11.1, community-fork-draft
 ---
 
 ## When to use
@@ -69,9 +69,22 @@ Check what you actually have before writing YAML:
 nuclei -version
 ```
 
-Everything below was confirmed against **Nuclei Engine v3.8.0** and
-`docs.projectdiscovery.io`. If your engine reports a different major version,
-re-confirm before trusting these names.
+Everything below was confirmed against **Nuclei Engine v3.11.1** (current release,
+2026-08-08: `nuclei -h`, the matcher/extractor type sources, and a live `-validate`
+of the Step 3 template) and `docs.projectdiscovery.io`. If your engine reports a
+different version, re-confirm before trusting these names.
+
+**Version notes that change behaviour:**
+- Since **v3.11.0**, custom templates that use the `javascript:` protocol must be
+  signed. Unsigned ones are skipped during template loading and when referenced from
+  workflows (code-protocol templates already required a signature). Sign with
+  `nuclei -sign -t <template>` (private key from `NUCLEI_SIGNATURE_PRIVATE_KEY`).
+  A skipped JS template looks like a Step 5 false negative. The only sign is a load-time
+  `[WRN] Found N unsigned or tampered javascript template` line (plus `no templates
+  provided for scan` if it was the only one), so check for it before blaming the
+  matcher. Official nuclei-templates are pre-signed.
+- `-fuzz` is deprecated in favour of `-dast` (`nuclei -h` on v3.11.1). DAST templates
+  inject payloads by design, so a `-dast` run is Stage B (Step 6).
 
 **Severity values** (from `nuclei -h`, the `-s, -severity` flag):
 `info`, `low`, `medium`, `high`, `critical`, `unknown`. Nothing else is accepted —
@@ -154,7 +167,7 @@ http:
           - '"admin_token"\s*:\s*"([a-f0-9]{32})"'
 ```
 
-That exact template passes `-validate` on v3.8.0. Matcher rules that earn their
+That exact template passes `-validate` on v3.11.1. Matcher rules that earn their
 place:
 
 - **Set `matchers-condition: and` and `condition: and` explicitly.** The defaults
@@ -259,6 +272,10 @@ if it does any of the following:
 - loops over a candidate list against an authentication endpoint, or does anything
   else that can lock an account or exhaust a resource.
 
+Running the engine with `-dast` (formerly `-fuzz`) is Stage B by definition: DAST
+templates inject payloads into the request parts their fuzzing rules target, whatever
+the corpus holds.
+
 Stage B templates live in a separate directory from the Stage A corpus, so a
 `-t <corpus-dir>` run can never pick one up by accident. Mark the file:
 
@@ -280,7 +297,7 @@ Stage A probe that proves reachability and stop there.
 ## Step 7 — Rate-limit posture before any estate-wide run
 
 The engine's defaults are tuned for throughput, not for a production target. From
-`nuclei -h` on v3.8.0:
+`nuclei -h` on v3.11.1:
 
 | Flag | Default | What it does |
 |---|---|---|
@@ -305,7 +322,7 @@ nuclei -l ./hosts.txt -t ./forge-corpus/ -rl 20 -c 10 -duc -o ./forge-hits.txt
 nuclei -t ./forge/t.yaml -u http://127.0.0.1:8080/ -duc -v
 ```
 
-Note that `-rlm`, `-rate-limit-minute` is marked DEPRECATED on v3.8.0; use `-rl`
+Note that `-rlm`, `-rate-limit-minute` is marked DEPRECATED on v3.11.1; use `-rl`
 with `-rld` if you need a per-minute window. Take the concrete ceiling from the
 engagement's own scope document when it names one; where it does not, 5 requests
 per second with `-c 5` is the default posture for a production asset, and anything

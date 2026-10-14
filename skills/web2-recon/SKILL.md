@@ -13,23 +13,29 @@ Full asset discovery from nothing to a prioritized URL list ready for hunting.
 ## SETUP (one-time)
 
 ```bash
-# 1. Set your Chaos API key (get free key at chaos.projectdiscovery.io)
-export CHAOS_API_KEY="your-key-here"
+# 1. Set your ProjectDiscovery Cloud API key (free at cloud.projectdiscovery.io).
+#    chaos-client reads PDCP_API_KEY; the raw key also goes in the Chaos API "Authorization" header.
+export PDCP_API_KEY="your-key-here"
 # Add to ~/.zshrc or ~/.bashrc for persistence:
-echo 'export CHAOS_API_KEY="your-key-here"' >> ~/.zshrc
+echo 'export PDCP_API_KEY="your-key-here"' >> ~/.zshrc
 
 # 2. Update nuclei templates (run weekly)
 nuclei -update-templates
 
-# 3. Configure subfinder with API keys for more sources
+# 3. Configure subfinder with API keys for more sources.
+#    Keys belong in provider-config.yaml (created on first run), NOT config.yaml.
+#    One YAML list per source; composite credentials (Censys) are "ID:SECRET".
 mkdir -p ~/.config/subfinder
-cat > ~/.config/subfinder/config.yaml << 'EOF'
+cat > ~/.config/subfinder/provider-config.yaml << 'EOF'
 # Get free keys at: virustotal.com, securitytrails.com, censys.io, shodan.io
-virustotal: [YOUR_VT_KEY]
-securitytrails: [YOUR_ST_KEY]
-censys_apiid: YOUR_CENSYS_ID
-censys_secret: YOUR_CENSYS_SECRET
-shodan: [YOUR_SHODAN_KEY]
+virustotal:
+  - YOUR_VT_KEY
+securitytrails:
+  - YOUR_ST_KEY
+censys:
+  - YOUR_CENSYS_ID:YOUR_CENSYS_SECRET
+shodan:
+  - YOUR_SHODAN_KEY
 EOF
 
 # 4. Verify all tools installed
@@ -66,15 +72,25 @@ curl -s "https://crt.sh/?q=%.${TARGET}&output=json" \
 echo "[+] crt.sh: $(wc -l < /tmp/subs.txt) subdomains"
 
 # Step 1: Chaos API (ProjectDiscovery — most comprehensive source)
+# Response is {"domain": "...", "subdomains": ["www", ...]} -- labels without the apex.
 curl -s "https://dns.projectdiscovery.io/dns/$TARGET/subdomains" \
-  -H "Authorization: $CHAOS_API_KEY" \
-  | jq -r '.[]' >> /tmp/subs.txt
+  -H "Authorization: $PDCP_API_KEY" \
+  | jq -r --arg d "$TARGET" '.subdomains[] | "\(.).\($d)"' >> /tmp/subs.txt
+# Same via the client: chaos -d $TARGET -silent | anew /tmp/subs.txt
 
 echo "[+] Chaos returned $(wc -l < /tmp/subs.txt) subdomains"
 
 # Step 2: subfinder (passive multi-source)
 subfinder -d $TARGET -silent | anew /tmp/subs.txt
 assetfinder --subs-only $TARGET | anew /tmp/subs.txt
+
+# Step 2b: Active bruteforce + permutations (sends DNS queries; massdns-based, wildcard-aware).
+# Needs massdns on PATH and a validated resolvers.txt (dnsvalidator).
+shuffledns -d $TARGET -w ~/wordlists/subdomains.txt -r resolvers.txt -mode bruteforce -silent | anew /tmp/subs.txt
+#   or: puredns bruteforce ~/wordlists/subdomains.txt $TARGET -r resolvers.txt | anew /tmp/subs.txt
+# Permutations learned from what you already found, then resolved with wildcard filtering:
+alterx -l /tmp/subs.txt -enrich -silent \
+  | shuffledns -d $TARGET -r resolvers.txt -mode resolve -silent | anew /tmp/subs.txt
 
 echo "[+] Total subdomains after all sources: $(wc -l < /tmp/subs.txt)"
 
@@ -94,6 +110,11 @@ echo "[+] Total URLs: $(wc -l < /tmp/urls.txt)"
 
 # Step 6: Nuclei scan
 nuclei -l /tmp/live.txt -t ~/nuclei-templates/ -severity critical,high,medium -o /tmp/nuclei.txt
+
+# Step 6b: DAST fuzzing pass (ACTIVE: injects payloads into every parameter -- in-scope hosts only,
+# respect the program's rate limit). Input must be URLs that carry parameters.
+# -dast replaces the deprecated -fuzz flag.
+grep '?' /tmp/urls.txt | nuclei -dast -rl 10 -o /tmp/nuclei-dast.txt
 ```
 
 ### Output to Organized Directory
@@ -297,8 +318,8 @@ KNOWN="/tmp/$TARGET-subs-known.txt"
 
 subfinder -d $TARGET -silent > /tmp/$TARGET-subs-fresh.txt
 curl -s "https://dns.projectdiscovery.io/dns/$TARGET/subdomains" \
-  -H "Authorization: $CHAOS_API_KEY" \
-  | jq -r '.[]' >> /tmp/$TARGET-subs-fresh.txt
+  -H "Authorization: $PDCP_API_KEY" \
+  | jq -r --arg d "$TARGET" '.subdomains[] | "\(.).\($d)"' >> /tmp/$TARGET-subs-fresh.txt
 
 # Diff against known
 NEW=$(comm -23 <(sort /tmp/$TARGET-subs-fresh.txt) <(sort $KNOWN 2>/dev/null))
@@ -348,10 +369,12 @@ cat /tmp/live.txt | awk '{print $1}' | naabu -port 80,443,8080,8443,3000,4000,50
 ## SECRET SCANNING IN JS BUNDLES
 
 ```bash
-# trufflehog — high-signal secret detection with entropy analysis
-# Scans JS files and git repos
-pip install trufflehog3 2>/dev/null || true
-trufflehog filesystem --only-verified recon/$TARGET/ 2>/dev/null
+# trufflehog v3 (trufflesecurity) — detects secrets and verifies them against the provider API
+# Scans JS files and git repos. PyPI "trufflehog3" is a separate third-party project, not this tool.
+# Install: brew install trufflehog
+#   or the official script (review it first):
+#   curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+trufflehog filesystem --results=verified recon/$TARGET/ 2>/dev/null
 
 # SecretFinder — manual JS bundle scan (already in tools/)
 source ~/tools/SecretFinder/.venv/bin/activate
@@ -686,10 +709,10 @@ Critical distinction operators get wrong:
 - **"Page not found · GitHub Pages"** with HTTP 404 means the repo EXISTS — NOT a takeover.
 - **"There isn't a GitHub Pages site here"** means the repo was deleted — TAKEOVER candidate.
 
-Same distinction for CloudFront:
+For CloudFront, neither error is a takeover signal:
 
 - **"Error - 404"** with `Server: CloudFront` = distribution exists, origin returned 404 — NOT a takeover.
-- **"The request could not be satisfied"** with `X-Cache: Error from cloudfront` = origin missing entirely — potential takeover.
+- **"The request could not be satisfied"** with `X-Cache: Error from cloudfront` = generic CloudFront error, also NOT a takeover. CloudFront is listed Not vulnerable on can-i-take-over-xyz (checked 2026-10-13), so do not file on this string.
 
 Phase 2C verified both patterns live. Always check the EXACT response body string before filing a takeover finding — the takeover-scanner tools (subzy, subjack) match on multiple fingerprints and frequently false-positive on the "still owned, just empty" case.
 

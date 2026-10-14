@@ -312,7 +312,7 @@ A checklist tells you what to look for one bug at a time. Senior work composes p
 - **B.** Inject a sibling `<Assertion>` element so the signature-checker XML parser (REXML/Xerces) resolves a different node than the business-logic XML parser (Nokogiri/JAXP). Sign the outer benign assertion; embed `<NameID>admin@victim</NameID>` in the unsigned inner assertion.
 - **C.** SP signature validates against the outer element; SP business logic reads the inner one; admin role assumed without password or MFA.
 - **Impact:** Full enterprise SSO compromise. Every SAML-gated app inherits the spoofed admin identity for the session lifetime.
-- **Real shape:** GitHub Enterprise CVE-2025-25291 / CVE-2025-25292 (parser differential, 2025); samlify CVE-2025-47949. Cross-refs `hunt-auth-bypass` Disclosed Report Citation #5 and #7, and root cause #5 (SAML XML parsing quirks).
+- **Real shape:** ruby-saml CVE-2025-25291 / CVE-2025-25292 (REXML vs Nokogiri parser differential, found by GitHub Security Lab, Mar 2025; fixed in ruby-saml 1.12.4 / 1.18.0). The exploitable instance was **GitLab CE/EE** before 17.7.7 / 17.8.5 / 17.9.2 ([CERT-EU 2025-011](https://cert.europa.eu/publications/security-advisories/2025-011/)); GitHub itself does not use ruby-saml, so this is not a GitHub Enterprise bug. samlify CVE-2025-47949. Cross-refs `hunt-auth-bypass` Disclosed Report Citation #5 and #7, and root cause #5 (SAML XML parsing quirks).
 
 ### Chain 5 — Token-Scope Check at Issuance, Not at Use → Cross-Tenant Write via Low-Scope PAT
 

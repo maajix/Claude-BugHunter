@@ -44,24 +44,21 @@ censys search "names: ${D}" --index-type certificates --fields names | jq -r '.n
 curl -sk "https://api.certspotter.com/v1/issuances?domain=${D}&include_subdomains=true&expand=dns_names" | \
   jq -r '.[].dns_names[]' | sort -u
 
-# 3. CertStream archive (Calidog) — historical CT log mirror
-curl -sk "https://crt.calidog.io/?q=${D}" | jq -r '.[].name_value' | sort -u
-
-# 4. Subfinder bundled aggregator (uses 30+ sources internally — Chaos, Anubis, BinaryEdge, BufferOver, Censys, CertSpotter, Crobat, Crtsh, DNSDumpster, FOFA, Fullhunt, GitHub, HackerTarget, IntelX, PassiveTotal, Quake, Rapiddns, Shodan, Spyse, ThreatBook, ThreatMiner, URLScan, VirusTotal, WhoisXML, ZoomEye, etc.)
+# 3. Subfinder bundled aggregator (uses 30+ sources internally — Chaos, Anubis, BinaryEdge, BufferOver, Censys, CertSpotter, Crobat, Crtsh, DNSDumpster, FOFA, Fullhunt, GitHub, HackerTarget, IntelX, PassiveTotal, Quake, Rapiddns, Shodan, Spyse, ThreatBook, ThreatMiner, URLScan, VirusTotal, WhoisXML, ZoomEye, etc.)
 subfinder -d ${D} -all -recursive -silent
 
-# 5. AlienVault OTX — free, no key
+# 4. AlienVault OTX — free, no key
 curl -sk "https://otx.alienvault.com/api/v1/indicators/domain/${D}/passive_dns" | \
   jq -r '.passive_dns[].hostname' | sort -u
 
-# 6. ThreatMiner — free
+# 5. ThreatMiner — free
 curl -sk "https://api.threatminer.org/v2/domain.php?q=${D}&rt=5" | jq -r '.results[]'
 
-# 7. URLScan — passive DNS via past scans
+# 6. URLScan — passive DNS via past scans
 curl -sk "https://urlscan.io/api/v1/search/?q=domain:${D}" | \
   jq -r '.results[].page.domain' | sort -u
 
-# 8. Anubis-DB / DNSDumpster (HTML scrape, last resort)
+# 7. Anubis-DB / DNSDumpster (HTML scrape, last resort)
 curl -sk -A "Mozilla/5.0" "https://anubisdb.com/anubis/subdomains/${D}" | jq -r '.[]'
 ```
 
@@ -165,7 +162,7 @@ curl -sk "https://ipinfo.io/8.8.8.8?token=<key>" | jq .
 
 ### 28.2 Certificates & CT Monitoring
 
-- [crt.sh](https://crt.sh/), [Censys Certificates](https://search.censys.io/certificates), [CertStream](https://certstream.calidog.io/) (real-time CT WebSocket), [Rapid7 Open Data](https://opendata.rapid7.com/), [Cert Spotter](https://sslmate.com/certspotter) (freemium).
+- [crt.sh](https://crt.sh/), [Censys Certificates](https://search.censys.io/certificates), [CertStream](https://certstream.calidog.io/) (real-time CT WebSocket; Calidog's public server status unverified: as of 2026-10 the handshake succeeds but no data flows and `/latest.json` is frozen at 2025-10-31 — self-host [certstream-server-go](https://github.com/d-Rickyy-b/certstream-server-go) for live monitoring), [Rapid7 Open Data](https://opendata.rapid7.com/), [Cert Spotter](https://sslmate.com/certspotter) (freemium).
 - **Favicon mmh3 hash:** cluster infrastructure across hosts; pair with Shodan/Censys favicon search for shared-infra discovery.
 
 ### 28.3 Web tech / TLS / fingerprinting

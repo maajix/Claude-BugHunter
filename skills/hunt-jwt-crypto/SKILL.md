@@ -128,14 +128,32 @@ jwt_tool or PyJWT).
 
 Use purpose-built JWT attack suites to run all known forgery modes in parallel:
 ```bash
-# jwt_tool: auto-try alg:none, key confusion, kid injection, etc.
-jwt_tool <token> -X a
+# jwt_tool (v2.3.0, 2025-05-01): -X a is alg:none only; -M at runs the full
+# "all tests" scan (alg:none, key confusion, kid/jku injection, ...)
+jwt_tool <token> -M at
 
-# Nuclei: automated JWT vuln scanning
-nuclei -u <target_url> -t jwt/ -timeout 10s
+# Nuclei: there is no jwt/ directory or jwt tag in nuclei-templates. The
+# relevant templates are token-leak detectors, not forgery checks:
+nuclei -u <target_url> -t http/exposures/tokens/generic/jwt-token.yaml -t http/exposures/tokens/jwk-json-leak.yaml -timeout 10s
 ```
 Run these early in JWT recon; they often find the vulnerability faster than
 manual chaining of individual techniques.
+
+### Library version gates (2025-2026 verifier bugs)
+When the backend library and version are known (stack trace, `requirements.txt`,
+`package.json`, SBOM), check these before spending time on manual key confusion.
+Each is a variant of the HMAC-key-guard miss; the test is the same key-confusion
+flow above with the listed key shape. Verify ids on NVD before citing in a report.
+
+| Library | Affected | Fixed | Key shape that slips past the guard |
+|---|---|---|---|
+| PyJWT | 2.13.0 - 2.13.x | 2.14.0 | empty `oct` JWK as HMAC key (CVE-2026-102266) |
+| PyJWT | 2.13.0 - 2.13.x | 2.14.0 | BOM-prefixed JWK (CVE-2026-102272) |
+| PyJWT | 2.13.0 - 2.13.x | 2.14.0 | public JWK container used as the HMAC secret (CVE-2026-102273) |
+| PyJWT | old | 1.5.1 | PKCS1 PEM public key not caught by HMAC guard (CVE-2017-11424); the historical reference case |
+| Authlib | < 1.6.9 | 1.6.9 | `jwk` header trusted when `key=None` (CVE-2026-27962, GHSA-wvwj-cvrp-7pv5) |
+
+Note: CVE-2025-45768 is a disputed PyJWT weak-key-length entry on NVD, not a key-confusion bug; do not cite it for forgery.
 
 ## Drive to the ADMIN objective — do not stop at a working forge
 

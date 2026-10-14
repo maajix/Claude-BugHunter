@@ -1,6 +1,6 @@
 ---
 name: ios-redteam-pipeline
-description: End-to-end iOS red-team pipeline — IPA acquisition (App Store extraction, TestFlight, enterprise/ad-hoc sideload), class-dump/Hopper/Ghidra static analysis, Info.plist + entitlements + Keychain secret extraction, App Transport Security (ATS) misconfig + certificate-pinning bypass (frida-ios-dump, objection, SSL Kill Switch 2), URL-scheme / Universal Link hijack, exported-service enumeration, Frida runtime instrumentation. Companion to apk-redteam-pipeline for the iOS side of a mobile app catalogue. Use when target has an iOS app (App Store listing, TestFlight link, enterprise MDM distribution), when an IPA URL is found hosted on a web server, or when post-recon mentions "iOS app" / "mobile app" in scope alongside an Apple developer account.
+description: End-to-end iOS red-team pipeline — IPA acquisition (App Store extraction, TestFlight, enterprise/ad-hoc sideload), class-dump/Hopper/Ghidra static analysis, Info.plist + entitlements + Keychain secret extraction, App Transport Security (ATS) misconfig + certificate-pinning bypass (frida-ios-dump, objection, SSL Kill Switch 3), URL-scheme / Universal Link hijack, exported-service enumeration, Frida runtime instrumentation. Companion to apk-redteam-pipeline for the iOS side of a mobile app catalogue. Use when target has an iOS app (App Store listing, TestFlight link, enterprise MDM distribution), when an IPA URL is found hosted on a web server, or when post-recon mentions "iOS app" / "mobile app" in scope alongside an Apple developer account.
 sources: public_research, frida_docs, objection_docs, owasp_mastg
 report_count: 0
 ---
@@ -41,19 +41,25 @@ multi-brand conglomerate usually reuses `com.<corp>.<sub-brand>` naming on both 
 
 ## Stage 1 — IPA acquisition
 
-### Primary: from a real device you control (no jailbreak needed for a purchased/free app)
+### Primary: App Store IPA (ipatool) + test-device inventory
 ```bash
-# Install the app on a real device via Apple Configurator 2 or Xcode, then pull the .ipa
-# Apple Configurator 2 (macOS): Devices > select device > right-click installed app > "Save to..."
-# Or via libimobiledevice:
+# ipatool (github.com/majd/ipatool): downloads the App Store IPA for an app your Apple ID has obtained
+ipatool auth login -e <apple-id-email>
+ipatool download -b <bundle_id>
+# libimobiledevice — inventory what is installed on the test device:
 brew install libimobiledevice ideviceinstaller
 ideviceinstaller -l              # list installed apps + bundle IDs
 ```
+Apple Configurator 2 has no "export" for an installed app; the community workaround (catching a
+temporary IPA cache during "Add > Apps") is undocumented and reported broken on newer versions.
+Any App Store IPA (ipatool or Configurator) is **FairPlay-encrypted** — static tools see an encrypted
+binary until it is decrypted on a test device (see "Decrypting" below).
 
 ### Secondary: TestFlight (if the program distributes betas publicly)
-Open the public TestFlight link, install via the TestFlight app, then extract as above.
-TestFlight builds are frequently LESS hardened than App Store releases (debug logging left on,
-staging API hosts hardcoded) — always prefer a TestFlight build over the Store build if both exist.
+Open the public TestFlight link and install via the TestFlight app on the test device.
+TestFlight builds ship through the App Store and are FairPlay-encrypted like Store builds
+([Corellium](https://support.corellium.com/features/apps/testing-ios-apps)). They can still be less
+hardened (debug logging, staging hosts) — unverified as a rule, so diff against the Store build.
 
 ### Tertiary: enterprise / ad-hoc distribution (OTA install)
 ```bash
@@ -166,11 +172,13 @@ catches `URLSession`, `AFNetworking`, `Alamofire`, and `TrustKit` at once, which
 Objective-C hooks (like the deprecated `NSURLConnection` delegate) miss:
 ```bash
 # Pull a maintained universal BoringSSL-layer bypass and run it:
-frida -U -f <bundle_id> -l ios-ssl-bypass.js --no-pause
+frida -U -f <bundle_id> -l ios-ssl-bypass.js
 ```
-In practice, prefer **SSL Kill Switch 2** (jailbroken device, installs as a tweak) or
+In practice, prefer **SSL Kill Switch 3** ([NyaMisty/ssl-kill-switch3](https://github.com/NyaMisty/ssl-kill-switch3),
+rootless + rootful builds; last release 2023, so test it on your iOS version) or
 **objection's `ios sslpinning disable`** over any hand-rolled script — both cover the common
 pinning implementations (`NSURLSession`, `AFNetworking`, `TrustKit`) without per-app tuning.
+SSL Kill Switch 2 is unmaintained (last release 2019, supported up to iOS 14.2).
 
 ---
 
@@ -199,8 +207,17 @@ For each custom scheme found (e.g. `myapp://`):
 
 ## Stage 6 — Runtime instrumentation (Frida / objection)
 
-Requires a jailbroken device (checkra1n/palera1n for older iOS, or a Corellium virtual device) —
-unlike Android, there is no practical rooted-emulator equivalent for iOS.
+Requires a jailbroken device or a Corellium virtual device — unlike Android, there is no practical
+rooted-emulator equivalent for iOS. **Jailbreak availability is narrow:** there is no public jailbreak
+for current iOS 26 releases on current hardware. Coverage is limited to older chips and specific
+point releases (check the support matrix in the [Dopamine](https://github.com/opa334/Dopamine/releases)
+and [palera1n](https://github.com/palera1n/palera1n) release notes before buying a device). Default
+to Corellium when the target's minimum iOS version rules out a jailbreakable device.
+
+**Frida 17:** the ObjC/Swift bridges are no longer bundled in GumJS. The `frida` REPL and
+`frida-trace` (frida-tools ≥14) still include them; custom agents must install `frida-objc-bridge`
+/ `frida-swift-bridge` (npm or `frida-pm install`). Use objection ≥1.12.0 for Frida 17 support
+([bridges docs](https://frida.re/docs/bridges/)).
 
 ```bash
 # Setup
@@ -244,9 +261,9 @@ mitmproxy --listen-port 8080
 
 ## Anti-patterns
 
-- **Don't assume App Store = FairPlay-encrypted requires jailbreak** — TestFlight and enterprise/ad-hoc
-  builds are frequently NOT encrypted and need no decryption step at all. Always check distribution
-  channel before reaching for `frida-ios-dump`.
+- **Check the distribution channel before decrypting** — enterprise/ad-hoc builds are not FairPlay-encrypted
+  and need no decryption step; App Store and TestFlight builds are encrypted. Confirm with
+  `otool -l <AppBinary> | grep cryptid` (1 = encrypted) before reaching for `frida-ios-dump`.
 - **Don't skip Swift binaries because class-dump shows nothing** — `strings` and `nm` still work; a
   proper Swift-aware disassembler (Hopper, Ghidra with Swift demangling) recovers the rest.
 - **Don't stop at "pinning is present" as a finding** — pinning is a mitigation, not a vulnerability;
@@ -263,7 +280,7 @@ mitmproxy --listen-port 8080
 ```bash
 brew install libimobiledevice ideviceinstaller class-dump
 pip install --break-system-packages frida-tools objection iphone_backup_decrypt
-# Jailbroken test device (checkra1n/palera1n) or a Corellium virtual iOS device for runtime work
+# Jailbroken test device (see Stage 6 for current availability) or a Corellium virtual iOS device
 # frida-server installed on-device via the Frida Cydia/Sileo repo
 ```
 

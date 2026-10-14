@@ -5,7 +5,7 @@ sources: hackerone_public, cve_database, owasp, public_research
 report_count: 5
 ---
 
-## 9. FILE UPLOAD
+## FILE UPLOAD
 
 ### Content-Type Bypass
 ```
@@ -75,6 +75,13 @@ EOF
 # Use: https://github.com/mistymntncop/CVE-2023-4863 PoC
 ```
 
+### Image-pipeline CVEs: fingerprint and version-gate first
+Detection here is identifying the processor and its version (error strings, metadata the pipeline adds or strips, `Producer: GPL Ghostscript x.y` in generated PDFs, leaked `Dockerfile`/SBOM), then matching it to a fixed range. Crafted DjVu, PostScript or format-string files are **Stage B**: they execute code on the processing worker.
+- **ExifTool CVE-2021-22204 (canonical image-metadata RCE check).** DjVu annotation `eval` in ExifTool 7.44 to 12.23, fixed 12.24 (2021-04-13). Any upload path that runs ExifTool (metadata stripping, EXIF readers) on an attacker file is in scope regardless of extension, since ExifTool picks the parser from content. GitLab CVE-2021-22205 is the real case: unauthenticated RCE through image upload (GitLab 11.9 to 13.10.2; fixed 13.8.8 / 13.9.6 / 13.10.3). Both CVEs are in CISA KEV (22205 added 2021-11-03, 22204 added 2021-11-17).
+- **ImageMagick policy.xml gaps (PWNAI Research, 2026-03-30, no CVE):** <https://pwn.ai/blog/imagemagick-from-arbitrary-file-read-to-rce-in-every-policy-zeroday>. File read through the `text:` coder referenced from an SVG `<image>` (the file can be named `.jpg`); the "limited" policy blocks PS but not PDF, so PostScript renamed `.pdf` still reaches Ghostscript; EPT is detected by magic bytes regardless of extension (fixed 6.9.13-34); EPSI/EPI/EPSF are missing from Ubuntu's blocklist; a compiled-in gslib ignores the delegate policy. The post says the PDF and gslib gaps are unfixed in all versions, so a hardened `policy.xml` is not a negative. Read `policy.xml` (`convert -list policy` output, leaked config) before claiming the delegate is blocked.
+- **ImageMagick CVE-2025-55298 (GHSA-9ccg-6pjw-x645):** format string in `InterpretImageFilename`; a `%` specifier in a filename that reaches ImageMagick gives memory read/write. Fixed 7.1.2-2 / 6.9.13-28 (Magick.NET 14.8.1); workaround `-define filename:literal=true`. Check whether the uploaded filename is passed through to the ImageMagick command line.
+- **Ghostscript delegate CVEs (2023-2024)** behind ImageMagick/PDF thumbnailers: CVE-2023-28879 (BCP buffer overflow, fixed 10.01.1), CVE-2023-36664 (`%pipe%` permission validation, fixed 10.01.2), CVE-2024-29510 (uniprint format string, `-dSAFER` bypass, fixed 10.03.1; Codean Labs), CVE-2024-33871 (opvp driver loads an arbitrary library, fixed 10.03.1). None is in CISA KEV; version-gate and report.
+
 ### FFmpeg SSRF via HLS Playlist
 ```bash
 # FFmpeg processes m3u8 playlists and fetches referenced segments
@@ -129,9 +136,10 @@ curl -s -X POST "https://$TARGET/api/generate-pdf" \
 ## Archive Extraction Attacks (Zip Slip / Symlink)
 
 ```bash
-# Zip Slip — path traversal via archive filenames
-pip3 install evilarc
-python3 evilarc.py shell.php -o unix -p "../../../var/www/html/" -d 5 -f /tmp/zipslip.zip
+# Zip Slip — path traversal via archive filenames. evilarc is a single Python 2 script, not a PyPI package.
+# Archive a unique canary file, not a shell: fetching it back proves the write.
+git clone https://github.com/ptoomey3/evilarc
+python2 evilarc/evilarc.py canary_<rand>.txt -o unix -p "../../../var/www/html/" -d 5 -f /tmp/zipslip.zip
 
 # Symlink attack — archive contains symlink to sensitive file
 mkdir -p /tmp/sym_attack

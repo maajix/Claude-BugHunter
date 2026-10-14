@@ -1,6 +1,6 @@
 ---
 name: hunt-business-logic
-description: Hunting skill for business logic vulnerabilities. Built from 12 public bug bounty reports. Covers coupon-race-stacking (Instacart, Stripe, Reverb), negative-quantity-in-cart price tampering (Upserve, Eternal/Zomato), decimal/fraction price-field overflow (Shipt), client-side checkout amount trust on PayPal redirect (WordPress.org), price-per-unit mass-assignment (Krisp), and archived-price swap / cart-TOCTOU (Stripe). Use when hunting business logic — heavy emphasis on financial-impact-demonstrated cases.
+description: Hunting skill for business logic vulnerabilities. Built from 25 public bug bounty reports. Covers coupon-race-stacking (Instacart, Stripe, Reverb), negative-quantity-in-cart price tampering (Upserve, Eternal/Zomato), decimal/fraction price-field overflow (Shipt), client-side checkout amount trust on PayPal redirect (WordPress.org), price-per-unit mass-assignment (Krisp), and archived-price swap / cart-TOCTOU (Stripe). Use when hunting business logic — heavy emphasis on financial-impact-demonstrated cases.
 sources: hackerone_public, github
 report_count: 25
 ---
@@ -230,6 +230,7 @@ The following real, verified bug-bounty / coordinated-disclosure cases extend th
 ## Related Skills & Chains
 
 - **`hunt-race-condition`** — Every uniqueness/quota check in a logic flow is a race candidate. Chain primitive: Business logic (coupon/credit/promotion) + race condition → coupon redeemed N times in a single TCP packet via Turbo Intruder.
+- **`hunt-payment-api`** — Idempotency-key reuse. Stripe API v1 saves the first response per `Idempotency-Key`, prunes keys after at least 24 hours, and errors when the same key arrives with different parameters ([Stripe docs](https://docs.stripe.com/api/idempotent_requests)). Replay a charge/refund call with the same key and a changed amount in sandbox: a second charge, or the first result silently returned for the new amount, is the finding. Contract and sandbox-only rules → `hunt-payment-api` §8.
 - **`hunt-idor`** — Logic flows that trust a client-supplied identifier (order_id, tenant_id, beneficiary_id) overlap directly with IDOR. Chain primitive: business-logic step-skip + IDOR on beneficiary_id → transfer funds from victim account.
 - **`hunt-api-misconfig`** — Step-skip and verification-bypass often live next to mass-assignment fields. Chain primitive: business-logic email-verify skip + API mass assignment (`verified:true, role:admin`) → ATO without email control.
 - **`hunt-ato`** — Logic bugs in password reset, email change, and recovery flows are core ATO paths. Chain primitive: business logic (email change accepts without re-auth) + `hunt-ato` Path 2 → silent victim email swap → password reset to attacker mailbox.

@@ -135,6 +135,14 @@ A bypass is real only if the server reflects **your registerable origin** into
 `ACAO` with `ACAC: true`. `evil.target.example` reflecting back is NOT a bug unless
 you can actually control a `*.target.example` host (then see Phase 6 / hunt-subdomain).
 
+The six origins above are the minimum. For the full set of parser-confusion origins
+(special characters, encodings, Unicode forms) generate candidates for the trusted
+domain with PortSwigger's **URL validation bypass cheat sheet**, which ships wordlists
+for CORS as well as SSRF and redirects:
+https://portswigger.net/web-security/ssrf/url-validation-bypass-cheat-sheet . Run
+them through the same loop, then keep only reflections of origins a browser will
+actually send and that you could register.
+
 ### Phase 3b — Trusted insecure (HTTP) origin
 If ACAO reflects/allows any `http://` origin (even a correctly-anchored in-scope one) with ACAC:true, a network attacker on that cleartext host injects a page that reads the authed cross-origin body — no regex flaw needed, the plaintext scheme IS the flaw.
 ```bash

@@ -330,7 +330,7 @@ curl -s "https://api.osv.dev/v1/query" -d '{"package": {"name": "lodash", "ecosy
 ```bash
 # .npmrc patterns
 grep -r "registry=" .                                            # in cloned repos
-grep -r "_authToken=" .                                          # leaked npm token!
+grep -r "_authToken=" .                                          # leaked npm token! (see expiry note below)
 grep -r "@.*registry=" .                                          # scoped registry
 
 # pip config
@@ -343,6 +343,8 @@ grep -r "url.*\(.*nexus" .
 
 # Each leaked internal URL is intel — flag the URL itself even if not directly exploitable
 ```
+
+**npmjs.org token shelf life:** npm permanently revoked **all classic tokens on 2025-12-09**. Granular write tokens are capped at **90 days**, and `npm login` now issues 2-hour session tokens. A `_authToken` for `registry.npmjs.org` committed before then, or more than 90 days ago, is almost certainly dead. Prove it is live with a read-only `npm whoami --registry=https://registry.npmjs.org/` before calling it Critical, and record the scope it can publish to ([GitHub changelog](https://github.blog/changelog/2025-12-09-npm-classic-tokens-revoked-session-based-auth-and-cli-token-management-now-available/)). The rule does not apply to tokens for private registries (Artifactory, Nexus, GitHub Packages); validate those on their own terms.
 
 ---
 
@@ -358,7 +360,12 @@ curl -s "https://pypi.org/simple/" | grep "$ORG" | head -20
 # Check if scope is taken — if it's NOT, an attacker could register
 # (relevant for any internal package using that scope)
 curl -sI "https://registry.npmjs.org/-/org/$ORG"
+
+# Publish posture of the org's own packages: provenance present on the latest version?
+curl -s "https://registry.npmjs.org/$PKG/latest" | jq '.dist.attestations'   # null = no provenance
 ```
+
+- **PyPI Trusted Publishing / attestations:** PyPI projects can publish through OIDC Trusted Publishers (GitHub Actions, GitLab CI/CD, Google Cloud, ActiveState) instead of long-lived API tokens. `pypa/gh-action-pypi-publish` now uploads PEP 740 attestations by default for Trusted Publishing projects. Fetch them with `GET https://pypi.org/integrity/<project>/<version>/<filename>/provenance` ([docs](https://docs.pypi.org/attestations/)). A target package with no attestation, or one whose attesting workflow is not the org's repo, is a publish-path hygiene finding. Attestations prove which workflow built the file, not that the workflow was benign; see Mini Shai-Hulud below.
 
 ---
 
@@ -405,7 +412,7 @@ Reference: polyfill.io was compromised in 2024 to serve malicious payloads. Pres
 | Finding | Severity |
 |---|---|
 | Internal package name + no scope-mapping + unclaimed on public npm + actively in builds | **Critical** — Dep-confusion RCE |
-| Internal package name + scope-mapping in `.npmrc` but `_authToken` leaked | **Critical** — direct registry push |
+| Internal package name + scope-mapping in `.npmrc` but `_authToken` leaked | **Critical** — direct registry push, only if the token is live with publish scope (npmjs.org classic tokens all revoked 2025-12-09; write tokens ≤90 days). Dead token = **Low** hygiene |
 | Pull_request_target workflow + secrets exposed + PR-controlled code execution | **Critical** — Org-wide token theft |
 | Docker image with leaked secret in layer | **High** (varies by secret) |
 | Internal registry URL disclosed (but no creds) | **Low** — Info-disc only |
@@ -527,7 +534,7 @@ Twelve well-documented public cases, mapped to the recon surface above. Each ent
   - CISA alert: https://www.cisa.gov/news-events/alerts/2021/10/22/malware-discovered-popular-npm-package-ua-parser-js
   - Maintainer's incident note: https://github.com/faisalman/ua-parser-js/issues/536
   - Snyk analysis: https://snyk.io/blog/npm-security-malicious-code-found-in-npm-package-ua-parser-js/
-- **Recon takeaway:** Identify your target's top-30 npm/PyPI maintainers by package download count, then check whether their accounts have 2FA enabled (npm exposes this via `npm profile get` on org members, partially public via the registry API). Recon output: "these 4 maintainers control packages with X installs and have no 2FA per public registry data."
+- **Recon takeaway:** Identify your target's top-30 npm/PyPI maintainers by package download count. Their 2FA status is **not** publicly visible (`npm profile get` only shows your own account), and since 2025-12-09 npm defaults new publications to 2FA and caps write tokens at 90 days. Check the public publish posture instead: provenance on recent versions (`.dist.attestations` in the registry document, `npm audit signatures` in a consuming repo), versions published outside the usual CI identity, and recent maintainer additions. Recon output: "these N packages with X installs publish without provenance from personal accounts."
 
 ### 6. event-stream npm package (Nov 2018)
 
@@ -613,6 +620,13 @@ Twelve well-documented public cases, mapped to the recon surface above. Each ent
 - **Recon takeaway:** Hardest case for external recon — social-engineering a maintainer over years leaves few external signals. But: GitHub commit-history analysis (new contributors gaining commit access on critical libs, commits adding obfuscated test fixtures, build-only-on-release changes) is what Andres Freund effectively did. The skill's Step 2 (enumerate public repos) can be extended to "watch for high-trust grants to low-history accounts."
 
 ---
+
+### Addendum — 2025-2026 npm worm wave (not counted in the twelve above)
+
+- **s1ngularity / Nx (2025-08-26):** an npm token for the Nx repo was used to publish malicious `nx` versions with a `telemetry.js` postinstall. It harvested wallets, `.env`, SSH, GitHub and npm tokens, drove locally installed AI CLIs (Claude Code, Gemini CLI, Amazon Q) with permission-skipping flags to hunt for secrets, and committed the loot to a public `s1ngularity-repository` in the victim's own GitHub account. Unit 42 notes it also exposed private repositories.
+- **Shai-Hulud (Sep 2025, from ~09-15):** the first self-replicating npm worm. With a stolen npm token it publishes trojanized versions of every other package that maintainer owns, harvests `.npmrc`, GitHub PATs and AWS/GCP/Azure keys, and dumps them to a public `Shai-Hulud` repo under the victim account. "Shai-Hulud 2.0" (early Nov 2025) added self-hosted-runner persistence via a `discussion.yaml` workflow ([Unit 42](https://unit42.paloaltonetworks.com/npm-supply-chain-attack/)).
+- **Mini Shai-Hulud (late Apr - May 2026, peak 2026-05-11):** TeamPCP campaign across npm **and PyPI** (TanStack, Mistral AI, OpenSearch, SAP-ecosystem packages). It used `pull_request_target` workflows and CI OIDC tokens to mint publish credentials, so the malicious versions shipped with **valid SLSA provenance**. Start dates differ between sources (CSA: March 2026), so cite the vendor write-up you use ([Expel](https://expel.com/blog/mini-shai-hulud-cross-ecosystem-supply-chain-worm/)). TanStack's cache-poisoning entry point is in `hunt-cicd`.
+- **Recon takeaway:** after a wave, search the target org's GitHub users for public repos named `Shai-Hulud`, `s1ngularity-repository*` or described "Sha1-Hulud: The Second Coming". Each one is a public dump of that developer's secrets and a confirmed-compromise finding. Report the repo's existence; do not use the credentials inside.
 
 ### Coverage map: cases → recon skill steps
 

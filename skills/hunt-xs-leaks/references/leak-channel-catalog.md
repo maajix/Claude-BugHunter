@@ -344,6 +344,48 @@ you own. Stage B (gated): run the timing oracle against the target.
 | XSinator results matrix | The paper and matrix are 2021 data. Useful as a technique index, useless as a current-status source. Never paste its cells into a report. |
 | Style-reload error leak, request-merging error leak, WebSocket connection-limit leak, Payment Request API leak | Browser-bug-shaped channels from the 2021 XSinator set. Not re-verified this session — **unverified**, and programs that exclude browser-implementation issues will refuse them. |
 
+## 14. PortSwigger Top 10 of 2025 additions
+
+Both entries are from "Top 10 web hacking techniques of 2025"
+(https://portswigger.net/research/top-10-web-hacking-techniques-of-2025, published
+2026-02-05). Status lines below were read on 2026-10-13; treat anything not stated
+in the primary source as **unverified**.
+
+### 14a. Cross-Site ETag Length Leak (entry 6)
+
+- **Source:** Takeshi Kaneko (arkark), 2025-12-26 —
+  https://blog.arkark.dev/2025/12/26/etag-length-leak . Found as an unintended CTF
+  solution.
+- **Oracle:** an ETag format that encodes the response size (the write-up's example
+  is `jshttp/etag`, which embeds the size in hex) grows by one character when the size
+  crosses a boundary. The browser echoes the ETag back in `If-None-Match` on a repeat
+  navigation; with request headers already close to the server's limit, that one byte
+  turns the response into a `431`. In Chromium the failed repeat navigation replaces the
+  history entry instead of adding one, so the difference shows up in `history.length`
+  (channel 4).
+- **Preconditions:** Chromium; a variable-length ETag on the state-dependent response; a
+  way to put the two states on opposite sides of a size boundary; request headers near
+  the server's limit. Other engines: **unverified**.
+- **Killed by:** a fixed-length or opaque ETag, or no ETag on state-dependent
+  responses. COOP removes the window reference the `history.length` read needs (derived
+  from channel 4, not stated in the write-up).
+- **Gate:** moving the response size needs writes to the account and inflating request
+  headers. Same rules as channel 9: your own test accounts and browser profile only,
+  Stage B with written sign-off, clean up the written data and headers afterwards.
+
+### 14b. XSS-Leak: Leaking Cross-Origin Redirects (entry 8)
+
+- **Source:** Salvatore Abello — https://blog.babelo.xyz/posts/cross-site-subdomain-leak/
+  (the post returned HTTP 403 when this entry was written, so the mechanism below is the
+  Top 10 summary only). Not an XSS technique despite the name.
+- **Oracle:** uses Chrome's connection-pool prioritisation algorithm as an oracle to leak
+  the hostname a cross-origin redirect points to.
+- **Status:** Chrome per the summary; exact versions and other engines **unverified**.
+  The summary notes the result stays useful even if Chrome changes the algorithm, which
+  also means it may already have.
+- **Gate:** a connection-pool technique, so channel 7's cost table and Stage B sign-off
+  apply unchanged.
+
 ---
 
 ## Decision table — pick the channel from the observed defence set

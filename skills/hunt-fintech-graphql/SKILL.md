@@ -69,7 +69,10 @@ below assumes you already have (or have partially enumerated) a schema with mone
 
 3. **Test idempotency-key handling.** Send the identical mutation (same `idempotencyKey` /
    `clientMutationId`) twice, back-to-back and with a delay. A ledger write on the second call
-   means idempotency isn't enforced server-side — replay = double-execute.
+   means idempotency isn't enforced server-side — replay = double-execute. Then run the full
+   contract from `hunt-payment-api` Step 8 against the mutation: same key with a different
+   amount (correct behaviour is an error, not the first result replayed), key omitted, key
+   reused across two tenants, and predictable keys. Each deviation is its own finding.
 
 4. **Test decimal/precision edge cases** on every amount-accepting argument — see Payload section.
    Confirm server-side rounding matches client-displayed rounding; a mismatch is directly

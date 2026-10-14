@@ -65,6 +65,7 @@ Smuggling pays where a request crosses a trust boundary that rewrites it. Priori
 - **Caching layers.** One smuggled response becomes every subsequent visitor's response for the TTL. This is the single highest-impact chain — see `hunt-cache-poison`.
 - **Shared wildcard-certificate estates behind one reverse proxy.** First-request routing plus browser connection coalescing is connection contamination: a weak subdomain reaches a strong one's back-end.
 - **Single-server HTTP/1.1 sites with no proxy at all.** Client-side desync needs no proxy chain, only an endpoint that ignores `Content-Length`.
+- **HTTP/2 forward proxies that honour `CONNECT`.** A `:method CONNECT` stream per `:authority host:port` turns one multiplexed connection into an internal port scanner (200 = open, 503 / error body / `RST_STREAM` = closed); shown against Envoy and Apache httpd in "Playing with HTTP/2 CONNECT" (fl0mb, Sep 2025, https://blog.flomb.net/posts/http2connect/, PortSwigger Top 10 of 2025 entry 9). One probe to one in-scope internal port is the proof; a sweep is a scan and needs scope sign-off. Chain through `hunt-ssrf`.
 
 ---
 
@@ -108,8 +109,8 @@ The classic CL.TE / TE.CL payloads are NOT universally exploitable in 2026. Mode
 | **Caddy 2.x** | NO | NO | — | — | Hardened by default |
 | **Envoy ≥ 1.20** | NO | NO | partial | partial | Hardened in most paths |
 | **HAProxy ≤ 2.4** | ✓ | ✓ | — | — | **Vulnerable**, see CVE-2021-40346 |
-| **AWS ALB + specific upstream** | partial | partial | ✓ | ✓ | Several disclosed-paid reports 2022-2024 |
-| **Cloudflare → S3 / Lambda chains** | — | — | ✓ | ✓ | H2-downgrade attacks remain viable |
+| **AWS ALB + specific upstream** | partial | partial | ✓ | ✓ | Several disclosed-paid reports 2022-2024. AWS left the 2025 ALB+IIS desync unpatched for compatibility; the remediation to cite is `routing.http.drop_invalid_header_fields.enabled = true` plus `routing.http.desync_mitigation_mode = strictest` (Kettle, "HTTP/1.1 must die", Aug 2025) |
+| **Cloudflare (internal HTTP/1 hop)** | — | — | — | — | The 2025 H2.0 desync internal to Cloudflare's infrastructure (Pingora, per the linked Cloudflare post-mortem) was patched within hours ($7,000 bounty, post-mortem published; same paper). No open vector known — test the origin behind it, not the edge |
 | **Older F5 BIG-IP (TMM < 16)** | ✓ | — | — | — | Vendor advisories |
 | **Citrix ADC / NetScaler (older firmware)** | ✓ | ✓ | — | — | Disclosed in 2020-2022 |
 | **Squid 3.x** | ✓ | — | — | — | Older deployments |
@@ -167,7 +168,9 @@ Write it in the notes as **"hypothesis: suspected CL.TE on <hop>, 1/3 repetition
 ```bash
 # 1. Which protocol does the edge speak, and is there a hidden h2 listener?
 curl -sI --http2 https://target.example/ -o /dev/null -w '%{http_version}\n'
-curl -s --http2 --http2-prior-knowledge https://target.example/ -o /dev/null -w '%{http_version}\n'
+#    Hidden h2 (edge speaks h2 but does not offer it in ALPN): HTTP Request Smuggler's
+#    "HTTP/2-hidden probe" forces h2 and compares. curl's --http2-prior-knowledge only
+#    applies to cleartext h2c ports — see hunt-tls-network.
 #    h2 to the client + a Server header naming a non-upstream-h2 front-end
 #    (nginx, Akamai, CloudFront, Fastly) = a guaranteed HTTP/1.1 downgrade hop.
 
@@ -321,6 +324,7 @@ The CRLF and bare-LF discrepancies, HTTP/2 request splitting, the pseudo-header 
 | File | Coverage | Trigger phrases |
 |---|---|---|
 | references/h2-exclusive-vectors.md | Bare-LF and CRLF header discrepancies; H2.X request splitting; `:method` / `:scheme` / `:path` / `:authority` and header-name injection; response splitting and header injection (CWE-113) with a Stage A canary probe | h2 downgrade, pseudo-header injection, request splitting, CRLF injection, response splitting, header injection |
+| references/chunked-and-crlf-desync.md | Funky Chunks TERM.EXT / EXT.TERM / spill classes with the CVE table; CRLF-powered desync via nginx `$uri`, browser delivery, status-code detection probes with stage labels, scanner and nuclei templates, whitebox grep | bare LF chunk, chunk extension, chunk spill, funky chunks, Kestrel smuggling, CVE-2025-55315, CRLF desync, nginx $uri, proxy_pass |
 
 ### Chunk extensions and the trailer section
 
@@ -339,6 +343,15 @@ X-Forwarded-For: 127.0.0.1
 
 ```
 RFC 9112 §7.1.1 requires a recipient to **ignore unrecognized chunk extensions**, so a hop that chokes on `;name=value` instead of ignoring it is a parser differential you can measure. RFC 9112 §7.1.2 requires that a recipient **MUST NOT merge a received trailer field into the header section** unless that field's definition allows it. A server that merges anyway accepts, via the trailer, headers the front-end already stripped from the header section. Apache Traffic Server forwarded malformed chunked trailer sections to origins in 8.0.0-8.1.10 and 9.0.0-9.2.4 ([CVE-2024-35161](https://security.apache.org/projects/trafficserver/CVE-2024-35161.cve.json), CWE-444, fixed in 8.1.11 / 9.2.5, mitigable with `proxy.config.http.drop_chunked_trailers`).
+
+### Chunk-line terminators, spills and CRLF-powered desync — see references/
+
+Two newer families survive front-ends that already reject `CL`+`TE`, because neither needs a duplicate length header:
+
+- **Funky Chunks** (Jeppe Bonde Weikop, Jun 2025): hops disagree on a bare LF / bare CR inside a chunk-size line or chunk extension, or on chunk data longer than its declared size. CVE-2025-22871 (Go `net/http`), CVE-2025-4600 (Google Cloud Classic ALB), CVE-2025-43859 (h11), and later in the same family CVE-2025-55315 (ASP.NET Core Kestrel) and CVE-2025-66373 (Akamai Ghost).
+- **CRLF-powered desync** (PortSwigger, 5 Aug 2026): nginx `proxy_pass http://backend$uri;` decodes `%0d%0a` from the path into the upstream request. The trigger is a plain URL, so it is browser-deliverable.
+
+Probe shapes, stage labels, the CVE table and tooling (`t0xodile/crlf-powered-desync-scanner`, `turtlesec-software/crlf-desyncs` nuclei templates) are in `references/chunked-and-crlf-desync.md`.
 
 ### Expect-based desync
 

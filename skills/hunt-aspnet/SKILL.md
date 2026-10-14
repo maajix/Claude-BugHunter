@@ -15,7 +15,7 @@ ASP.NET deserialization bugs pay among the highest amounts in bug bounty when th
 - **Telerik UI for ASP.NET AJAX** — `Telerik.Web.UI.WebResource.axd` is a documented RCE sink when keys leak (CVE-2017-11317, CVE-2017-11357, CVE-2019-18935)
 - **Classic ASP.NET Webforms enterprise apps** — banking portals, dealer portals, HR systems left on .NET Framework 4.x
 - **WCF services** (`*.svc?WSDL`) — often forgotten admin endpoints with looser auth than the main app
-- **Sitecore CMS** — ViewState + Sitecore-specific deserialization chains (CVE-2021-42237)
+- **Sitecore CMS** — ViewState + Sitecore-specific deserialization chains (CVE-2021-42237). CVE-2025-53690 (Sep 2025, CVSS 9.0, CISA KEV 2025-09-04): XM/XP through 9.0 deployed with the *sample* machineKey from Sitecore's 2017-and-earlier deployment guides, exploited in the wild via ViewState POST to `/sitecore/blocked.aspx` ([Mandiant](https://cloud.google.com/blog/topics/threat-intelligence/viewstate-deserialization-zero-day-vulnerability)). Any Sitecore ViewState is a key-corpus candidate (Methodology step 3).
 - **DotNetNuke (DNN)** — historic ViewState RCE chains
 - **Umbraco CMS** — ViewState + custom deserialization sinks
 
@@ -84,6 +84,8 @@ Set-Cookie: ASP.NET_SessionId=...; SameSite=None  (suggests cross-origin embeddi
 2. **Locate every form with `__VIEWSTATE`.** Spider the target and grep for `name="__VIEWSTATE"`. Each is a candidate sink for deserialization attacks if MAC / encryption is bypassable.
 
 3. **Check `__VIEWSTATEENCRYPTED` value.** Empty (`value=""`) means ViewState is signed-only via `<machineKey>` but NOT encrypted. Recovery of the validation key → arbitrary deserialization. Non-empty (`value="something"`) means ViewState is BOTH signed and encrypted; both keys needed to forge.
+
+   **Key recovery: try public corpora first.** In Feb 2025 Microsoft reported over 3,000 publicly disclosed machineKeys (docs, code repos, vendor samples) being used for ViewState code injection ([Microsoft](https://www.microsoft.com/en-us/security/blog/2025/02/06/code-injection-attacks-using-publicly-disclosed-asp-net-machine-keys/)). Before anything else, check the captured `__VIEWSTATE` + `__VIEWSTATEGENERATOR` (and any key you find in a leak) against known-key corpora with [badsecrets](https://github.com/blacklanternsecurity/badsecrets) (`ASPNET_Viewstate` module; `badsecrets --url https://target.example/page.aspx` carves it from the page). A match is offline proof of a known key with no gadget sent. Vendor sample keys count (Sitecore CVE-2025-53690).
 
 4. **Test the ViewState parser-error differential** (the dual-parser anti-pattern). Send 7+ ViewState shapes and classify responses:
    - Trivial garbage (`AAAA`) → `"Validation of viewstate MAC failed"`
@@ -226,7 +228,7 @@ curl -sk "https://target.example/Telerik.Web.UI.WebResource.axd?type=rau" -X POS
 | `EnableViewStateMac="true"` enforced | Recover `validationKey` from web.config disclosure or `<machineKey>` AutoGenerate fingerprinting (ysoserial.net `--minify --islegacy` mode generates ViewState that passes some MAC-validation gaps) |
 | `trace.axd` localhost-only | Set `X-Forwarded-For: 127.0.0.1` if the trace mode is `localOnly` and the validation uses Request.UserHostAddress (some apps use Forwarded-For instead) |
 | WCF `.svc` 401 on anonymous | Try `?wsdl` and `?mex` first; metadata is sometimes anonymously enumerable even when service ops require auth |
-| Telerik upload patched | Check the Telerik version: anything pre-2017Q1 (build 2017.1.118 or earlier) is the original RAU RCE. Check 2017Q3 - 2019Q3 for CVE-2019-18935 |
+| Telerik upload patched | Check the Telerik version: anything pre-2017Q1 (build 2017.1.118 or earlier) is the original RAU RCE. Check 2017Q3 - 2019Q3 for CVE-2019-18935. CVE-2025-3600 (CVSS 7.5, unsafe reflection in `WebResource.axd?type=iec` / ImageEditorCacheHandler) spans 2011.2.712 to 2025.1.218, fixed 2025.1.416: DoS by default, RCE only if the app loads a usable gadget type ([watchTowr](https://labs.watchtowr.com/more-than-dos-progress-telerik-ui-for-asp-net-ajax-unsafe-reflection-cve-2025-3600/)). Report on the version gate; never send the crash gadget to production |
 | `SafeControl` whitelist enforced | Inheritance gate (`instanceof PickerDialog`) IS the gate on patched SP — bypass requires finding a SafeControl subclass with a deserialization sink; enumerate via Picker.aspx |
 | `customErrors mode="On"` (no stack traces) | Force a different error path: invalid Content-Length, malformed ViewState that triggers a parser-level exception below the customErrors handler |
 

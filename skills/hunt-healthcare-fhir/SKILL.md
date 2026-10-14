@@ -197,7 +197,11 @@ scopes — see `smart-scopes.md`.
 10. **Enumerate the bulk surface read-only.** The CapabilityStatement and
     `scopes_supported` tell you whether bulk operations and system-tier scopes
     exist without kicking anything off. A kick-off is Stage B.
-    `bulk-and-subscription.md` §1.
+    `bulk-and-subscription.md` §1. The `system/` tokens behind bulk come from
+    SMART Backend Services (asymmetric JWT client authentication, no user), which
+    moved from the Bulk Data IG into the SMART App Launch IG at v2.0.0; read it in
+    the current SMART App Launch 2.2.0 (STU 2.2), not in older Bulk Data copies
+    (<https://hl7.org/fhir/smart-app-launch/backend-services.html>).
 
 11. **Inventory the Subscription surface read-only.** Whether `Subscription`
     advertises `create`, and whether existing ones are readable — their

@@ -1078,7 +1078,9 @@ PimEyes, Exposing.ai, Azure Face API (compliance).
 
 ### 21.3 Social Graph & Content Analysis
 
-Maltego, snscrape, SocialBlade. Bluesky / Mastodon: instance explorers + handle resolvers.
+Maltego, SocialBlade. Bluesky / Mastodon: instance explorers + handle resolvers.
+
+X/Twitter: snscrape (Twitter module blocked by X's login wall since Jun 2023, [issue #996](https://github.com/JustAnotherArchivist/snscrape/issues/996)) and Twint (archived Mar 2023) no longer work. Use the official [X API](https://docs.x.com/x-api/getting-started/pricing) (paid, pay-per-use credits) or a commercial / maintained scraper; self-hosted ones such as [twscrape](https://github.com/vladkens/twscrape) need logged-in X accounts, so run them on sock-puppets only (§6.1) and accept the ToS risk.
 
 ---
 
@@ -1168,6 +1170,7 @@ Running a large dork corpus across multiple engines:
 - **Result classification** — URL-signature → title-hint → snippet-regex pipeline. Output: `(severity, category, confidence)`.
 - **Dedup by URL** — different engines surface duplicates.
 - **Confidence rule** — snippet-only = TENTATIVE.
+- **Google paging** — Google stopped honoring `&num=100` in Sep 2025 ([SER](https://www.seroundtable.com/google-search-drops-100-results-parameter-40097.html)); results come 10 per page, so sweeps must page with `&start=10`, `&start=20`, … — 10× the requests and ban exposure per dork; budget the token bucket for it. `&tbs=li:1` forces Verbatim mode (undocumented, 2011-era parameter; verify it still applies before relying on it).
 - **Persistence** — corpus DB so re-runs across engagements deduplicate.
 
 ### 24.4 Evidence Preservation for Offensive Engagements

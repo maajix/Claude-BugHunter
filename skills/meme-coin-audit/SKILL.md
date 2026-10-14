@@ -1,6 +1,6 @@
 ---
 name: meme-coin-audit
-description: Meme coin and token security audit — rug pull detection (honeypot, hidden mint, fee manipulation, LP lock bypass), Solana SPL token analysis (freeze authority, mint authority, metadata mutability), Token-2022 extension risks (transfer hooks, permanent delegate), DEX liquidity pool attacks (sandwich amplification, LP drain, bonding curve exploits), pump.fun/Raydium/Jupiter integration risks, and real exploit examples from 2024-2025. Use for any token audit, rug pull assessment, meme coin security review, or pre-investment due diligence.
+description: Meme coin and token security audit — rug pull detection (honeypot, hidden mint, fee manipulation, LP lock bypass), Solana SPL token analysis (freeze authority, mint authority, metadata mutability), Token-2022 extension risks (transfer hooks, permanent delegate), DEX liquidity pool attacks (sandwich amplification, LP drain, bonding curve exploits), pump.fun/PumpSwap/Raydium/Jupiter integration risks, and real exploit examples from 2024-2025. Use for any token audit, rug pull assessment, meme coin security review, or pre-investment due diligence.
 sources: public_research
 ---
 
@@ -254,7 +254,8 @@ When you don't have source code, check on-chain:
    - Should be null
    - If Some(pubkey) → CRITICAL: honeypot
 
-3. LP STATUS → Check Raydium/Orca pool
+3. LP STATUS → Check the graduation pool: PumpSwap (pump.fun's AMM; graduated
+   tokens migrate there instead of Raydium since 2025-03-20), Raydium, Orca
    - LP burned? (tokens sent to 1111...1111)
    - LP locked? (in verified locker with no backdoor)
    - LP held by deployer? → CRITICAL: instant rug
@@ -303,7 +304,9 @@ spl-token display <MINT_ADDRESS> --program-id TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBq
 
 If TransferHook authority is non-null → the holder of that key can revoke transfer rights mid-trade. If PermanentDelegate is non-null → that delegate can move any holder's tokens at any time (effectively a built-in confiscation). Either alone is rug-class.
 
-pump.fun bonding curves can be manipulated via the curve's K-parameter; mint authority retained beyond bonding-curve completion is the classic exit-scam shape. Check `mintAuthority` AFTER the curve completes — legitimate launches null it, scams retain it for the post-graduation dump.
+Mint extensions are fixed when the mint is initialized — none can be added later — so the `spl-token display` output is a complete screen to run **before** buying. What can still change is each extension's configuration under its authority: the transfer-hook authority can repoint the hook program, the transfer-fee authority can set a new fee. A clean hook program today is not a clean hook tomorrow while that authority is live. PermanentDelegate can burn or transfer any amount from any holder and holders cannot revoke it ([Solana docs](https://solana.com/docs/tokens/extensions/permanent-delegate)); launch factories that set it to burn buyers' tokens right after purchase are a reported pattern (verify).
+
+The May 2024 pump.fun incident (~$1.9M) was not curve math: a former employee abused privileged withdraw authority and used flash loans to drain bonding-curve accounts ([The Block](https://www.theblock.co/post/295029)) — launcher-key risk, not curve manipulation. Mint authority retained beyond bonding-curve completion is the classic exit-scam shape. Check `mintAuthority` AFTER the curve completes — legitimate launches null it, scams retain it for the post-graduation dump.
 
 ### Honeypot detection — beyond the obvious
 

@@ -1,6 +1,6 @@
 ---
 name: hunt-captcha-bypass
-description: "Hunt CAPTCHA Bypass — 6 distinct patterns: (1) CAPTCHA field simply omitted from the request (server-side validation absent), (2) CAPTCHA token replayed from a solved challenge (no single-use enforcement), (3) CAPTCHA response accepted on a different endpoint than it was solved on (no binding to action/session), (4) static or predictable CAPTCHA values accepted (e.g. '0', 'null', empty string), (5) audio/accessibility CAPTCHA trivially solvable programmatically, (6) CAPTCHA only enforced after N failures (first N requests bypass it). Detection: intercept a successful form submission, remove the CAPTCHA field entirely, replay — if it still succeeds, server-side validation is absent. Medium severity standalone; High when it removes the only rate-limit gate protecting a login, registration, or payment endpoint."
+description: "Hunt CAPTCHA Bypass — 6 distinct patterns: (1) CAPTCHA field simply omitted from the request (server-side validation absent), (2) CAPTCHA token replayed from a solved challenge (no single-use enforcement), (3) CAPTCHA response accepted on a different endpoint than it was solved on (no binding to action/session), (4) static or predictable CAPTCHA values accepted (e.g. '0', 'null', empty string), (5) audio/accessibility CAPTCHA trivially solvable programmatically, (6) CAPTCHA only enforced after N failures (first N requests bypass it). Also provider checks: Cloudflare Turnstile single-use / expiry and reCAPTCHA v3 score handling. Detection: intercept a successful form submission, remove the CAPTCHA field entirely, replay — if it still succeeds, server-side validation is absent. Medium severity standalone; High when it removes the only rate-limit gate protecting a login, registration, or payment endpoint."
 sources: public_research, operator_experience
 report_count: 6
 ---
@@ -31,7 +31,7 @@ Some apps validate field presence but not content.
 **Pattern 4 — Test without CAPTCHA on similar endpoints:**
 Some apps add CAPTCHA to the registration form but forget the password reset, API endpoint, or mobile API path (`/api/register` vs `/register`). Try the same action via the API path without any CAPTCHA field.
 
-**Pattern 5 — Rate/throughput-gated "prove you're automated" challenges:**
+**Pattern 5 — Rate/throughput-gated "prove you're automated" challenges (app-specific, Juice-Shop-style heuristic — not a generic CAPTCHA bug; skip it unless the target defines its challenge this way):**
 Some apps define CAPTCHA "bypass" as simply exceeding the rate a human could plausibly sustain —
 e.g. "N submissions within T seconds" — checked by a middleware that counts REQUESTS REACHING the
 route, not successful outcomes. Garbage/placeholder payloads satisfy this exactly as well as valid
@@ -47,6 +47,8 @@ simultaneously and satisfy the sliding window trivially. Check the endpoint's ow
 required-field validation first (e.g. a `rating` field that can't be null) so the concurrent
 payload is at least well-formed enough to reach the counting middleware, even if other fields
 (like the CAPTCHA answer itself) are wrong or reused.
+
+**Pattern 6 — Provider-specific server checks (Turnstile, reCAPTCHA v3):** see class 6 below — token reuse, expiry, `action`/`hostname` binding, and a score threshold that is only enforced client-side.
 
 **What to skip in automated testing:** Solving real reCAPTCHA/hCaptcha programmatically (OCR, audio bypass) requires external services. Only attempt if patterns 1-4 fail and the test budget allows.
 
@@ -71,11 +73,20 @@ Some apps only show CAPTCHA after 3-5 failed login attempts. Before that thresho
 ### 5. Static or Predictable CAPTCHA
 Math CAPTCHAs (`3 + 4 = ?`), simple image CAPTCHAs, or text CAPTCHAs with a finite answer set can be automated. These are custom CAPTCHA implementations, not Google/hCaptcha.
 
+### 6. Provider Verification Gaps (Cloudflare Turnstile, reCAPTCHA v3)
+**Turnstile** — the widget posts `cf-turnstile-response`; the server must call `https://challenges.cloudflare.com/turnstile/v0/siteverify`. Per [Cloudflare's docs](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/) each token is valid for 300 seconds and can be validated once (`timeout-or-duplicate` otherwise), and the widget alone protects nothing. Tests: replay one solved token on a second request; replay it after 300 s; replay a token solved on another page/site of yours (the server should compare `hostname` and `action`). Any acceptance = the server skips siteverify or ignores its result.
+
+**reCAPTCHA v3** — there is no challenge; siteverify returns a `score` from 0.0 (bot) to 1.0 (human), plus `action` and `hostname`, and tokens expire after two minutes ([Google docs](https://developers.google.com/recaptcha/docs/v3); 0.5 is Google's suggested default threshold). The bypass is in the site's handling, not the score itself: a request from a headless client (low score) is still accepted, the threshold is applied in front-end JS only, `success:true` is treated as a pass regardless of score, or the `action` name is never compared. Prove it by showing a low-score or wrong-action token completing the protected action, ideally with the siteverify response visible (debug output, error message) or inferred by a headless vs real-browser comparison.
+
+**Leaked verification secret** — grep JS bundles and mobile apps for `siteverify` calls or a `secret` parameter next to the CAPTCHA code. A client that verifies its own token means the server-side check is missing (the real finding, test it as Pattern 1). The leaked secret itself is a Low hygiene note: it lets anyone call siteverify on the site's behalf but does not mint tokens.
+
 ---
 
 ## Impact Chain
 
 CAPTCHA bypass alone: **Medium** (enables automation of rate-limited actions)
+
+**Solver economics (impact framing):** commercial solving services list roughly $2–3 per 1,000 reCAPTCHA v2 / hCaptcha solves and about $5–10 per 1,000 for reCAPTCHA v3 / Turnstile ([AIMultiple comparison](https://aimultiple.com/captcha-solving-services), updated Aug 2026; prices move, re-check before quoting). A correctly enforced CAPTCHA therefore already costs an attacker well under a cent per attempt. Severity comes from what the bypass removes on top of that cost (a per-account lockout, an OTP keyspace, a paid resource), so state the attack volume and the gate it opens, not just "CAPTCHA bypassed".
 
 CAPTCHA bypass + login endpoint = **brute force gate removed** → chain with `hunt-brute-force` → High/Critical
 

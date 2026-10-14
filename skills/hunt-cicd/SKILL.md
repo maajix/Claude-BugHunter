@@ -143,12 +143,16 @@ gh api graphql -f query='{organization(login:"ORG"){repositories(first:100){node
   done
 done
 ```
-Triage candidates with the static analyzer before opening any PR: `gh extension install rhysd/actionlint` or run **zizmor** (`pip install zizmor; zizmor .github/workflows/`) which flags template-injection and dangerous-checkout patterns specifically.
+Triage candidates with the static analyzer before opening any PR: **actionlint** (not a `gh` extension: `brew install actionlint`, `go install github.com/rhysd/actionlint/cmd/actionlint@latest`, or a release binary) or run **zizmor** (`pip install zizmor; zizmor .github/workflows/`) which flags template-injection and dangerous-checkout patterns specifically.
 
 ---
 
 ### Actions cache poisoning
 The GitHub Actions cache is not trust-isolated across branches by default: a workflow from an attacker branch/fork PR can write a cache entry (key or restore-key) that a later privileged workflow on the default branch restores, injecting attacker files (built binaries, deps, scripts) into a trusted build -> code execution in the privileged context. Check for cache actions keyed on attacker-influenced values, and whether privileged pipelines `restore-keys` a prefix an untrusted job can populate.
+
+- **Tooling:** Adnan Khan's [Cacheract](https://github.com/AdnaneKhan/Cacheract) (Dec 2024) is cache-native persistence that rides poisoned entries into later runs. Use the write-up for the mechanics; in an engagement, prove the write with a benign marker file under an engagement-specific key, never a live implant.
+- **Real case, TanStack (May 2026):** a fork PR hit a `pull_request_target` job that ran PR code; each push wrote a poisoned pnpm store via the shared `actions/cache` setup, and `release.yml` on `main` restored it under the same key, ending in malicious npm publishes. The job's `permissions:` block did not restrict cache writes ([SafeDep](https://safedep.io/tanstack-github-actions-cache-poisoning/)).
+- **Platform changes:** from 2025-12-08 `pull_request_target` always runs the default branch's workflow with `GITHUB_REF` = default branch ([changelog](https://github.blog/changelog/2025-11-07-actions-pull_request_target-and-environment-branch-protections-changes/)), so its cache writes land in the scope release jobs restore. That changelog says nothing about making the cache read-only. The read-only default came later: the `cache-mode` workflow/job key (`read`, `write`, `write-only`, `none`) with `read` as the default for low-trust events such as `pull_request_target` ([changelog 2026-09-10](https://github.blog/changelog/2026-09-10-control-github-actions-cache-access-with-cache-mode/)). Today the finding is a workflow that sets `cache-mode: write` on an untrusted trigger, or another untrusted trigger that still writes the cache (verify which triggers default to `read`).
 
 ## Phase 3 — Secrets in Logs & Artifacts
 
@@ -166,6 +170,8 @@ gh api "repos/ORG/REPO/actions/artifacts" | jq -r '.artifacts[] | "\(.id) \(.nam
 ```
 Note `actions/upload-artifact` does **not** redact secrets — an artifact named `env`/`debug` is a common direct leak.
 
+**Compromised third-party action (tj-actions/changed-files, CVE-2025-30066, KEV 2025-03-18):** tags v1 to v45.0.7 were repointed to a commit that dumped runner secrets into the workflow log on 2025-03-14/15; the likely entry point was the earlier reviewdog `action-setup@v1` compromise (CVE-2025-30154, KEV 2025-03-24). In a **public** repo those logs are readable by anyone. Grep the org's workflows for `tj-actions/changed-files` or `reviewdog/action-*` and pull run logs from that window with the loop above (only repos whose log retention, 90 days by default, still covers it). Secrets printed there (double-base64 in the log) are a finding only after you prove they are still live and unrotated. The same pattern applies to any future tag-repointing compromise.
+
 ---
 
 ## Phase 4 — GitLab CI
@@ -181,6 +187,8 @@ curl -s "https://$TARGET/api/v4/runners?type=instance_type" -H "PRIVATE-TOKEN: $
 curl -s "https://$TARGET/api/v4/projects/PID/repository/files/.gitlab-ci.yml/raw?ref=main"
 ```
 A registration token alone is **not** a finding unless the instance allows that token to register a runner that will execute a target project's pipeline. Demonstrate by registering an ephemeral runner you own and capturing a job's masked variables.
+
+**GitLab SAML SSO (ruby-saml CVE-2025-25291 / CVE-2025-25292):** REXML/Nokogiri parser differential enables signature wrapping, so anyone holding one valid IdP signature can log in as any user. Fixed in ruby-saml 1.12.4 / 1.18.0; GitLab CE/EE before **17.7.7 / 17.8.5 / 17.9.2** is affected ([CERT-EU 2025-011](https://cert.europa.eu/publications/security-advisories/2025-011/)). Detection is version plus a SAML button on `/users/sign_in`; building the wrapped assertion is Stage B, against an account you own. Mechanics: `hunt-saml`, `hunt-misc` Chain 4.
 
 ---
 
@@ -214,9 +222,9 @@ gh search code --owner ORG 'backend "s3"' --limit 10
 docker pull ORG/IMAGE:latest
 docker history --no-trunc ORG/IMAGE:latest | grep -iE 'ENV|ARG|secret|token|password|key'
 # Layer-level scan catches secrets removed in a later layer but still present in history:
-trufflehog docker --image ORG/IMAGE:latest --only-verified
+trufflehog docker --image ORG/IMAGE:latest --results=verified
 ```
-`--only-verified` filters trufflehog to credentials it could actually authenticate — use it to drop the noise of expired/example keys before reporting.
+`--results=verified` filters trufflehog to credentials it could actually authenticate — use it to drop the noise of expired/example keys before reporting.
 
 ---
 
@@ -225,6 +233,8 @@ trufflehog docker --image ORG/IMAGE:latest --only-verified
 - **Pwnrequest / `pull_request_target` class** — GitHub Security Lab (Jaroslav Lobačevski), "Keeping your GitHub Actions and workflows secure: Untrusted input." The original write-up of fork-PR secret exfil and the dangerous-checkout pattern.
 - **GitHub Actions workflow-command injection — CVE-2020-15228** — `set-env`/`add-path` workflow commands allowed env/PATH injection from logged output; this drove the deprecation of those commands and the move to `$GITHUB_ENV`.
 - **Jenkins CLI arbitrary file read — CVE-2024-23897** — args4j `@`-prefixed file expansion (Jenkins ≤2.441 / LTS ≤2.426.2), read `secret.key`/`credentials.xml` → admin → RCE.
+- **Jenkins WSO2 Oauth Plugin auth bypass — CVE-2025-47889** — plugin ≤1.0, no fix at publication ([advisory 2025-05-14](https://www.jenkins.io/security/advisory/2025-05-14/)). The "WSO2 Oauth" security realm accepts any username and password, even for users that do not exist. Impact depends on the authorization strategy: under "Logged-in users can do anything" the session gets Overall/Administer. Check the realm on the login page before claiming it.
+- **tj-actions/changed-files — CVE-2025-30066** (and reviewdog `action-setup` CVE-2025-30154) — March 2025 tag-repointing compromise that printed CI secrets into public workflow logs; see Phase 3.
 - **Jenkins Stapler RCE — CVE-2018-1000861** — dynamic routing reaches `groovy.lang.GroovyShell`; a staple of the unauth script-execution chain on older Jenkins.
 - **PortSwigger / Liam Galvin & others** — research on GitHub Actions injection sinks (title/branch/body/label) and the `${{ }}`-into-`run` template-substitution vector; the basis of the actionlint/zizmor detection rules cited above.
 
@@ -254,7 +264,7 @@ trufflehog docker --image ORG/IMAGE:latest --only-verified
 - **Actions injection:** confirm the data flow into a sink first (FP section). Blind step → **Collaborator callback with the runner's source IP** is mandatory. Token exfil via `printenv`/`/proc/self/environ` decoded at your endpoint — never `cat $GITHUB_TOKEN`.
 - **OIDC abuse:** `aws sts get-caller-identity` from your controlled workflow returns the privileged role ARN — not just a permissive-looking trust policy.
 - **Terraform state:** `jq` extraction yields ≥1 *live* secret, then a read-only auth proves it. ID/ARN-only state = no finding.
-- **Runner token / image / logs:** demonstrate the secret authenticates (trufflehog `--only-verified`, or a real API call) — possession of a string is not impact.
+- **Runner token / image / logs:** demonstrate the secret authenticates (trufflehog `--results=verified`, or a real API call) — possession of a string is not impact.
 
 ### Common false positives to retract
 - `/script` returning a login page (auth required) reported as "unauth RCE."
