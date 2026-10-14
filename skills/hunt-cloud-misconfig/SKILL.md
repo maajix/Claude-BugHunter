@@ -1,6 +1,6 @@
 ---
 name: hunt-cloud-misconfig
-description: "Hunt cloud / infrastructure misconfigurations. AWS: public S3 buckets (s3:GetObject anonymous), permissive bucket policies (PutObjectAcl public-write), exposed CloudFront origin, public Lambda function URL, public RDS snapshot, IAM credentials in JS bundles, AWS metadata accessible via SSRF. GCP: public GCS buckets, exposed Cloud Run services, leaked service account JSON. Azure: public blob containers, exposed Function App. (Kubernetes/Docker exposure is owned by hunt-k8s; CI/CD pipeline attacks by hunt-cicd; post-credential IAM escalation by cloud-iam-deep.) Detection: targeted dorking, certificate transparency, JS bundle secret extraction, port scan for known service ports. Validate: actual data read / write / RCE. Use when hunting cloud-native storage and compute misconfig (S3/GCS/Blob, IMDS-via-SSRF, serverless, public managed services)."
+description: "Hunt cloud storage and compute misconfiguration: public S3, GCS and Azure Blob containers, public-write bucket policies, exposed CloudFront origins, public Lambda function URLs and Cloud Run services, public RDS snapshots, cloud credentials in JS bundles, IMDS reachable via SSRF, exposed managed services. Kubernetes belongs to hunt-k8s, CI/CD to hunt-cicd, post-credential escalation to cloud-iam-deep. Use when hunting S3, GCS or Blob exposure, serverless endpoints, metadata via SSRF or public managed services."
 metadata:
   sources: hackerone_public, public_research
   report_count: 6

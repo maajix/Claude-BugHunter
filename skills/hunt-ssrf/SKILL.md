@@ -1,6 +1,6 @@
 ---
 name: hunt-ssrf
-description: Hunting skill for ssrf vulnerabilities. Built from 34 public bug bounty reports including AWS metadata SSRF (HackerOne $25k Analytics PDF, Shopify Exchange $25k, Capital One 106M-record breach, Dropbox/HelloSign $4,913), GCP metadata SSRF (Snapchat $4k), Azure IMDS SSRF (Azure DevOps $15k chain, ChatGPT Custom Actions MSRC), DNS rebinding SSRF (Concrete CMS, GitLab UrlBlocker), gopher-protocol-to-Redis-RCE (Yahoo Mail $15k), link-preview SSRF (Reddit Matrix $6k), and headless-browser PDF-generator SSRF chains. Use when hunting SSRF on any target — OOB Collaborator confirmation mandatory for blind cases.
+description: "Hunt SSRF from 34 disclosed reports: AWS, GCP and Azure metadata SSRF (Capital One, Shopify Exchange, Azure DevOps chains), DNS rebinding past URL blockers, gopher-to-Redis RCE, link-preview and webhook SSRF, headless-browser PDF-generator chains. Use when hunting SSRF on any target; OOB Collaborator confirmation is mandatory for blind cases."
 metadata:
   sources: github, hackerone_public, portswigger_research, binarysecurity_research
   report_count: 34

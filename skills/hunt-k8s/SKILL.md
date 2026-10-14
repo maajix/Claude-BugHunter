@@ -1,6 +1,6 @@
 ---
 name: hunt-k8s
-description: "Hunt Kubernetes & Docker — API anonymous access, kubelet 10250 exec (SPDY/WebSocket, NOT plain POST) and the simpler /run primitive, etcd 2379 unauth, dashboard skip-login, RBAC misconfig, secret/SA-token abuse, docker.sock host escape, runc/container-escape (Leaky Vessels CVE-2024-21626), API-server-mediated nodes/proxy RCE, EphemeralContainers node-shell, bound/projected SA-token audience+expiry abuse, admission-controller bypass, Helm/Tiller remnants. Use when target runs containerized infra, exposes K8s ports (6443/10250/10255/2379/8443), or cloud metadata reveals K8s service accounts."
+description: "Hunt Kubernetes and Docker exposure: anonymous API access, kubelet 10250 exec and /run, etcd 2379, dashboard skip-login, RBAC misconfig, service-account token abuse, docker.sock host escape, container escapes (Leaky Vessels CVE-2024-21626), nodes/proxy RCE, ephemeral-container node shells, projected token audience and expiry abuse, admission-controller bypass, Helm/Tiller remnants. Use when a target runs containerized infra, exposes 6443, 10250, 10255, 2379 or 8443, or cloud metadata reveals K8s service accounts."
 metadata:
   sources: hackerone_public, cve_database, kubernetes_security_research, portswigger_research
   report_count: 13

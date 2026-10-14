@@ -1,6 +1,6 @@
 ---
 name: hunt-xss
-description: "Hunting skill for xss vulnerabilities. Built from 174 public bug bounty reports. Use when hunting xss on any target. For markup injection that reflects raw HTML but does NOT execute JavaScript (no `<script>`/event-handler execution), see hunt-html-injection — escalate here once script execution is possible. Also covers Shadow DOM and declarative shadow roots as a sink context, SOME (Same Origin Method Execution) callback abuse, XSSI (cross-site script inclusion), WebAssembly linear-memory XSS, and CSP bypass depth: strict-dynamic and script gadgets, nonce reuse and nonce theft, base-uri omission, JSONP on allowlisted origins, and Chrome disk-cache/bfcache nonce reuse."
+description: "Hunt XSS from 174 disclosed reports: reflected, stored and DOM contexts, Shadow DOM and declarative shadow roots as sink contexts, SOME callback abuse, XSSI, WebAssembly linear-memory XSS, and CSP bypass depth (strict-dynamic and script gadgets, nonce reuse and theft, base-uri omission, JSONP on allowlisted origins, bfcache nonce reuse). Raw HTML that does not execute script belongs to hunt-html-injection. Use when hunting XSS on any target."
 metadata:
   sources: github, hackerone_public, mdn_web_docs, w3c_csp3_spec, chrome_developers, chromium_source, github_security_advisories, public_research, hacktricks_coverage_checklist
   report_count: 174

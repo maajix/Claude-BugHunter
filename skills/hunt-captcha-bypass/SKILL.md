@@ -1,6 +1,6 @@
 ---
 name: hunt-captcha-bypass
-description: "Hunt CAPTCHA Bypass — 6 distinct patterns: (1) CAPTCHA field simply omitted from the request (server-side validation absent), (2) CAPTCHA token replayed from a solved challenge (no single-use enforcement), (3) CAPTCHA response accepted on a different endpoint than it was solved on (no binding to action/session), (4) static or predictable CAPTCHA values accepted (e.g. '0', 'null', empty string), (5) audio/accessibility CAPTCHA trivially solvable programmatically, (6) CAPTCHA only enforced after N failures (first N requests bypass it). Also provider checks: Cloudflare Turnstile single-use / expiry and reCAPTCHA v3 score handling. Detection: intercept a successful form submission, remove the CAPTCHA field entirely, replay — if it still succeeds, server-side validation is absent. Medium severity standalone; High when it removes the only rate-limit gate protecting a login, registration, or payment endpoint."
+description: "Hunt CAPTCHA bypass, six patterns: CAPTCHA field omitted and still accepted, solved token replayed, token accepted on a different endpoint than it was solved on, static or predictable values accepted, audio challenge solvable programmatically, CAPTCHA enforced only after N failures. Provider checks for Cloudflare Turnstile single-use and reCAPTCHA v3 score handling. Medium standalone, High when it removes the only rate-limit gate on login, registration or payment. Use when a form or API carries a CAPTCHA token."
 metadata:
   sources: public_research, operator_experience
   report_count: 6

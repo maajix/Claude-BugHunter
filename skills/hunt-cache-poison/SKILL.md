@@ -1,6 +1,6 @@
 ---
 name: hunt-cache-poison
-description: Hunting skill for cache poison vulnerabilities. Built from 8 public bug bounty reports including X-Forwarded-Host poisoning, X-HTTP-Method-Override / GCS cache, reflected→stored XSS via cache, classic Omer-Gil Web Cache Deception, Cloudflare Cache Deception Armor bypass, session-token cache deception, Akamai hop-by-hop smuggling → server-side edge poisoning, Doyhenard's 2024 delimiter/normalization WCD and Cache-What-Where (Gotta cache 'em all), and Next.js internal cache poisoning (CVE-2024-46982). Host/X-Forwarded-Host injection that reaches app logic (reset-link poisoning, routing SSRF, OAuth issuer) is owned by hunt-host-header; this skill owns the case where the poisoned response is CACHED and served to other users. Use when hunting cache poisoning, Web Cache Deception, CDN-fronted apps.
+description: "Hunt web cache poisoning and web cache deception from 8 disclosed reports: X-Forwarded-Host and X-HTTP-Method-Override poisoning, reflected-to-stored XSS via cache, Omer Gil cache deception, Cloudflare Cache Deception Armor bypass, session-token cache deception, hop-by-hop smuggling to edge poisoning, delimiter and normalization WCD, Next.js cache poisoning (CVE-2024-46982). Host-header injection reaching app logic is owned by hunt-host-header; this skill owns the poisoned response cached for other users. Use on CDN-fronted apps."
 metadata:
   sources: github, hackerone_public, portswigger_research, omergil_research, youstin_research
   report_count: 8

@@ -1,6 +1,6 @@
 ---
 name: hunt-dom
-description: "Hunt client-side DOM vulnerabilities — DOM Clobbering (overwrite JS globals via HTML injection), PostMessage hijacking (missing origin check), Service Worker abuse (intercept requests from same-origin script), CSS Injection/Exfiltration (attribute selectors → token char-by-char via OOB), client-side template injection, dangerouslySetInnerHTML. Grounded in named public research: Gareth Heyes / PortSwigger DOM-clobbering + DOM-Invader, Michał Bentkowski DOMPurify clobbering bypasses, jQuery htmlPrefilter XSS (CVE-2020-11022 / CVE-2020-11023), d0nut CSS-exfil research. Also covers client-side path traversal (CSPT/OSRF, chained to CSPT2CSRF, e.g. Grafana CVE-2025-4123) and iframe-trap persistence of same-origin XSS. Use when hunting DOM-XSS, CSPT, client-side auth bypass, or token exfiltration without server-side interaction."
+description: "Hunt client-side DOM vulnerabilities: DOM clobbering, postMessage hijacking with missing origin checks, service worker abuse, CSS injection and exfiltration, client-side template injection, dangerouslySetInnerHTML, client-side path traversal (CSPT, CSPT2CSRF, Grafana CVE-2025-4123), iframe-trap persistence of same-origin XSS. Grounded in PortSwigger DOM Invader research, DOMPurify clobbering bypasses and jQuery htmlPrefilter XSS. Use when hunting DOM XSS, CSPT, client-side auth bypass or token exfiltration without server-side interaction."
 metadata:
   sources: portswigger_research, hackerone_public, github_security_advisories, doyensec_research, grafana_advisory
   report_count: 14

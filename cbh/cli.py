@@ -480,7 +480,7 @@ def load_skill_descriptions() -> dict[str, str]:
             text = sm.read_text(encoding="utf-8")
         except Exception:
             continue
-        m = re.search(r"^description:\s*(.+?)(?=\n[a-z_]+:|^---|\Z)",
+        m = re.search(r"^description:\s*(.+?)(?=\n[A-Za-z0-9_-]+:|^---|\Z)",
                       text, re.M | re.S)
         if m:
             desc = m.group(1).strip().strip('"').strip("'").strip()

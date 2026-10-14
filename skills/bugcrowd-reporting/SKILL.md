@@ -1,6 +1,6 @@
 ---
 name: bugcrowd-reporting
-description: "Bugcrowd-specific reporting tactics complementing report-writing: VRT category search-and-fallback strategy when no exact match exists, manual severity override when VRT defaults underrate impact, severity-request paragraph as first body section, OOS-clause rebuttal templates (rate limiting on auth-flow endpoints, debug-info framing, user-enumeration with sensitive PII, theoretical-issue counter), chained-finding cross-reference patterns, target selection for QA-vs-prod programs, researcher-side hygiene (Bugcrowdninja email alias, account state restoration, friendly-tester posture). Use when filing a Bugcrowd submission, when VRT default seems wrong, when triager closes as OOS or downgrades severity, when chaining linked submissions, or when scope distinguishes production from QA. Pairs with report-writing and triage-validation."
+description: "Bugcrowd-specific reporting tactics on top of report-writing: VRT category search and fallback, severity override when the VRT default underrates impact, severity-request paragraph, OOS-clause rebuttal templates (rate limiting on auth flows, debug info, user enumeration with PII), chained-submission cross-references, QA-vs-prod target selection, researcher hygiene (Bugcrowdninja alias). Use when filing a Bugcrowd submission, when a triager closes as OOS or downgrades severity, or when linking submissions."
 metadata:
   sources: bugcrowd, community
 ---

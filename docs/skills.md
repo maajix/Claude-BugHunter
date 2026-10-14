@@ -14,120 +14,120 @@ All **111 skills** in the bundle, grouped by domain. Each auto-loads when your p
 
 | Skill | What it does | Reports |
 |---|---|---|
-| `hunt-api-misconfig` | Hunt API security misconfiguration — mass assignment, prototype pollution, HTTP verb tampering. | 0 |
+| `hunt-api-misconfig` | Hunt API security misconfiguration: mass assignment (is_admin, role, verified fields applied blindly on profile, account and reset endpoints), prototype pollution (__proto__ via JSON merge, Object.assign or lodash merge reaching RCE in… | 0 |
 | `hunt-aspnet` | Hunt ASP.NET-specific surface — ViewState deserialization (signed-only vs encrypted), machineKey recovery, dual-parser MAC-bypass anti-pattern, request-validator bypass, trace.axd/elmah.axd disclosure, load-balanced ViewState cross-node… | 1 |
-| `hunt-ato` | Hunt account takeover taxonomy — 9 distinct paths to ATO, plus chains. | 7 |
-| `hunt-auth-bypass` | Hunting skill for auth bypass vulnerabilities. | 12 |
-| `hunt-browser-extension` | Audit a browser extension (Chrome/Edge/Firefox) as a web attack surface — an extension is a web app holding privileges no page has. | 3 |
-| `hunt-brute-force` | Hunt Missing/Weak Rate Limiting — login brute force, OTP/2FA brute force (10^6 keyspace), password-reset-token brute, credential stuffing, username/email enumeration via error-string / status-code / timing differences, weak password… | 6 |
-| `hunt-business-logic` | Hunting skill for business logic vulnerabilities. | 25 |
-| `hunt-cache-poison` | Hunting skill for cache poison vulnerabilities. | 8 |
-| `hunt-captcha-bypass` | Hunt CAPTCHA Bypass — 6 distinct patterns: (1) CAPTCHA field simply omitted from the request (server-side validation absent), (2) CAPTCHA token replayed from a solved challenge (no single-use enforcement), (3) CAPTCHA response accepted on… | 6 |
-| `hunt-cicd` | Hunt CI/CD pipeline vulnerabilities — GitHub Actions workflow injection (pull_request_target Pwnrequest + ${{ }}-into-shell), self-hosted runner poisoning, OIDC trust-policy abuse, Jenkins script-console RCE and CVE-2024-23897 file read,… | 18 |
-| `hunt-clickjacking` | Hunt Clickjacking — missing X-Frame-Options / CSP frame-ancestors lets an attacker embed the target page in an invisible iframe and trick victims into clicking buttons they cannot see (UI redressing). | 6 |
-| `hunt-cloud-backends` | Hunt misconfigured backend-as-a-service and managed-auth platforms that web and mobile apps embed client-side, tested from outside with only the public app config. | 0 |
-| `hunt-cloud-misconfig` | Hunt cloud / infrastructure misconfigurations. | 6 |
-| `hunt-cms` | Hunt internet-facing content-management and groupware applications: WordPress, Drupal, Joomla, Moodle, PrestaShop, Roundcube, Bolt CMS, Craft CMS and Adobe Experience Manager (AEM, Sling, CRX). | 0 |
+| `hunt-ato` | Hunt account takeover: nine ATO paths and their chains. | 7 |
+| `hunt-auth-bypass` | Hunt authentication bypass from 12 disclosed reports: SAML XSW and parser differentials (ruby-saml CVE-2025-25291, samlify CVE-2025-47949), signature stripping, domain-enforcement bypass via control characters, cross-IdP assertion reuse,… | 12 |
+| `hunt-browser-extension` | Audit a Chrome, Edge or Firefox extension as a web attack surface: unpack the CRX/XPI, triage the MV3 manifest (host_permissions, web_accessible_resources, externally_connectable, content_security_policy), test the four trust boundaries… | 3 |
+| `hunt-brute-force` | Hunt missing or weak rate limiting: login brute force, OTP/2FA brute force, password-reset-token brute force, credential stuffing, username and email enumeration via error strings, status codes or timing, weak password policy, missing… | 6 |
+| `hunt-business-logic` | Hunt business logic flaws from 25 disclosed reports: coupon race stacking, negative-quantity price tampering, decimal or fraction price overflow, client-side checkout amount trust on payment redirects, price-per-unit mass assignment,… | 25 |
+| `hunt-cache-poison` | Hunt web cache poisoning and web cache deception from 8 disclosed reports: X-Forwarded-Host and X-HTTP-Method-Override poisoning, reflected-to-stored XSS via cache, Omer Gil cache deception, Cloudflare Cache Deception Armor bypass,… | 8 |
+| `hunt-captcha-bypass` | Hunt CAPTCHA bypass, six patterns: CAPTCHA field omitted and still accepted, solved token replayed, token accepted on a different endpoint than it was solved on, static or predictable values accepted, audio challenge solvable… | 6 |
+| `hunt-cicd` | Hunt CI/CD pipeline vulnerabilities: GitHub Actions workflow injection (pull_request_target, expression-into-shell), self-hosted runner poisoning, OIDC trust-policy abuse, Jenkins script console and CVE-2024-23897 file read, GitLab… | 18 |
+| `hunt-clickjacking` | Hunt clickjacking and UI redressing: missing X-Frame-Options or CSP frame-ancestors on login flows, money transfers, account settings and OAuth confirmation pages, plus DoubleClickjacking (top-level window swap during a double click, which… | 6 |
+| `hunt-cloud-backends` | Hunt misconfigured backend-as-a-service and managed-auth platforms embedded client-side, tested from the public app config: Firebase (Realtime Database, Firestore and Storage rules, Cloud Functions, Remote Config, FCM keys), Supabase (anon… | 0 |
+| `hunt-cloud-misconfig` | Hunt cloud storage and compute misconfiguration: public S3, GCS and Azure Blob containers, public-write bucket policies, exposed CloudFront origins, public Lambda function URLs and Cloud Run services, public RDS snapshots, cloud… | 6 |
+| `hunt-cms` | Hunt internet-facing CMS and groupware: WordPress, Drupal, Joomla, Moodle, PrestaShop, Roundcube, Bolt, Craft CMS and Adobe Experience Manager (AEM, Sling, CRX). | 0 |
 | `hunt-cors` | Hunt CORS Misconfiguration — origin-reflection with credentials, null-origin trust, subdomain-regex bypass (unanchored vs unescaped-dot vs prefix-only), pre-flight (OPTIONS) gating bypass, postMessage origin checks. | 19 |
-| `hunt-csrf` | Hunting skill for csrf vulnerabilities. | 18 |
-| `hunt-deserialization` | Hunt Insecure Deserialization — Java gadget chains (ysoserial), PHP object injection (phpggc), Python pickle RCE, .NET BinaryFormatter, Ruby Marshal.load, JNDI/Log4Shell. | 22 |
+| `hunt-csrf` | Hunt CSRF from 18 disclosed reports, modern variants included: SameSite=Lax sibling-subdomain bypass (Argo CD CVE-2024-22424), GraphQL mutations via GET, framework CSRF middleware disabled, path-traversal token bypass (GitHub Enterprise… | 18 |
+| `hunt-deserialization` | Hunt insecure deserialization: Java gadget chains (ysoserial), PHP object injection (phpggc), Python pickle, .NET BinaryFormatter, Ruby Marshal, JNDI/Log4Shell. | 22 |
 | `hunt-dispatch` | Skill-set loader for /hunt orchestrator. | 0 |
-| `hunt-dom` | Hunt client-side DOM vulnerabilities — DOM Clobbering (overwrite JS globals via HTML injection), PostMessage hijacking (missing origin check), Service Worker abuse (intercept requests from same-origin script), CSS Injection/Exfiltration… | 14 |
-| `hunt-electron` | Hunt Electron and Chromium-wrapper desktop apps as a web attack surface - the app is web code, so an XSS inside it reaches the OS. | 6 |
+| `hunt-dom` | Hunt client-side DOM vulnerabilities: DOM clobbering, postMessage hijacking with missing origin checks, service worker abuse, CSS injection and exfiltration, client-side template injection, dangerouslySetInnerHTML, client-side path… | 14 |
+| `hunt-electron` | Hunt Electron and Chromium-wrapper desktop apps: the app is web code, so an XSS inside it reaches the OS. | 6 |
 | `hunt-exceptional-conditions` | Hunt mishandling of exceptional conditions — feed an endpoint malformed/unexpected input (wrong type, broken JSON, oversized field, null byte) and make it fail OPEN or leak internals: a verbose stack-trace / framework error page that… | 0 |
-| `hunt-exposed-panels` | Triage internet-exposed HTTP admin, monitoring and infrastructure-tooling panels: an enterprise web console answering from the public internet that belonged behind a VPN. | 0 |
-| `hunt-exposed-services` | Triage internet-exposed non-HTTP services and management interfaces: a port answering from the public internet that belonged behind a firewall or VPN. | 0 |
-| `hunt-file-upload` | Hunt file upload bugs — RCE via webshell, XSS via SVG/HTML, SSRF via XXE in DOCX, path traversal via filename. | 5 |
-| `hunt-fintech-graphql` | Hunt fintech-specific GraphQL vulnerabilities: money-movement mutations (transfers, redemptions, withdrawals, card top-ups), ledger/balance/portfolio query IDOR, decimal-precision and rounding abuse, idempotency-key bypass enabling… | 0 |
-| `hunt-forgot-password` | Hunt Forgot Password / Account Recovery Authentication Flaws — 5 distinct patterns: (1) username enumeration via different responses for valid vs invalid email, (2) reset token exposed directly in the API response body, (3) reset token not… | 6 |
+| `hunt-exposed-panels` | Triage internet-exposed HTTP admin, monitoring and infrastructure panels that belonged behind a VPN: Zabbix, Grafana, Prometheus, Netdata, JBoss/WildFly consoles, Tomcat Manager, phpMyAdmin, Adminer, Jupyter, Spark UI, Flink, Airflow,… | 0 |
+| `hunt-exposed-services` | Triage internet-exposed non-HTTP services that belonged behind a firewall: Redis 6379, MongoDB 27017, Elasticsearch 9200, Kibana 5601, CouchDB, InfluxDB, memcached 11211, PostgreSQL 5432, MySQL 3306, Oracle TNS, RabbitMQ, AMQP, MQTT, NATS,… | 0 |
+| `hunt-file-upload` | Hunt file upload bugs: webshell RCE, XSS via SVG or HTML, XXE via DOCX, path traversal via filename, ZIP slip, polyglots. | 5 |
+| `hunt-fintech-graphql` | Hunt fintech-specific GraphQL bugs: money-movement mutations (transfers, withdrawals, redemptions), ledger, balance and portfolio query IDOR, decimal precision and rounding abuse, idempotency-key bypass enabling double spend, KYC and PII… | 0 |
+| `hunt-forgot-password` | Hunt forgot-password and account-recovery flaws, five patterns: username enumeration via response differences, reset token exposed in the API response, token not invalidated after use, reset delivered to an attacker address via email… | 6 |
 | `hunt-graphql` | Hunting skill for graphql vulnerabilities. | 26 |
-| `hunt-grpc` | Hunt gRPC vulnerabilities — server reflection enabled (enumerate all services/methods), missing authentication / metadata-stripping on internal endpoints, plaintext gRPC over HTTP/2, internal endpoint disclosure, proto file leakage,… | 6 |
-| `hunt-healthcare-fhir` | Hunt authorization flaws in HL7 FHIR R4 healthcare APIs, where a token scoped to one patient reaches another patient's records. | 0 |
-| `hunt-host-header` | Hunt Host Header Injection — password reset poisoning → ATO, web cache poisoning via unkeyed Host/X-Forwarded-Host, routing-based SSRF (Host picks upstream → cloud metadata/internal services), path-override SSRF/ACL-bypass… | 16 |
+| `hunt-grpc` | Hunt gRPC vulnerabilities: server reflection enabled, missing authentication or metadata stripping on internal endpoints, plaintext gRPC over HTTP/2, proto file leakage, gRPC-Web and grpc-gateway transcoding injection, HTTP/2 DoS classes… | 6 |
+| `hunt-healthcare-fhir` | Hunt authorization flaws in HL7 FHIR R4 healthcare APIs where a token scoped to one patient reaches another patient's records: CapabilityStatement and smart-configuration recon, the Patient compartment as the access boundary,… | 0 |
+| `hunt-host-header` | Hunt Host header injection: password reset poisoning to ATO, web cache poisoning via unkeyed Host or X-Forwarded-Host, routing-based SSRF to cloud metadata or internal services, path-override SSRF and ACL bypass (X-Original-URL,… | 16 |
 | `hunt-html-injection` | Hunt HTML Injection — user-supplied input is rendered as raw HTML in the response without sanitisation, allowing an attacker to inject arbitrary HTML tags (but not necessarily JavaScript). | 6 |
-| `hunt-http-smuggling` | Hunt HTTP request smuggling (CL.TE, TE.CL, H2.CL, H2.TE). | 12 |
+| `hunt-http-smuggling` | Hunt HTTP request smuggling: CL.TE, TE.CL, H2.CL, H2.TE, CL.0, client-side desync (CSD), chunk-extension and trailer differentials, response splitting. | 12 |
 | `hunt-idor` | Hunting skill for idor vulnerabilities. | 39 |
-| `hunt-jwt-crypto` | Hunt JWT cryptographic failures — alg:none signature-stripping and RS256→HS256 key-confusion that let an attacker forge a token for any identity (e.g. | 6 |
-| `hunt-k8s` | Hunt Kubernetes & Docker — API anonymous access, kubelet 10250 exec (SPDY/WebSocket, NOT plain POST) and the simpler /run primitive, etcd 2379 unauth, dashboard skip-login, RBAC misconfig, secret/SA-token abuse, docker.sock host escape,… | 13 |
-| `hunt-laravel` | Hunt Laravel specific vulnerabilities — Debug mode leakage (APP_DEBUG=true exposes full stack trace + env vars), Laravel Telescope/Horizon dashboard unauthorized access, Ignition RCE (CVE-2021-3129), Livewire v3 pre-auth RCE… | 14 |
-| `hunt-ldap` | Hunt LDAP Injection and XPath Injection — authentication bypass, blind char-by-char attribute exfiltration, AD user/group enumeration, XML-store XPath bypass. | 0 |
-| `hunt-lfi` | Hunt Local File Inclusion (LFI), Remote File Inclusion (RFI), and Path Traversal — /etc/passwd read, log poisoning → RCE, PHP filter-chain RCE (no upload needed), php:// / data:// / zip:// / phar:// wrappers, RFI via allow_url_include,… | 24 |
-| `hunt-llm-ai` | Hunt LLM/AI feature bugs — prompt injection, indirect injection, exfiltration via tool-use/markdown, ASCII smuggling, agentic AI security (OWASP Agentic Apps 2026, ASI01-ASI10). | 0 |
-| `hunt-mfa-bypass` | Hunt MFA / 2FA bypass — 12 patterns. | 5 |
+| `hunt-jwt-crypto` | Hunt JWT cryptographic failures: alg:none signature stripping, RS256 to HS256 key confusion, kid and jku header injection, weak HMAC secrets, letting an attacker forge a token for any identity. | 6 |
+| `hunt-k8s` | Hunt Kubernetes and Docker exposure: anonymous API access, kubelet 10250 exec and /run, etcd 2379, dashboard skip-login, RBAC misconfig, service-account token abuse, docker.sock host escape, container escapes (Leaky Vessels… | 13 |
+| `hunt-laravel` | Hunt Laravel-specific vulnerabilities: APP_DEBUG stack traces with env vars, Telescope and Horizon dashboards, Ignition RCE (CVE-2021-3129), Livewire v3 pre-auth RCE (CVE-2025-54068), APP_KEY leak to decrypt and unserialize RCE, signed URL… | 14 |
+| `hunt-ldap` | Hunt LDAP injection and XPath injection: authentication bypass, blind attribute exfiltration, AD user and group enumeration, XPath bypass on XML stores. | 0 |
+| `hunt-lfi` | Hunt local file inclusion, remote file inclusion and path traversal: /etc/passwd reads, log poisoning to RCE, PHP filter-chain RCE without upload, php://, data://, zip:// and phar:// wrappers, RFI via allow_url_include, traversal read,… | 24 |
+| `hunt-llm-ai` | Hunt LLM and AI feature bugs: direct and indirect prompt injection, ASCII smuggling with Unicode tag characters, tool-use and markdown-image exfiltration, system-prompt extraction, IDOR via AI across tenants, agentic security per OWASP… | 0 |
+| `hunt-mfa-bypass` | Hunt MFA and 2FA bypass, twelve patterns: no rate limit on OTP verification, OTP reuse, response manipulation, skipping the MFA step with the pre-MFA session, OTP validation races, backup-code brute force, unbound remember-device cookies,… | 5 |
 | `hunt-misc` | Hunting skill for misc vulnerabilities. | 225 |
-| `hunt-mobile-android` | Android app pentest methodology aligned to OWASP MASVS v2.1.0 and MASTG v2.0.0, for an authorized tester with the APK and a test device. | 0 |
-| `hunt-mobile-frameworks` | Test apps built with cross-platform mobile frameworks and route what the bundle ships to the backend skills. | 0 |
-| `hunt-mobile-ios` | MASVS v2 and MASTG aligned iOS app pentest for an authorized tester holding the IPA and a test device (jailbroken, developer-signed build on a stock device, or Corellium). | 0 |
+| `hunt-mobile-android` | Android app pentest aligned to OWASP MASVS v2.1 and MASTG v2, for an authorized tester with the APK and a test device. | 0 |
+| `hunt-mobile-frameworks` | Test apps built with cross-platform mobile frameworks and route what the bundle ships to the backend skills: Flutter (Dart AOT, Blutter, reFlutter, BoringSSL pinning), React Native (Hermes bytecode, CodePush and EAS Update), Xamarin and… | 0 |
+| `hunt-mobile-ios` | iOS app pentest aligned to MASVS v2 and MASTG, for an authorized tester holding the decrypted IPA and a test device. | 0 |
 | `hunt-nextjs` | Hunt Next.js specific vulnerabilities — React2Shell RSC Flight deserialization RCE (CVE-2025-55182), Server Actions arbitrary function execution, Middleware auth bypass via static asset paths, ISR cache poisoning, Image Optimization SSRF… | 0 |
 | `hunt-nodejs` | Hunt Node.js specific vulnerabilities — Prototype Pollution → RCE chains (lodash/merge/assign), Express trust proxy misconfiguration, child_process/eval injection, template engine SSTI (EJS/Pug/Handlebars), path traversal in file servers,… | 24 |
 | `hunt-nosqli` | Hunt NoSQL Injection — MongoDB operator injection ($where, $regex, $gt, $ne), CouchDB, Redis command injection, auth bypass via NoSQLi, data dump. | 14 |
 | `hunt-ntlm-info` | Hunt NTLM/Negotiate information disclosure on internet-reachable IIS/SharePoint/Exchange. | 1 |
 | `hunt-oauth` | Hunting skill for oauth vulnerabilities. | 22 |
 | `hunt-open-redirect` | Hunt Open Redirect — all types including low-impact, chained to OAuth token theft → ATO, phishing chains. | 28 |
-| `hunt-payment-api` | Hunt vulnerabilities in payment and billing APIs, where the defect lives in the merchant's wrapper code and in what it accepts back from the PSP rather than in the provider's own API. | 9 |
-| `hunt-race-condition` | Hunting skill for race condition vulnerabilities. | 10 |
-| `hunt-rag-vector` | Hunt vector-store / embedding-layer weaknesses in RAG pipelines (OWASP LLM08 Vector and Embedding Weaknesses) — persistent corpus poisoning that survives across sessions and users (distinct from one-shot indirect prompt injection, which is… | 0 |
+| `hunt-payment-api` | Hunt payment and billing API bugs that live in the merchant's wrapper code and in what it accepts back from the PSP: webhook and IPN verification (fail-open signatures, raw-body mismatch, replay, swapped order references),… | 9 |
+| `hunt-race-condition` | Hunt race conditions from 10 disclosed reports, including HTTP/2 single-packet attacks (James Kettle, Smashing the State Machine) and the first-sequence-sync expansion: coupon double redemption, gift-card double spend, OTP validation… | 10 |
+| `hunt-rag-vector` | Hunt vector-store and embedding-layer weaknesses in RAG pipelines (OWASP LLM08): persistent corpus poisoning that survives across sessions and users, cross-tenant vector-database IDOR against Pinecone, Weaviate, Chroma, Milvus, Qdrant or… | 0 |
 | `hunt-rce` | Hunting skill for rce vulnerabilities. | 87 |
-| `hunt-saml` | Hunt SAML / SSO attacks. | 6 |
-| `hunt-session` | Hunt Session Management vulnerabilities — session fixation (no regeneration on login), insufficient invalidation on logout / password-change / email-change, predictable or low-entropy session IDs, JWT-as-session with no exp/revocation,… | 19 |
-| `hunt-shadow-api` | Hunt shadow / zombie / undocumented API surface (OWASP API9 Improper Inventory Management) — enumerate the full API version history (v1/v2/beta/legacy paths, header- and subdomain-based versioning), pull and diff every reachable… | 0 |
-| `hunt-sharepoint` | Hunt Microsoft SharePoint Server (2013/2016/2019/Subscription Edition) on-prem farms — anonymous endpoint enumeration, version disclosure, legacy SOAP login bypass (Authentication.asmx), ToolShell precondition chain (CVE-2025-53770),… | 1 |
+| `hunt-saml` | Hunt SAML and SSO attacks: XML Signature Wrapping (XSW), comment injection in NameID, signature stripping, key confusion, audience restriction not validated, assertion replay, and the 2025 parser-differential XSW family (ruby-saml,… | 6 |
+| `hunt-session` | Hunt session management flaws: fixation without regeneration on login, missing invalidation on logout, password or email change, predictable session IDs, JWT-as-session without expiry or revocation, cookie attributes (Secure, HttpOnly,… | 19 |
+| `hunt-shadow-api` | Hunt shadow, zombie and undocumented API surface (OWASP API9): enumerate the version history (v1, v2, beta, legacy paths, header and subdomain versioning), pull and diff every reachable OpenAPI or Swagger spec including Wayback copies, and… | 0 |
+| `hunt-sharepoint` | Hunt Microsoft SharePoint Server on-prem farms (2013 to Subscription Edition): anonymous endpoint enumeration, version disclosure, legacy SOAP login bypass via Authentication.asmx, ToolShell precondition chain (CVE-2025-53770), SafeControl… | 1 |
 | `hunt-source-leak` | Hunt source code and build artifact leakage — JavaScript source maps (.js.map) reconstructing TypeScript/ES6 source, Swagger/OpenAPI JSON endpoint discovery, .env/.git exposure, webpack chunks with hardcoded secrets,… | 7 |
-| `hunt-spa-api` | Discover a single-page-app's hidden backend API from its public JS bundle, then test that API for broken access control / missing authentication. | 1 |
-| `hunt-springboot` | Hunt Spring Boot specific vulnerabilities — Actuator endpoints (heapdump, env, loggers, mappings, shutdown), Spring Expression Language (SpEL) injection → RCE, H2 console RCE, Jolokia JMX exposure, Spring4Shell (CVE-2022-22965), Spring… | 16 |
-| `hunt-sqli` | Hunting skill for sqli vulnerabilities. | 29 |
-| `hunt-ssrf` | Hunting skill for ssrf vulnerabilities. | 34 |
-| `hunt-ssti` | Hunt server-side template injection (SSTI) across Jinja2 (Flask/Django), Twig (Symfony), Freemarker (Java), ERB (Rails), Spring, Velocity, Mako, Thymeleaf, Smarty. | 6 |
-| `hunt-subdomain` | Hunting skill for subdomain takeover vulnerabilities. | 3 |
-| `hunt-tls-network` | Hunt TLS/SSL and DNS misconfigurations — missing HSTS (downgrade attack), weak cipher suites, expired/invalid certificates, mTLS bypass, missing SPF/DKIM/DMARC (email spoofing), DNS Zone Transfer (AXFR), dangling CNAME subdomain takeover,… | 6 |
+| `hunt-spa-api` | Discover a single-page app's hidden backend API from its public JS bundle, then test that API for broken access control and missing authentication. | 1 |
+| `hunt-springboot` | Hunt Spring Boot specific vulnerabilities: Actuator endpoints (heapdump, env, loggers, mappings, shutdown), SpEL injection to RCE, H2 console RCE, Jolokia JMX exposure, Spring4Shell (CVE-2022-22965), Spring Cloud Function (CVE-2022-22963),… | 16 |
+| `hunt-sqli` | Hunt SQL injection from 12 disclosed reports: ORM raw-fragment SQLi (Django CVE-2024-42005, Sequelize), second-order SOQL injection, time-based blind SQLi in GraphQL resolvers, SQLi on OIDC-proxy backends, PostgreSQL escalation (dblink,… | 29 |
+| `hunt-ssrf` | Hunt SSRF from 34 disclosed reports: AWS, GCP and Azure metadata SSRF (Capital One, Shopify Exchange, Azure DevOps chains), DNS rebinding past URL blockers, gopher-to-Redis RCE, link-preview and webhook SSRF, headless-browser PDF-generator… | 34 |
+| `hunt-ssti` | Hunt server-side template injection across Jinja2, Twig, Freemarker, ERB, Spring, Velocity, Mako, Thymeleaf and Smarty: double-curly and dollar-curly math probes, engine fingerprinting from errors, escalation to RCE through engine-specific… | 6 |
+| `hunt-subdomain` | Hunt subdomain takeover and broken-link hijacking with current provider fingerprints: Azure cloudapp.azure.com regional re-issue (OAuth ATO via wildcard reply_to), Vercel deleted-project takeover, S3 dangling-bucket cookie-scope… | 3 |
+| `hunt-tls-network` | Hunt TLS, SSL and DNS misconfiguration: missing HSTS, weak cipher suites, expired or invalid certificates, mTLS bypass, missing SPF, DKIM and DMARC (email spoofing), DNS zone transfer (AXFR), dangling CNAME takeover, CAA records. | 6 |
 | `hunt-websocket` | Hunt WebSocket vulnerabilities — Cross-Site WebSocket Hijacking (CSWSH), missing/weak Origin validation on the WS handshake, no per-message authentication, message tampering, socket.io namespace/room authorization bypass, and… | 11 |
-| `hunt-xs-leaks` | Hunt cross-site leaks (XS-Leaks) and XS-Search — inferring a victim's cross-origin state through side channels the same-origin policy does not close. | 1 |
-| `hunt-xss` | Hunting skill for xss vulnerabilities. | 174 |
+| `hunt-xs-leaks` | Hunt cross-site leaks (XS-Leaks) and XS-Search: inferring a victim's cross-origin state through channels the same-origin policy leaves open. | 1 |
+| `hunt-xss` | Hunt XSS from 174 disclosed reports: reflected, stored and DOM contexts, Shadow DOM and declarative shadow roots as sink contexts, SOME callback abuse, XSSI, WebAssembly linear-memory XSS, and CSP bypass depth (strict-dynamic and script… | 174 |
 | `hunt-xxe` | Hunting skill for xxe vulnerabilities. | 10 |
 
 ## Enterprise platform attack (10)
 
 | Skill | What it does | Reports |
 |---|---|---|
-| `apk-redteam-pipeline` | End-to-end Android APK red-team pipeline — automated APK acquisition (Play Store + apkpure + apkmirror fallback), jadx decompilation, secret/URL/JWT/Firebase grep, pinned-cert extraction, exported-component enumeration, Frida runtime… | 1 |
-| `cloud-iam-deep` | External cloud IAM post-credential analysis. | 6 |
-| `enterprise-vpn-attack` | External SSL VPN / remote-access appliance attack matrix — Cisco ASA/AnyConnect, Fortinet FortiGate/FortiOS, Citrix NetScaler/ADC, Palo Alto GlobalProtect, Pulse Secure / Ivanti Connect Secure, SonicWall, F5 Big-IP. | 1 |
-| `ios-redteam-pipeline` | End-to-end iOS red-team pipeline — IPA acquisition (App Store extraction, TestFlight, enterprise/ad-hoc sideload), class-dump/Hopper/Ghidra static analysis, Info.plist + entitlements + Keychain secret extraction, App Transport Security… | 0 |
-| `m365-entra-attack` | Microsoft 365 / Entra ID red-team attack chain — current 2026 reality. | 1 |
-| `meme-coin-audit` | Meme coin and token security audit — rug pull detection (honeypot, hidden mint, fee manipulation, LP lock bypass), Solana SPL token analysis (freeze authority, mint authority, metadata mutability), Token-2022 extension risks (transfer… | — |
-| `okta-attack` | Okta-as-IdP red-team attack chain — tenant discovery, user enumeration (multiple vectors), authentication flow analysis (factors enumeration, push-notification fatigue, SMS bypass), password spray with lockout discipline, Okta-specific… | 8 |
-| `supply-chain-attack-recon` | External recon for software supply-chain attack surface — package-namespace squatting candidates, dependency-confusion vulnerabilities, GitHub Actions injection openings, container image registry exposure, SBOM mining,… | 12 |
-| `vmware-vcenter-attack` | VMware vSphere / vCenter Server external attack matrix — version fingerprinting, the high-impact CVE chain (CVE-2021-21972 vRealize unauth file upload, CVE-2021-21985 vSAN plugin RCE, CVE-2022-22954 Workspace ONE SSTI, CVE-2023-20887 Aria… | 10 |
+| `apk-redteam-pipeline` | End-to-end Android APK red-team pipeline: APK acquisition (Play Store, apkpure, apkmirror), jadx decompilation, secret, URL, JWT and Firebase grep, pinned-cert extraction, exported-component enumeration, Frida instrumentation templates,… | 1 |
+| `cloud-iam-deep` | External cloud IAM post-credential analysis: a key, token or service-account JSON surfaced in recon; prove it is live with one read-only identity call, learn what it grants, map escalation without executing it. | 6 |
+| `enterprise-vpn-attack` | External SSL VPN and remote-access appliance attack matrix: Cisco ASA/AnyConnect, Fortinet FortiGate, Citrix NetScaler/ADC, Palo Alto GlobalProtect, Pulse Secure / Ivanti Connect Secure, SonicWall, F5 BIG-IP. | 1 |
+| `ios-redteam-pipeline` | End-to-end iOS red-team pipeline: IPA acquisition (App Store extraction, TestFlight, enterprise or ad-hoc sideload), class-dump, Hopper and Ghidra static analysis, Info.plist, entitlements and Keychain secret extraction, ATS… | 0 |
+| `m365-entra-attack` | Microsoft 365 and Entra ID red-team attack chain: AADSTS code reference, user enumeration vectors with hardening status, Smart Lockout math, Conditional Access bypass options, ROPC and SAML SSO browser flow, Burp and Playwright templates,… | 1 |
+| `meme-coin-audit` | Meme coin and token security audit: rug pull detection (honeypot, hidden mint, fee manipulation, LP lock bypass), Solana SPL token analysis (freeze and mint authority, metadata mutability), Token-2022 extension risks (transfer hooks,… | — |
+| `okta-attack` | Okta-as-IdP red-team attack chain: tenant discovery, user enumeration vectors, authentication flow analysis (factor enumeration, push fatigue, SMS bypass), password spray with lockout discipline, Okta-specific phishing primitives (FastPass… | 8 |
+| `supply-chain-attack-recon` | External recon for software supply-chain attack surface: package-namespace squatting candidates, dependency confusion, GitHub Actions injection openings, container registry exposure, SBOM mining, internal package-name leakage, CI/CD… | 12 |
+| `vmware-vcenter-attack` | VMware vSphere and vCenter Server external attack matrix: version fingerprinting, the high-impact CVE chain (CVE-2021-21972 file upload, CVE-2021-21985 vSAN plugin RCE, CVE-2022-22954 Workspace ONE SSTI, CVE-2023-20887 Aria RCE,… | 10 |
 | `web3-audit` | Smart contract security audit — 10 DeFi bug classes (accounting desync, access control, incomplete path, off-by-one, oracle, ERC4626, reentrancy, flash loan, signature replay, proxy), pre-dive kill signals (TVL < $500K etc), Foundry PoC… | — |
 
 ## External infrastructure — ports and services (16)
 
 | Skill | What it does | Reports |
 |---|---|---|
-| `infra-ai-ml-services` | Triage internet-exposed AI/ML serving, training, orchestration and agent-builder services at the service layer: Ollama 11434, vLLM, TGI, llama.cpp, LM Studio, LiteLLM and OpenAI-compatible endpoints; Ray (ShadowRay CVE-2023-48022),… | 0 |
-| `infra-backup-nas` | Triage internet-exposed backup servers, NAS appliances, object storage and file-sync platforms. | 0 |
-| `infra-data-platforms` | Triage internet-exposed big-data, streaming, search and database services no other skill owns: Hadoop HDFS, YARN and JobHistory beyond the baseline probes, Spark standalone, Hive, HBase, Oozie, Hue, Livy, Zeppelin, Storm, Trino and Presto,… | 0 |
-| `infra-devops-platforms` | Triage internet-exposed DevOps control planes, secret stores, service discovery, artifact registries and source-control daemons at the protocol and unauthenticated-API layer: HashiCorp Vault 8200, Consul 8500 and DNS 8600, Nomad 4646,… | 0 |
-| `infra-dns` | Triage internet-exposed DNS servers the client owns, authoritative and recursive, on 53/udp and 53/tcp, DoT 853 and DoH. | 0 |
-| `infra-enterprise-appservers` | Triage internet-exposed enterprise application servers and ERP platforms: SAP NetWeaver ABAP and Java (DIAG 32NN, Gateway 33NN, Message Server 36NN, ICM 80NN/443NN, AS Java 5NN00-5NN04), SAP Web Dispatcher, Oracle WebLogic (7001/7002, T3… | 0 |
-| `infra-external-methodology` | Orchestrate an external infrastructure penetration test at the port and service layer. | 0 |
-| `infra-ftp` | Triage an internet-exposed FTP service on an in-scope host: plain FTP on port 21, explicit FTPS via AUTH TLS, implicit FTPS on 990, and the FTP listeners on NAS boxes, cameras, printers and managed-file-transfer products. | 0 |
-| `infra-mail` | Test internet-exposed mail services at the protocol layer: SMTP port 25, submission 587, SMTPS 465, IMAP 143/993, POP3 110/995 and ManageSieve 4190, and the server software behind them (Postfix, Exim, Sendmail, Microsoft Exchange… | 0 |
-| `infra-monitoring-logging` | Triage internet-exposed monitoring, metrics, logging and tracing services and their agent and ingest protocols: Zabbix agent/agent 2 (10050) and trapper (10051), NRPE 5666, NSClient++ 8443/12489, Icinga 2 API 5665, Checkmk agent 6556,… | 0 |
-| `infra-network-devices` | Triage internet-exposed management and control planes of network devices. | 0 |
-| `infra-rmm-remote-support` | Triage internet-exposed RMM and remote-support servers and the remote-display protocols behind them: ConnectWise ScreenConnect, SimpleHelp, BeyondTrust Remote Support and PRA, N-able N-central, Kaseya VSA, ManageEngine Endpoint Central,… | 0 |
-| `infra-ssh` | Triage internet-exposed SSH on port 22 and non-standard ports, including SFTP-over-SSH and SSH on appliances, firewalls, BMCs and network devices. | 0 |
-| `infra-voip-sip` | Triage internet-exposed VoIP and unified-communications infrastructure found by an external infrastructure pentest: SIP 5060/5061, SIPS, RTP ranges, H.323 1720, IAX2 4569, STUN/TURN 3478/5349, and the PBX or SBC behind them (Asterisk,… | 0 |
-| `infra-vpn-ike` | Triage internet-exposed non-SSL VPN and tunnel endpoints: IKE/IPsec on port 500/udp and NAT-T 4500/udp, L2TP 1701/udp, PPTP 1723/tcp with GRE, OpenVPN 1194 and OpenVPN on 443, WireGuard 51820/udp, SSTP, SoftEther, Tailscale DERP, Headscale… | 0 |
-| `infra-windows-perimeter` | Triage Windows and Active Directory services answering from the public internet: SMB port 445, NetBIOS 137/138/139, MSRPC 135 and dynamic RPC 49152+, RDP 3389, Kerberos 88, CLDAP 389/udp, MSSQL 1433 and SQL Browser 1434/udp. | 0 |
+| `infra-ai-ml-services` | Triage internet-exposed AI/ML serving, training, orchestration and agent-builder services: Ollama 11434, vLLM, TGI, llama.cpp, LiteLLM and OpenAI-compatible endpoints, Ray (ShadowRay CVE-2023-48022), MLflow, JupyterHub, Gradio, ComfyUI,… | 0 |
+| `infra-backup-nas` | Triage internet-exposed backup servers, NAS appliances, object storage and file-sync platforms: Veeam (9392, 9401, 9443), Commvault, NetBackup, Rubrik, Cohesity; QNAP, Synology DSM (5000/5001), TrueNAS, WD My Cloud, Asustor; MinIO… | 0 |
+| `infra-data-platforms` | Triage internet-exposed big-data, streaming, search and database services: Hadoop HDFS and YARN, Spark, Hive, HBase, Solr, ClickHouse, Kafka and Schema Registry, ZooKeeper, Pulsar, ActiveMQ (CVE-2023-46604), Neo4j, Db2, Firebird, SAP ASE… | 0 |
+| `infra-devops-platforms` | Triage internet-exposed DevOps control planes, secret stores, service discovery, artifact registries and source-control daemons: HashiCorp Vault 8200, Consul 8500, Nomad 4646, Jenkins agent port 50000, TeamCity 8111, GitLab, Gitea, Gerrit… | 0 |
+| `infra-dns` | Triage internet-exposed DNS servers the client owns, authoritative and recursive, on 53, DoT 853 and DoH: open recursive resolver proven with one canary query, cache snooping, version.bind and NSID disclosure, unauthenticated dynamic… | 0 |
+| `infra-enterprise-appservers` | Triage internet-exposed enterprise application servers and ERP platforms: SAP NetWeaver (DIAG, Gateway, Message Server, ICM, AS Java), SAP Web Dispatcher, Oracle WebLogic (T3, IIOP), IBM WebSphere, JBoss EAP and WildFly management, Adobe… | 0 |
+| `infra-external-methodology` | Orchestrate an external infrastructure penetration test at the port and service layer: confirm scope and per-IP ownership, plan discovery (nmap top ports then the full range, targeted UDP, IPv6, when masscan, naabu or rustscan are… | 0 |
+| `infra-ftp` | Triage an internet-exposed FTP service: plain FTP on 21, explicit FTPS via AUTH TLS, implicit FTPS on 990, and FTP on NAS boxes and MFT products. | 0 |
+| `infra-mail` | Test internet-exposed mail services at the protocol layer: SMTP 25, submission 587, SMTPS 465, IMAP 143/993, POP3 110/995, ManageSieve 4190, and the software behind them (Postfix, Exim, Sendmail, Exchange, Zimbra, Dovecot). | 0 |
+| `infra-monitoring-logging` | Triage internet-exposed monitoring, metrics, logging and tracing services: Zabbix agent 10050 and trapper 10051, NRPE 5666, Icinga 2 API 5665, Checkmk 6556, Prometheus exporters 9100, Alertmanager, Graphite 2003, StatsD 8125, Loki 3100,… | 0 |
+| `infra-network-devices` | Triage internet-exposed management planes of network devices: MikroTik RouterOS (Winbox 8291, API 8728/8729, WebFig), Ubiquiti (discovery 10001/udp, UniFi 8443, EdgeOS, airOS), TR-069/CWMP 7547 and ACS servers, Cisco IOS XE web UI, ASA and… | 0 |
+| `infra-rmm-remote-support` | Triage internet-exposed RMM and remote-support servers and remote-display protocols: ConnectWise ScreenConnect (CVE-2024-1709), SimpleHelp (CVE-2024-57727), BeyondTrust Remote Support and PRA, N-able N-central, Kaseya VSA, TeamViewer 5938,… | 0 |
+| `infra-ssh` | Triage internet-exposed SSH on port 22 and non-standard ports, including SFTP and SSH on appliances, firewalls, BMCs and network devices: banner and version gates (regreSSHion CVE-2024-6387, Erlang/OTP SSH CVE-2025-32433, libssh auth… | 0 |
+| `infra-voip-sip` | Triage internet-exposed VoIP and unified-communications infrastructure: SIP 5060/5061, H.323 1720, IAX2 4569, STUN/TURN 3478/5349, and the PBX or SBC behind them (Asterisk, FreePBX, FreeSWITCH, Kamailio, OpenSIPS, 3CX, Cisco CUCM, Mitel,… | 0 |
+| `infra-vpn-ike` | Triage internet-exposed non-SSL VPN and tunnel endpoints: IKE/IPsec 500/udp and NAT-T 4500/udp, L2TP 1701, PPTP 1723 with GRE, OpenVPN 1194 or on 443, WireGuard 51820, SSTP, SoftEther, Tailscale, ZeroTier. | 0 |
+| `infra-windows-perimeter` | Triage Windows and Active Directory services answering from the public internet: SMB 445, MSRPC 135 and dynamic RPC, RDP 3389, Kerberos 88, CLDAP 389/udp, MSSQL 1433. | 0 |
 
 ## Recon & OSINT (5)
 
 | Skill | What it does | Reports |
 |---|---|---|
-| `offensive-osint` | Operational arsenal for authorized external red-team and bug-bounty recon. | — |
-| `osint-methodology` | Comprehensive OSINT methodology for external red-team operations and authorized attack-surface assessments. | — |
-| `recon-scope-triage` | Triage ASM/recon output for ownership before testing — separate the target's real assets from namespace-collision noise. | 1 |
+| `offensive-osint` | Operational arsenal for authorized external red-team and bug-bounty recon: probes, wordlists, regexes and dorks for subdomain enumeration, GraphQL, Swagger and REST discovery, identity fabric (Entra, Okta, ADFS, SAML, M365), cloud bucket… | — |
+| `osint-methodology` | Comprehensive OSINT methodology for external red-team operations and authorized attack-surface assessments: the 5-stage recon pipeline from seed discovery to reporting, 29-type asset graph, severity rubric, identity-fabric mapping,… | — |
+| `recon-scope-triage` | Triage ASM and recon output for ownership before testing: separate the target's real assets from namespace-collision noise. | 1 |
 | `security-arsenal` | Security payloads, bypass tables, wordlists, gf pattern names, always-rejected bug list, and conditionally-valid-with-chain table. | — |
 | `web2-recon` | Web2 recon pipeline — subdomain enumeration (subfinder, Chaos API, assetfinder), live host discovery (dnsx, httpx), URL crawling (katana, waybackurls, gau), directory fuzzing (ffuf), JS analysis (LinkFinder, SecretFinder), continuous… | — |
 
@@ -136,18 +136,18 @@ All **111 skills** in the bundle, grouped by domain. Each auto-loads when your p
 | Skill | What it does | Reports |
 |---|---|---|
 | `bb-methodology` | Use at the START of any bug bounty hunting session, when switching targets, or when feeling lost about what to do next. | — |
-| `bug-bounty` | Complete bug bounty workflow: recon (subdomain enumeration, asset discovery, fingerprinting, scope parsing, source code audit), pre-hunt learning (disclosed reports, tech stack research, threat modeling), vulnerability hunting (IDOR, SSRF,… | — |
-| `nuclei-template-forge` | Forge and validate custom Nuclei templates so a finding you confirmed once by hand becomes a repeatable, estate-wide check. | — |
+| `bug-bounty` | Complete bug bounty workflow: recon, pre-hunt learning from disclosed reports, hunting across every web class (IDOR, SSRF, XSS, auth bypass, CSRF, race conditions, SQLi, XXE, file upload, business logic, GraphQL, OAuth, SSTI, cloud… | — |
+| `nuclei-template-forge` | Forge and validate custom Nuclei templates so a finding confirmed once by hand becomes a repeatable, estate-wide check: current template schema, matcher discipline against false positives, nuclei -validate, the mandatory known-bad and… | — |
 | `redteam-mindset` | Red-team operator discipline — the mindset corrections that separate offensive testing from defensive WAPT. | 1 |
 
 ## Reporting & validation (6)
 
 | Skill | What it does | Reports |
 |---|---|---|
-| `bugcrowd-reporting` | Bugcrowd-specific reporting tactics complementing report-writing: VRT category search-and-fallback strategy when no exact match exists, manual severity override when VRT defaults underrate impact, severity-request paragraph as first body… | — |
-| `evidence-hygiene` | Evidence-capture and PoC-redaction discipline for bug-bounty submissions: cookie redaction protocol (which fields to mask, Preview annotation / Burp panel hiding / DevTools workflow), PII black-bar discipline (what to mask in other-user… | — |
-| `mid-engagement-ir-detection` | Methodology for detecting client SOC patches, attacker activity, and security-state changes that occur DURING a red-team engagement — and converting those observations into deliverable findings. | 1 |
-| `redteam-report-template` | Client-facing red-team deliverable format — codifies the Subject / Observations / Description / Impact / Recommendation / PoC structure used for external red-team engagements (not bug-bounty platform reports). | 1 |
-| `report-writing` | Bug bounty report writing for H1/Bugcrowd/Intigriti/Immunefi — report templates, human tone guidelines, impact-first writing, CVSS 3.1 scoring, title formula, impact statement formula, severity decision guide, downgrade counters,… | — |
+| `bugcrowd-reporting` | Bugcrowd-specific reporting tactics on top of report-writing: VRT category search and fallback, severity override when the VRT default underrates impact, severity-request paragraph, OOS-clause rebuttal templates (rate limiting on auth… | — |
+| `evidence-hygiene` | Evidence capture and PoC redaction for bug-bounty submissions: cookie redaction protocol (Burp panel hiding, DevTools workflow), PII black-bar discipline for other-user data, HAR sanitization with jq filters for Cookie, Set-Cookie and… | — |
+| `mid-engagement-ir-detection` | Detect client SOC patches, attacker activity and security-state changes that occur during a red-team engagement, and turn those observations into deliverable findings; built from work where a client patched a confirmed SQLi within 30… | 1 |
+| `redteam-report-template` | Client-facing red-team deliverable format: the Subject, Observations, Description, Impact, Recommendation and PoC structure used for external red-team engagements rather than bug-bounty platform reports, with its own audience, tone and… | 1 |
+| `report-writing` | Bug bounty report writing for HackerOne, Bugcrowd, Intigriti and Immunefi: report templates, human tone, impact-first writing, CVSS 3.1 scoring, title and impact-statement formulas, severity decision guide, downgrade counters, pre-submit… | — |
 | `triage-validation` | Finding validation before writing any report — 7-Question Gate (all 7 questions), 4 pre-submission gates, always-rejected list, conditionally valid with chain table, CVSS 3.1 quick reference, severity decision guide, report title formula,… | — |
 

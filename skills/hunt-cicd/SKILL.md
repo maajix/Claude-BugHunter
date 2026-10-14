@@ -1,6 +1,6 @@
 ---
 name: hunt-cicd
-description: "Hunt CI/CD pipeline vulnerabilities — GitHub Actions workflow injection (pull_request_target Pwnrequest + ${{ }}-into-shell), self-hosted runner poisoning, OIDC trust-policy abuse, Jenkins script-console RCE and CVE-2024-23897 file read, GitLab CI runner-token registration, Terraform state file leakage, artifact/log secret leakage, pipeline env-var disclosure. Use when target has a public GitHub/GitLab org, exposed CI dashboards (Jenkins/TeamCity/Drone/Argo), or build artifacts/images are reachable."
+description: "Hunt CI/CD pipeline vulnerabilities: GitHub Actions workflow injection (pull_request_target, expression-into-shell), self-hosted runner poisoning, OIDC trust-policy abuse, Jenkins script console and CVE-2024-23897 file read, GitLab runner-token registration, Terraform state leakage, secrets in artifacts and logs, pipeline env-var disclosure. Use when the target has a public GitHub or GitLab org, exposed CI dashboards (Jenkins, TeamCity, Drone, Argo) or reachable build artifacts."
 metadata:
   sources: hackerone_public, github_security_lab, cve_database, portswigger_research
   report_count: 18

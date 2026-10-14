@@ -1,6 +1,6 @@
 ---
 name: bug-bounty
-description: "Complete bug bounty workflow: recon (subdomain enumeration, asset discovery, fingerprinting, scope parsing, source code audit), pre-hunt learning (disclosed reports, tech stack research, threat modeling), vulnerability hunting (IDOR, SSRF, XSS, auth bypass, CSRF, race conditions, SQLi, XXE, file upload, business logic, GraphQL, HTTP smuggling, cache poisoning, OAuth/OIDC, SSTI, subdomain takeover, cloud misconfig, ATO chains, agentic AI), LLM/AI testing (prompt injection, exfil channels, system prompt extraction), A-to-B bug chaining, bypass tables, language-specific grep (JS, Python, PHP, Go, Ruby, Rust), and reporting (7-Question Gate, templates by vuln class, CVSS 3.1, PoC, submission checklist). Use for any bug bounty task: starting a new target, recon, hunting specific vulns, auditing source code, testing AI features, validating findings, or writing reports. 中文触发词：漏洞赏金、安全测试、渗透测试、漏洞挖掘、信息收集、子域名枚举、XSS测试、SQL注入、SSRF、安全审计、漏洞报告"
+description: "Complete bug bounty workflow: recon, pre-hunt learning from disclosed reports, hunting across every web class (IDOR, SSRF, XSS, auth bypass, CSRF, race conditions, SQLi, XXE, file upload, business logic, GraphQL, OAuth, SSTI, cloud misconfig, ATO chains, LLM/AI features), bug chaining, bypass tables, and reporting with the 7-Question Gate. Use for any bug bounty task: new target, recon, hunting a vuln class, source audit, validating findings, writing reports. 中文触发词：漏洞赏金、安全测试、渗透测试、漏洞挖掘、XSS测试、SQL注入、SSRF、漏洞报告"
 metadata:
   sources: community, public_research
 ---

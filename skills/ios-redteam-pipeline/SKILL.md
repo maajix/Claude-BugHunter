@@ -1,6 +1,6 @@
 ---
 name: ios-redteam-pipeline
-description: End-to-end iOS red-team pipeline — IPA acquisition (App Store extraction, TestFlight, enterprise/ad-hoc sideload), class-dump/Hopper/Ghidra static analysis, Info.plist + entitlements + Keychain secret extraction, App Transport Security (ATS) misconfig + certificate-pinning bypass (frida-ios-dump, objection, SSL Kill Switch 3), URL-scheme / Universal Link hijack, exported-service enumeration, Frida runtime instrumentation. Companion to apk-redteam-pipeline for the iOS side of a mobile app catalogue. Use when target has an iOS app (App Store listing, TestFlight link, enterprise MDM distribution), when an IPA URL is found hosted on a web server, or when post-recon mentions "iOS app" / "mobile app" in scope alongside an Apple developer account.
+description: "End-to-end iOS red-team pipeline: IPA acquisition (App Store extraction, TestFlight, enterprise or ad-hoc sideload), class-dump, Hopper and Ghidra static analysis, Info.plist, entitlements and Keychain secret extraction, ATS misconfiguration and certificate-pinning bypass (frida-ios-dump, objection, SSL Kill Switch 3), URL-scheme and Universal Link hijack, Frida instrumentation. Companion to apk-redteam-pipeline; hands the decrypted IPA to hunt-mobile-ios. Use when a target has an iOS app, a TestFlight link or enterprise MDM distribution, or an IPA URL turns up on a web server."
 metadata:
   sources: public_research, frida_docs, objection_docs, owasp_mastg
   report_count: 0

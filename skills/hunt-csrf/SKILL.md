@@ -1,6 +1,6 @@
 ---
 name: hunt-csrf
-description: Hunting skill for csrf vulnerabilities. Built from 18 public bug bounty reports including modern variants — SameSite=Lax sibling-subdomain bypass (Argo CD CVE-2024-22424), GraphQL mutations-via-GET (GitLab $3,370), framework-wide CSRF middleware disabled (Stripe Dashboard $5,000), path-traversal CSRF-token bypass (GitHub Enterprise CVE-2022-23732 $10k), Origin-omission bypass (TikTok $2,500), OAuth-state null-byte (Streamlabs), WebSocket CSRF / CSWSH (Coda), default-SameSite email-change → ATO (YoYo Games $400), social-account-link CSRF (HackerOne), JSON-CSRF via text/plain on email-change (TikTok $500). Use when hunting modern CSRF — heavy emphasis on chain-to-ATO patterns.
+description: "Hunt CSRF from 18 disclosed reports, modern variants included: SameSite=Lax sibling-subdomain bypass (Argo CD CVE-2024-22424), GraphQL mutations via GET, framework CSRF middleware disabled, path-traversal token bypass (GitHub Enterprise CVE-2022-23732), Origin-omission bypass, OAuth state null byte, WebSocket CSRF (CSWSH), email-change CSRF to ATO, JSON CSRF via text/plain. Use when hunting CSRF on state-changing endpoints, with emphasis on chains to account takeover."
 metadata:
   sources: github, hackerone_public, bugcrowd_public, github_security_advisories
   report_count: 18

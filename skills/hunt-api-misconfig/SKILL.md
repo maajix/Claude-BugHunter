@@ -1,6 +1,6 @@
 ---
 name: hunt-api-misconfig
-description: "Hunt API security misconfiguration — mass assignment, prototype pollution, HTTP verb tampering. Mass assignment: send {is_admin:true, role:admin, verified:true} on profile/account/reset endpoints — server blindly applies. JWT signature/crypto forging (alg:none, key confusion, kid/jku) is owned by hunt-jwt-crypto; this skill covers only non-crypto JWT handling. Prototype pollution: __proto__ injection in JSON merge / Object.assign / lodash _.merge → polluted prototype reaches sink (RCE in Node, XSS in browser). HTTP verb: GET-bypass-CSRF, X-HTTP-Method-Override, TRACE enabled. Detection: API responses with extra fields, JWTs in headers (decode at jwt.io). CORS misconfiguration (reflect-any-origin, null origin, subdomain-regex bypass, postMessage) is owned by hunt-cors. Use when hunting API misconfigs, mass-assignment, prototype pollution (JWT crypto → hunt-jwt-crypto)."
+description: "Hunt API security misconfiguration: mass assignment (is_admin, role, verified fields applied blindly on profile, account and reset endpoints), prototype pollution (__proto__ via JSON merge, Object.assign or lodash merge reaching RCE in Node or XSS in the browser), HTTP verb tampering (GET bypasses CSRF, X-HTTP-Method-Override, TRACE). JWT signature forgery is owned by hunt-jwt-crypto, CORS by hunt-cors. Use when hunting API misconfigs, mass assignment, prototype pollution or verb tampering."
 metadata:
   sources: hackerone_public, owasp_api_top10_2023, public_research
   report_count: 0

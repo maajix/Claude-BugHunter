@@ -1,6 +1,6 @@
 ---
 name: hunt-business-logic
-description: Hunting skill for business logic vulnerabilities. Built from 25 public bug bounty reports. Covers coupon-race-stacking (Instacart, Stripe, Reverb), negative-quantity-in-cart price tampering (Upserve, Eternal/Zomato), decimal/fraction price-field overflow (Shipt), client-side checkout amount trust on PayPal redirect (WordPress.org), price-per-unit mass-assignment (Krisp), and archived-price swap / cart-TOCTOU (Stripe). Use when hunting business logic — heavy emphasis on financial-impact-demonstrated cases.
+description: "Hunt business logic flaws from 25 disclosed reports: coupon race stacking, negative-quantity price tampering, decimal or fraction price overflow, client-side checkout amount trust on payment redirects, price-per-unit mass assignment, archived-price swap and cart TOCTOU. Use when hunting logic bugs in carts, checkout, pricing, coupons, subscriptions or workflows, with the financial impact demonstrated."
 metadata:
   sources: hackerone_public, github
   report_count: 25

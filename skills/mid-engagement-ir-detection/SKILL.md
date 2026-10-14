@@ -1,6 +1,6 @@
 ---
 name: mid-engagement-ir-detection
-description: Methodology for detecting client SOC patches, attacker activity, and security-state changes that occur DURING a red-team engagement — and converting those observations into deliverable findings. Built from authorized red-team work where the client patched a confirmed SQLi within 30 minutes of detection AND an external attacker locked multiple new accounts during a single test session. Use when (a) running ANY active engagement against a monitored target, (b) a previously-confirmed finding stops reproducing, (c) baseline timing shifts unexpectedly, or (d) you notice response patterns changing during testing.
+description: "Detect client SOC patches, attacker activity and security-state changes that occur during a red-team engagement, and turn those observations into deliverable findings; built from work where a client patched a confirmed SQLi within 30 minutes and an external attacker locked accounts mid-test. Use when running any active engagement against a monitored target, when a confirmed finding stops reproducing, when baseline timing shifts, or when response patterns change during testing."
 metadata:
   sources: authorized-engagement
   report_count: 1

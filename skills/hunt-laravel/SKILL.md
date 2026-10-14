@@ -1,6 +1,6 @@
 ---
 name: hunt-laravel
-description: Hunt Laravel specific vulnerabilities — Debug mode leakage (APP_DEBUG=true exposes full stack trace + env vars), Laravel Telescope/Horizon dashboard unauthorized access, Ignition RCE (CVE-2021-3129), Livewire v3 pre-auth RCE (CVE-2025-54068), APP_KEY leak to decrypt() unserialize RCE, Signed URL manipulation, Queue Worker abuse, mass assignment via Eloquent, deserialization via cookies, .env file exposure. Use when target runs Laravel (PHP) — detected via X-Powered-By, Laravel session cookies, or /storage/ paths.
+description: "Hunt Laravel-specific vulnerabilities: APP_DEBUG stack traces with env vars, Telescope and Horizon dashboards, Ignition RCE (CVE-2021-3129), Livewire v3 pre-auth RCE (CVE-2025-54068), APP_KEY leak to decrypt and unserialize RCE, signed URL manipulation, queue worker abuse, Eloquent mass assignment, cookie deserialization, .env exposure. Use when the target runs Laravel, detected via X-Powered-By, laravel_session cookies or /storage/ paths."
 metadata:
   sources: hackerone_public, cve_database
   report_count: 14

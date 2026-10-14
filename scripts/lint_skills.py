@@ -9,7 +9,7 @@ Checks per skills/<name>/SKILL.md:
   STRUCTURE (errors) — SKILL.md only
     - frontmatter block present (between the first two `---` lines)
     - `name` present, matches ^[a-z0-9-]+$, and equals the directory name
-    - `description` present and <= 1024 chars
+    - `description` present and <= 1024 chars (warning above 600: the always-loaded budget)
     - only Agent Skills / Claude Code keys at top level; custom keys under `metadata:`
     - body (everything after frontmatter) <= 500 lines
   SAFETY (errors) — SKILL.md *and* every other .md in the skill dir (references/)
@@ -38,6 +38,9 @@ SCRIPTS_DIR = os.path.join(REPO, "scripts")
 
 NAME_RE = re.compile(r"^[a-z0-9-]+$")
 MAX_DESC = 1024
+# Every description is loaded into context at session start, so the bundle budget is
+# the sum of all of them. Above this the lint warns; the hard limit stays MAX_DESC.
+TARGET_DESC = 600
 MAX_BODY_LINES = 500
 
 # Grounding enforcement. Every skill must declare `sources:`; hunt-* skills (built
@@ -211,6 +214,8 @@ def lint_skill(skill_dir, denylist):
     elif len(desc) > MAX_DESC:
         errors.append(f"{name}: description {len(desc)} chars > {MAX_DESC} limit "
                       f"(Codex rejects >1024; install.sh --agents auto-truncates the Codex copy)")
+    elif len(desc) > TARGET_DESC:
+        warnings.append(f"{name}: description {len(desc)} chars > {TARGET_DESC} target — trim, every description is always loaded")
     elif len(desc) < 40:
         warnings.append(f"{name}: description very short ({len(desc)} chars) — weak trigger surface")
     # body length
