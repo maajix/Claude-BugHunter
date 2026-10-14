@@ -1,6 +1,6 @@
 ---
 name: hunt-idor
-description: Hunting skill for idor vulnerabilities. Built from 39 public bug bounty reports. Use when hunting idor on any target.
+description: "Hunt insecure direct object references from 39 disclosed reports: sequential and predictable IDs on REST and GraphQL endpoints (node and GID lookups), multi-tenant org, account and business parameters, file and invoice downloads, message threads, admin and membership endpoints, UUIDv1 sandwich prediction, soft-delete and post-removal access. Chains to password-reset ATO, role escalation via mass assignment and cross-tenant financial actions. Validate with two accounts and a body diff. Use when any endpoint takes a user-supplied identifier for a user-owned resource."
 metadata:
   sources: github, hackerone_public, rfc_9562
   report_count: 39

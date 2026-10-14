@@ -63,6 +63,8 @@ versioning is loosely [SemVer](https://semver.org/) at the bundle level.
   and the `Use when` sentence stay, content inventories moved out. `lint_skills.py`
   warns above 600; the `cbh` description parser stops at hyphenated keys such as
   `user-invocable`.
+- `hunt-idor`, `hunt-misc`, `hunt-oauth` and `hunt-rce` descriptions written out
+  from their bodies (they were one-line stubs of about 117 chars).
 - `hunt-dispatch` is `user-invocable: false`; credits and architecture agree on
   81 original, 22 community and 8 vendored skills.
 - Docs: the throttle `PreToolUse` hook is wired by the plugin install only, with

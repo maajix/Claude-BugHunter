@@ -1,6 +1,6 @@
 ---
 name: hunt-oauth
-description: Hunting skill for oauth vulnerabilities. Built from 22 public bug bounty reports. Use when hunting oauth on any target.
+description: "Hunt OAuth 2.0 and OpenID Connect flaws from 22 disclosed reports: redirect_uri validation bypasses (prefix, parser and browser-versus-server differentials), missing or reusable state, code and token leakage via Referer, mobile deep-link and custom-scheme handlers, token endpoint client authentication gaps, PKCE and nonce omissions, OIDC dynamic registration and prompt=none abuse, cross-client token confusion, device-code exposure. Use when a target has social login, /oauth/authorize or /oauth/token endpoints, a .well-known/openid-configuration document or an SSO integration."
 metadata:
   sources: github, hackerone_public, salt_labs, descope, detectify_labs, harel_research
   report_count: 22

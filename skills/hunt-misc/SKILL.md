@@ -1,6 +1,6 @@
 ---
 name: hunt-misc
-description: Hunting skill for misc vulnerabilities. Built from 225 public bug bounty reports. Use when hunting misc on any target.
+description: "Hunt access-control, auth-logic and disclosure bugs that fit no single class, from 225 disclosed reports: role-boundary and privilege escalation in SaaS role hierarchies, invitation and partner-link token reuse, token and PAT scopes checked at issuance instead of use, soft-delete and post-removal session persistence, cross-tenant writes, CRLF and header injection in Ruby and Rack stacks, SMTP header injection, internal API trust (LFS, hooks, integrations). Use when a finding does not map to a named hunt-* skill or when testing roles, invitations, tokens and tenant boundaries."
 metadata:
   sources: github, hackerone_public, rfc_5322, python_email_docs
   report_count: 225

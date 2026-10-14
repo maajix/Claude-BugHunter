@@ -1,6 +1,6 @@
 ---
 name: hunt-rce
-description: Hunting skill for rce vulnerabilities. Built from 87 public bug bounty reports. Use when hunting rce on any target.
+description: "Hunt remote code execution from 87 disclosed reports: OS command injection with content-type awareness, server-side template injection, YAML and Java deserialization gadgets (SnakeYAML, Ruby YAML), Spring SpEL (CVE-2022-22963), Apache path traversal to execution (CVE-2021-41773), argument injection and Args4j file expansion (Jenkins CVE-2024-23897), dependency confusion, ingress-nginx and exposed Kubernetes API paths. Proves execution with out-of-band callbacks or command output. Use when hunting command injection, template injection, deserialization or supply-chain execution paths."
 metadata:
   sources: github, hackerone_public
   report_count: 87
