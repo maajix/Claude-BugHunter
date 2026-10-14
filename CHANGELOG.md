@@ -19,6 +19,12 @@ versioning is loosely [SemVer](https://semver.org/) at the bundle level.
   with sign-off. CVE matrices carry CISA KEV status as of catalog 2026.10.13.
 - **`hunt-cloud-backends`**: Firebase, Supabase, Cognito/Amplify, Appwrite,
   PocketBase, Hasura and Auth0 tenants tested from client-side config.
+- **Mobile application pentest layer**: `hunt-mobile-android` and
+  `hunt-mobile-ios` (MASVS v2 / MASTG v2 aligned test plans: storage, IPC and
+  platform, biometrics and session, network and pinning, resilience, tooling)
+  and `hunt-mobile-frameworks` (Flutter, React Native, Xamarin/MAUI, Unity,
+  Cordova/Capacitor, Kotlin Multiplatform, bundle-to-backend routing, app-store
+  recon). The two `*-redteam-pipeline` skills keep acquisition and extraction.
 - **`hunt-cloud-misconfig` references** for storage by provider, instance
   metadata endpoints of every major and second-tier provider, serverless/PaaS
   and managed-service exposure; **`cloud-iam-deep` references** for second-tier
@@ -31,7 +37,7 @@ versioning is loosely [SemVer](https://semver.org/) at the bundle level.
   subdomain-takeover provider status, Frida and Android 14+ CA paths, Burp
   single-packet attack wording, React2Shell and Livewire gates, SAML parser
   differentials, platform CVSS 4.0 policy dates, Redis probes reduced to `PING`.
-- Plugin version 2.3.0; skill count 109 (67 `hunt-*`).
+- Plugin version 2.3.0; skill count 112 (70 `hunt-*`).
 
 ### Added (earlier, unreleased)
 - **A request ceiling and required headers, enforced in code** (`engine/throttle.py`,

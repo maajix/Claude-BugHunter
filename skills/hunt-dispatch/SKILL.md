@@ -109,7 +109,9 @@ pulse | fortinet | ivanti | citrix          →  enterprise-vpn-attack
 vsphere | vcenter | :9443                   →  vmware-vcenter-attack
 amazonaws | azure | googleapis | gcp        →  cloud-iam-deep
 github.com/<org>/                           →  supply-chain-attack-recon
-.apk | play.google.com                      →  apk-redteam-pipeline
+.apk | play.google.com                      →  apk-redteam-pipeline, then hunt-mobile-android
+.ipa | apps.apple.com | testflight          →  ios-redteam-pipeline, then hunt-mobile-ios
+flutter | hermes | xamarin | unity | cordova →  hunt-mobile-frameworks
 MongoDB | mongoose | CouchDB | Redis        →  hunt-nosqli
 ?page= | ?file= | ?path= | php wrapper      →  hunt-lfi
 rO0A | VIEWSTATE | rememberMe cookie        →  hunt-deserialization
@@ -200,6 +202,10 @@ vmware-vcenter-attack
 cloud-iam-deep
 supply-chain-attack-recon
 apk-redteam-pipeline
+ios-redteam-pipeline
+hunt-mobile-android
+hunt-mobile-ios
+hunt-mobile-frameworks
 ```
 
 high-impact hunt-* set (load third):
@@ -256,7 +262,8 @@ hunt-source-leak     hunt-tls-network     hunt-payment-api
 hunt-xs-leaks        hunt-exposed-services
 hunt-jwt-crypto      hunt-forgot-password hunt-shadow-api
 hunt-spa-api         hunt-fintech-graphql hunt-rag-vector
-hunt-cloud-backends
+hunt-cloud-backends  hunt-mobile-android  hunt-mobile-ios
+hunt-mobile-frameworks
 hunt-captcha-bypass  hunt-html-injection  hunt-clickjacking
 hunt-exceptional-conditions
 hunt-cms             hunt-exposed-panels  hunt-electron
@@ -322,6 +329,7 @@ loaded for red team: {N} skills
   auth:       hunt-ato, hunt-auth-bypass, hunt-saml, hunt-oauth, hunt-mfa-bypass
   inj:        hunt-rce, hunt-sqli, hunt-ssrf, hunt-file-upload
   infra:      hunt-http-smuggling, hunt-cloud-misconfig, hunt-cloud-backends
+  mobile:     hunt-mobile-android, hunt-mobile-ios, hunt-mobile-frameworks (when an app is in scope)
   stack:      hunt-sharepoint, hunt-aspnet
   ir:         mid-engagement-ir-detection
 ```
@@ -338,6 +346,7 @@ loaded for wapt ({blackbox|greybox}): {N} skills
   infra:      hunt-http-smuggling, hunt-cache-poison
   recon:      hunt-subdomain
   cloud:      hunt-cloud-misconfig, hunt-cloud-backends
+  mobile:     hunt-mobile-android, hunt-mobile-ios, hunt-mobile-frameworks (when an app is in scope)
   ai:         hunt-llm-ai
   stack:      hunt-aspnet, hunt-sharepoint, hunt-ntlm-info
   misc:       hunt-misc, hunt-csrf

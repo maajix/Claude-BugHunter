@@ -160,7 +160,7 @@ plaintext credential/token interception without touching pinning at all.
 ### Certificate-pinning bypass (when pinning IS present and correctly configured)
 ```bash
 pip install --break-system-packages frida-tools objection
-objection --gadget <bundle_id> explore
+objection -n <bundle_id> start   # objection 1.12.5 syntax; --gadget/explore are deprecated aliases
 # inside objection:
 ios sslpinning disable
 ```
@@ -208,8 +208,9 @@ For each custom scheme found (e.g. `myapp://`):
 ## Stage 6 — Runtime instrumentation (Frida / objection)
 
 Requires a jailbroken device or a Corellium virtual device — unlike Android, there is no practical
-rooted-emulator equivalent for iOS. **Jailbreak availability is narrow:** there is no public jailbreak
-for current iOS 26 releases on current hardware. Coverage is limited to older chips and specific
+rooted-emulator equivalent for iOS. **Jailbreak availability is narrow:** Dopamine 3.0 covers iOS 15.0 to 18.7.1
+and 26.0 to 26.0.1 on A8 to A13 devices only, A14 and newer stop at 17.3.1, and nothing public covers
+iOS 26.1+ or A19 hardware (verify at engagement time). Coverage is limited to older chips and specific
 point releases (check the support matrix in the [Dopamine](https://github.com/opa334/Dopamine/releases)
 and [palera1n](https://github.com/palera1n/palera1n) release notes before buying a device). Default
 to Corellium when the target's minimum iOS version rules out a jailbreakable device.
@@ -226,7 +227,7 @@ pip install --break-system-packages frida-tools objection
 # host frida-tools version exactly — version skew is the #1 cause of "failed to attach" errors.
 
 # Full interactive exploration
-objection --gadget <bundle_id> explore
+objection -n <bundle_id> start   # objection 1.12.5 syntax; --gadget/explore are deprecated aliases
 # Inside objection:
 ios hooking watch class <ClassName>
 ios hooking watch class_method <Class>.<method> --dump-args --dump-return
@@ -288,6 +289,7 @@ pip install --break-system-packages frida-tools objection iphone_backup_decrypt
 
 ## Related Skills & Chains
 
+- **`hunt-mobile-ios`** — the MASVS-aligned on-device test plan (Keychain and Data Protection, URL schemes and Universal Links, LAContext, ATS and pinning, resilience) once this pipeline has the IPA; **`hunt-mobile-frameworks`** when the app is Flutter, React Native, Xamarin, Unity or a WebView wrapper.
 - **`apk-redteam-pipeline`** — the Android counterpart; run both when a target ships on both
   platforms. Sibling bundle IDs and shared backend endpoints frequently surface cross-platform.
 - **`hunt-shadow-api`** — mobile builds (iOS and Android alike) often hardcode an older API

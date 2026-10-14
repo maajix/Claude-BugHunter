@@ -319,7 +319,7 @@ Java.perform(function() {
 
 ### Quick token extraction via objection
 ```bash
-objection --gadget com.target.app explore
+objection -n com.target.app start   # objection 1.12.5 syntax; --gadget/explore are deprecated aliases
 # Inside:
 android hooking watch class_method <class>.<method> --dump-args --dump-return
 ```
@@ -425,6 +425,7 @@ download-apk() {
 
 ## Related Skills & Chains
 
+- **`hunt-mobile-android`** — the MASVS-aligned on-device test plan (storage, IPC, biometrics, network, resilience) once this pipeline has the APK and the backend map; **`hunt-mobile-frameworks`** when the app is Flutter, React Native, Xamarin, Unity or a WebView wrapper (pinning bypass and secret locations differ per framework).
 - **`cloud-iam-deep`** — APK secret extraction frequently yields live AWS/GCP/Azure credentials. Chain primitive: jadx string-grep produces AWS Access Key ID + Secret → `cloud-iam-deep` `aws sts get-caller-identity` → role/policy enumeration → IAM privilege-escalation path (one of 24 documented AWS escalation patterns) → cloud-plane takeover. Same flow applies to GCP service-account JSON and Azure shared-access-signature tokens extracted from APK resources.
 - **`hunt-api-misconfig`** — APK endpoint inventory hands you the API surface for free; mass-assignment, JWT, and CORS bugs are typical. Chain primitive: APK reveals `/v1/users/me` and `/v1/admin/users` → `hunt-api-misconfig` mass-assignment probes (`{is_admin:true}`) against `/v1/users/me` → admin role escalation → access to `/v1/admin/users`.
 - **`hunt-rce`** — Hardcoded JWT signing secrets (HS256) extracted from APK enable arbitrary token forging. Chain primitive: APK strings yield HS256 secret → forge admin token → access admin API → if API has eval/template/sink → `hunt-rce` to server. Also: exported components with intent-injection sinks can reach `Runtime.exec` if app is local-installed.

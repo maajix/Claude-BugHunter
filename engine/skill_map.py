@@ -65,6 +65,9 @@ CLASS_SKILL = {
     "exceptional-conditions": ["hunt-exceptional-conditions", "hunt-source-leak"],
     "cicd": ["hunt-cicd"], "k8s": ["hunt-k8s"], "cloud-misconfig": ["hunt-cloud-misconfig"],
     "cloud-backends": ["hunt-cloud-backends"],
+    "mobile-android": ["hunt-mobile-android", "hunt-mobile-frameworks"],
+    "mobile-ios": ["hunt-mobile-ios", "hunt-mobile-frameworks"],
+    "mobile-frameworks": ["hunt-mobile-frameworks"],
     "ldap": ["hunt-ldap"], "ntlm-info": ["hunt-ntlm-info"], "tls-network": ["hunt-tls-network"],
     "subdomain-takeover": ["hunt-subdomain"],
     "payment-api": ["hunt-payment-api", "hunt-business-logic"],
@@ -101,6 +104,10 @@ TECH_SKILL = {
     "electron": ["hunt-electron"],
     "firebase": ["hunt-cloud-backends"], "supabase": ["hunt-cloud-backends"],
     "cognito": ["hunt-cloud-backends"], "hasura": ["hunt-cloud-backends"],
+    "android": ["hunt-mobile-android"], "ios": ["hunt-mobile-ios"],
+    "flutter": ["hunt-mobile-frameworks"], "react native": ["hunt-mobile-frameworks"],
+    "xamarin": ["hunt-mobile-frameworks"], "unity": ["hunt-mobile-frameworks"],
+    "cordova": ["hunt-mobile-frameworks"], "capacitor": ["hunt-mobile-frameworks"],
 }
 
 # curl-first starter probe per class. {u}=url with FUZZ->1, {ur}=injection prefix (before the value)
@@ -139,6 +146,9 @@ CLASS_PROBE = {
     "k8s": "curl -s \"{u}\"   # API anonymous access, kubelet /run, etcd unauth",
     "cloud-misconfig": "curl -s \"{u}\"   # anonymous read on S3/GCS/Blob; PutObjectAcl public-write",
     "cloud-backends": "curl -s \"{u}\"   # Firebase/Supabase/Cognito config in bundle -> open rules, RLS gap, open signup",
+    "mobile-android": "curl -sI \"{u}\"   # APK in scope -> MASVS storage/IPC/auth/network/resilience test plan on a test device",
+    "mobile-ios": "curl -sI \"{u}\"   # IPA in scope -> MASVS storage/platform/auth/network/resilience test plan on a test device",
+    "mobile-frameworks": "curl -sI \"{u}\"   # Flutter/RN/Xamarin/Unity/hybrid bundle -> framework-specific intercept and pinning bypass, then backend skills",
     "ldap": "curl -s \"{ur}*)(objectClass=*\"   # LDAP search-filter injection in auth/search",
     "ntlm-info": "curl -sI \"{u}\"   # WWW-Authenticate: NTLM -> leak domain/forest/computer name",
     "tls-network": "curl -sI \"{u}\"   # HSTS / weak cipher / SPF-DKIM-DMARC / DNS AXFR",

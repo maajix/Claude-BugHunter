@@ -249,6 +249,8 @@ def classify(item):
         (("kubernetes", "/apis/", "/api/v1/namespaces", "kubelet"), "k8s"),
         (("s3.amazonaws", "storage.googleapis", "blob.core.windows", "cloudfront.net"), "cloud-misconfig"),
         (("firebaseio.com", "firebaseapp.com", "supabase.co", "amazoncognito.com", "hasura.app"), "cloud-backends"),
+        ((".apk", "play.google.com/store/apps"), "mobile-android"),
+        ((".ipa", "apps.apple.com", "testflight.apple.com"), "mobile-ios"),
         (("/forgot-password", "/forgot", "/reset-password", "/password-reset", "/recover"), "forgot-password"),
         (("captcha", "recaptcha"), "captcha-bypass"),
         (("jwt",), "jwt-crypto"),
