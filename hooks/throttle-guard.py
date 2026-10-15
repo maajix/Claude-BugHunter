@@ -54,7 +54,8 @@ def main():
         print(f"WebFetch cannot carry the engagement's required header(s) "
               f"({', '.join(lim.headers) or 'none set'}) and its requests do "
               f"not take from the shared budget "
-              f"({lim.rps:g} req/s), so it must not be used against an "
+              f"({lim.requests:g} req / {lim.period:g}s), so it must not be "
+              f"used against an "
               f"in-scope host.\n"
               f"Use the wrapper instead:\n"
               f"    python3 engine/throttle.py exec -- curl -s {url}",
@@ -78,12 +79,16 @@ if __name__ == "__main__":
         # Fail closed inside an engagement, open outside one. A guard that
         # crashes must not be the quiet reason a ceiling stopped applying, but
         # it must also not break a session that never asked for one.
+        # An engagement named in the environment counts as active even when
+        # the module will not import or the path is wrong: both are the
+        # operator's intent to be governed, not an absence of one.
+        active = bool(os.environ.get("BUGHUNTER_ENGAGEMENT"))
         try:
             sys.path.insert(0, ENGINE)
             import throttle
-            active = throttle.find_engagement(os.getcwd()) is not None
+            active = active or throttle.find_engagement(os.getcwd()) is not None
         except Exception:           # noqa: BLE001
-            active = False
+            pass
         if active:
             print(f"bughunter throttle: the request-budget guard failed "
                   f"({exc}), so no limit can be proven for this command. "

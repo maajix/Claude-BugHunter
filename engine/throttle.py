@@ -53,14 +53,20 @@ What this does NOT do, stated plainly because the gap matters:
 
     python3 engine/throttle.py --selftest
 """
-import fcntl
+import functools
 import json
+import math
 import os
 import re
 import shlex
 import sys
 import time
 from urllib.parse import urlparse
+
+try:
+    import fcntl
+except ImportError:         # native Windows: no flock, so no shared budget
+    fcntl = None
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from scope import Scope  # noqa: E402  (same directory, deliberate)
@@ -80,18 +86,42 @@ ENV_ENGAGEMENT = "BUGHUNTER_ENGAGEMENT"
 #              it takes the exclusive lock instead of a per-request slot.
 #   targets  — argv flags whose value is a target, or a file of targets.
 TOOLS = {
-    # curl 8.5.0: -H/--header, --rate, -g/--globoff, --url   (curl --help all)
+    # curl 8.22.0: -H/--header, -g/--globoff, --url, -K/--config, -L/--location
+    # (curl --help all). Its URLs are positional, and which options take an
+    # operand is read from `curl --help all` at run time (`_curl_value_flags`).
     "curl": {
         "header": "-H", "rate": None, "fanout": False,
-        "targets": {"value": ["--url"], "file": ["-K", "--config"]},
+        "targets": {"value": ["--url"], "file": [], "positional": True},
     },
-    # nuclei v3.8.0: -H/-header, -rl/-rate-limit (default 150), -u/-target,
-    # -l/-list   (nuclei -h)
+    # nuclei v3.11.1: -H/-header, -rl/-rate-limit (default 150, per second),
+    # -rld/-rate-limit-duration (the period -rl counts over, default 1s),
+    # -u/-target, -l/-list   (nuclei -h)
     "nuclei": {
-        "header": "-H", "rate": "-rl", "fanout": True,
+        "header": "-H", "rate": "-rl", "rate_period": "-rld", "fanout": True,
         "targets": {"value": ["-u", "-target"], "file": ["-l", "-list"]},
+        # every long spelling of a flag this file acts on, so an alias or an
+        # `=value` form cannot sit beside the clamped flag and override it
+        "aliases": {"-header": "-H", "-rate-limit": "-rl",
+                    "-rate-limit-duration": "-rld"},
     },
 }
+
+
+def _normalize(spec, argv):
+    """Rewrite aliases to their canonical flag and split `-flag=value`, so the
+    rest of build_argv has exactly one spelling to find and replace."""
+    aliases = spec.get("aliases", {})
+    known = set(aliases) | set(aliases.values())
+    out = argv[:1]
+    for a in argv[1:]:
+        key, eq, val = a.partition("=")
+        # Only the flags this file acts on. Anything else, `-dfoo=http://x`
+        # included, is an operand and must reach the tool untouched.
+        if key in known:
+            out += [aliases.get(key, key), val] if eq else [aliases.get(key, key)]
+        else:
+            out.append(a)
+    return out
 
 # Network tools this file cannot govern, because their header and rate flags
 # were not verifiable on this machine. They are named anyway so that running one
@@ -131,10 +161,17 @@ class ThrottleError(Exception):
 # --------------------------------------------------------------------------- #
 
 def find_engagement(start=None):
-    """Locate the engagement JSON: the env var first, then upwards from cwd."""
+    """Locate the engagement JSON: the env var first, then upwards from cwd.
+
+    An env var that names a file which is not there is a refusal, not an
+    absence: a typo in the path must not quietly remove the ceiling.
+    """
     env = os.environ.get(ENV_ENGAGEMENT)
     if env:
-        return env if os.path.isfile(env) else None
+        if not os.path.isfile(env):
+            raise ThrottleError(f"{ENV_ENGAGEMENT}={env} is not a readable "
+                                f"file, so no limit can be enforced")
+        return env
     d = os.path.abspath(start or os.getcwd())
     while True:
         for name in ("engagement.json", "engagement/engagement.json"):
@@ -165,10 +202,18 @@ class Limits:
         else:
             self.requests = float(rl.get("requests_per_second") or 0)
             self.period = 1.0
+        if 0 < self.requests < 1:
+            # "0.5 per second" is "1 per 2 seconds". Never round a maximum up.
+            self.period /= self.requests
+            self.requests = 1.0
         self.headers = dict(data.get("headers") or {})
         self.scope = Scope(data.get("in_scope", []), data.get("out_of_scope", []),
                            data.get("seeds", []), data.get("name", "engagement"))
         self.active = bool(self.requests > 0 or self.headers)
+
+    @property
+    def per_second(self):
+        return self.requests / self.period
 
     @classmethod
     def load(cls, path):
@@ -205,6 +250,20 @@ class Limits:
 # --------------------------------------------------------------------------- #
 # the shared budget
 # --------------------------------------------------------------------------- #
+
+def _flock(fd, shared=False):
+    """flock, or a refusal on a platform without it. Never a silent allow."""
+    if fcntl is None:
+        raise ThrottleError("the shared request budget needs fcntl.flock, "
+                            "which this platform lacks. Run the engagement "
+                            "from Linux, macOS or WSL.")
+    fcntl.flock(fd, fcntl.LOCK_SH if shared else fcntl.LOCK_EX)
+
+
+def _funlock(fd):
+    if fcntl is not None:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
 
 class Window:
     """A hard cap: never more than `limit` requests in any `period` seconds.
@@ -249,7 +308,7 @@ class Window:
         """Admit n arrivals, or return how long to wait. Runs under the lock."""
         fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o600)
         try:
-            fcntl.flock(fd, fcntl.LOCK_EX)
+            _flock(fd)
             raw = os.read(fd, 1 << 20).decode("utf-8") or "[]"
             try:
                 stamps = [float(x) for x in json.loads(raw)]
@@ -279,7 +338,7 @@ class Window:
             os.write(fd, json.dumps([round(s, 6) for s in stamps]).encode())
             return wait
         finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
+            _funlock(fd)
             os.close(fd)
 
     def take(self, n=1, on_wait=None):
@@ -288,8 +347,8 @@ class Window:
         if n > self.limit:
             raise ThrottleError(
                 f"one invocation would send {n} requests, over the whole "
-                f"ceiling of {self.limit} per second. Split it so no single "
-                f"command needs more than the ceiling allows.")
+                f"ceiling of {self.limit} per {self.period:g}s. Split it so no "
+                f"single command needs more than the ceiling allows.")
         waited = 0.0
         while True:
             wait = self._attempt(n)
@@ -301,18 +360,28 @@ class Window:
             waited += min(wait, self.period)
 
 
-def hold_fanout_lock(path):
-    """Take the engagement's exclusive fan-out lock and keep it across execvp.
+def hold_fanout_lock(path, shared=False):
+    """Take the engagement's fan-out lock and keep it across execvp.
+
+    A fan-out tool takes it exclusively: it runs at the whole ceiling on its
+    own rate flag, so nothing else may send meanwhile. A single request takes
+    it shared: many of them run side by side under the window, and a scanner
+    waits for them to finish. That is what makes the two kinds of traffic one
+    budget instead of two that each fill the ceiling.
 
     flock lives on the open file description, so the lock survives `execvp` as
     long as the descriptor is not close-on-exec. Python marks every descriptor
     close-on-exec by default, so that has to be cleared explicitly. The kernel
     releases the lock when the process exits or dies, which is why no PostToolUse
     hook is needed to clean up after a background scan.
+
+    ponytail: flock is unfair, so a scanner can wait behind a steady stream of
+    single requests; and the requests in flight when the lock changes hands
+    overlap the next holder by one window at most. A fair queue if either bites.
     """
     fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
     os.set_inheritable(fd, True)
-    fcntl.flock(fd, fcntl.LOCK_EX)
+    _flock(fd, shared)
     return fd
 
 
@@ -326,9 +395,78 @@ def _host_looks_real(token):
     return bool(URLISH.match(token)) and "." in token.split("/")[0]
 
 
+@functools.lru_cache(maxsize=None)
+def _curl_value_flags():
+    """The curl options that take an operand, read from `curl --help all`.
+
+    Asked of the binary in front of you rather than copied from a man page, so
+    `-o index.html` is consumed as an operand and never read as a host. When
+    curl cannot be asked the set is empty, and a stray operand is then refused
+    as an out-of-scope host rather than let through.
+    """
+    import subprocess
+    try:
+        out = subprocess.run(["curl", "--help", "all"], capture_output=True,
+                             text=True, timeout=10).stdout
+    except (OSError, subprocess.SubprocessError):
+        return frozenset()
+    flags = set()
+    for m in re.finditer(r"^\s*(?:(-\w), )?(--[\w-]+) <", out, re.M):
+        flags.update(f for f in m.groups() if f)
+    return frozenset(flags)
+
+
+def _curl_argv(argv):
+    """(targets, flags) for a curl argv.
+
+    Targets are the positional URLs and `--url` operands; every other option's
+    operand is consumed so it is never read as a URL. `flags` holds each option
+    seen, short letters split out of their cluster (`-sL` is `-s` and `-L`), so
+    a caller can ask for `-L` or `-g` without re-reading the argv.
+    """
+    takes = _curl_value_flags()
+    targets, flags, i = [], set(), 0
+    while i < len(argv):
+        a = argv[i]
+        nxt = argv[i + 1] if i + 1 < len(argv) else None
+        if a.startswith("--"):
+            key, eq, inline = a.partition("=")
+            flags.add(key)
+            # `--data=` is an empty operand, not a missing one: the next word
+            # is a URL, and it has to be read as one
+            val = inline if eq else nxt
+            if key == "--url" and val:
+                targets.append(val)
+            i += 2 if (key in takes or key == "--url") and not eq else 1
+            continue
+        if a.startswith("-") and len(a) > 1:
+            for k, ch in enumerate(a[1:]):
+                flags.add("-" + ch)
+                if "-" + ch in takes:
+                    # the operand is the rest of the cluster, or the next word
+                    if k == len(a) - 2:
+                        i += 1
+                    break
+            i += 1
+            continue
+        if _host_looks_real(a):
+            targets.append(a)
+        i += 1
+    return targets, flags
+
+
 def targets_in(tool, argv):
     """Every target this invocation will touch, list files included."""
     spec = TOOLS[tool]["targets"]
+    if tool == "curl":
+        targets, flags = _curl_argv(argv)
+        if flags & {"-K", "--config"}:
+            # A config file carries its own url, header and location lines,
+            # so nothing on the command line says what will be sent.
+            raise ThrottleError("curl -K/--config hides the request's URL and "
+                                "options from the budget. Pass them on the "
+                                "command line instead.")
+        return targets
     found, i = [], 0
     while i < len(argv):
         a = argv[i]
@@ -356,8 +494,6 @@ def targets_in(tool, argv):
                                     f"hosts cannot be scope-checked")
             i += 1 if inline else 2
             continue
-        if not a.startswith("-") and _host_looks_real(a):
-            found.append(a)
         i += 1
     return found
 
@@ -370,10 +506,9 @@ def request_estimate(tool, argv, n_targets):
     """
     if tool != "curl":
         return max(1, n_targets)
-    n = max(1, n_targets)
-    globbed = any(not a.startswith("-") and re.search(r"[\[{].*[\]}]", a)
-                  for a in argv)
-    if globbed and not any(a in ("-g", "--globoff") for a in argv):
+    targets, flags = _curl_argv(argv)
+    globbed = any(re.search(r"[\[{].*[\]}]", t) for t in targets)
+    if globbed and not flags & {"-g", "--globoff"}:
         # A range like [1-100] is one argument and up to a hundred requests. The
         # count is not knowable from the string, so refuse and let the operator
         # expand it into requests that can be counted.
@@ -381,9 +516,23 @@ def request_estimate(tool, argv, n_targets):
             "curl URL globbing hides the request count from the budget. "
             "Expand the range into a list file and loop over it, so each "
             "request is counted, or pass -g to disable globbing.")
-    if any(a in ("-L", "--location") for a in argv):
-        n += 1          # a redirect chain is at least one more request
-    return n
+    return max(1, n_targets)
+
+
+def refuse_redirects(tool, argv):
+    """Refuse curl -L for in-scope traffic.
+
+    curl re-sends every -H header to wherever a redirect points, so the bounty
+    username would follow a 302 off-host, and each hop is a request the budget
+    never saw. The wrapper execs the tool, so it cannot judge hops itself.
+    """
+    if tool == "curl" and _curl_argv(argv)[1] & {"-L", "--location",
+                                                 "--location-trusted"}:
+        raise ThrottleError(
+            "curl -L would carry the engagement headers to wherever the "
+            "redirect points and send hops the budget cannot count. Drop -L, "
+            "read Location from -i, and request the next hop through the "
+            "wrapper so it is scope-checked and counted on its own.")
 
 
 # --------------------------------------------------------------------------- #
@@ -416,8 +565,16 @@ def gate(url, start=None):
         return {}
     waited = 0.0
     if lim.requests > 0:
-        waited = Window(os.path.join(lim.state_dir, STATE_NAME),
-                        lim.requests, lim.period).take(1)
+        # Shared slot: wait out any scanner that holds the ceiling, then take
+        # from the window every single request shares.
+        fd = hold_fanout_lock(os.path.join(lim.state_dir, FANOUT_NAME),
+                              shared=True)
+        try:
+            waited = Window(os.path.join(lim.state_dir, STATE_NAME),
+                            lim.requests, lim.period).take(1)
+        finally:
+            _funlock(fd)
+            os.close(fd)
     audit(lim, {"t": time.time(), "tool": "engine", "targets": [url],
                 "in_scope": True, "waited_s": round(waited, 3),
                 "fanout_lock": False, "headers": sorted(lim.headers)})
@@ -472,7 +629,9 @@ class fanout:
     def __init__(self, start=None):
         self._lim = Limits.discover(start)
         self._fd = None
-        self.ceiling = (max(1, int(self._lim.requests / self._lim.period))
+        # Floored, never rounded up: a per-second flag cannot say "30 per
+        # minute", so a ceiling under one per second is a refusal in __enter__.
+        self.ceiling = (int(self._lim.per_second)
                         if self._lim and self._lim.requests > 0 else None)
         # The required headers, read without charging a request. A fan-out tool
         # adds them once with its own flag for a whole run, so calling gate()
@@ -484,6 +643,12 @@ class fanout:
         return bool(self._lim) and self._lim.scope.in_scope_host(target)
 
     def __enter__(self):
+        if self.ceiling == 0:
+            raise ThrottleError(
+                f"the ceiling of {self._lim.requests:g} per "
+                f"{self._lim.period:g}s is under one request per second, "
+                f"which a per-second rate flag cannot express. Use the "
+                f"per-request path for this engagement.")
         if self.ceiling:
             self._fd = hold_fanout_lock(
                 os.path.join(self._lim.state_dir, FANOUT_NAME))
@@ -491,7 +656,7 @@ class fanout:
 
     def __exit__(self, *exc):
         if self._fd is not None:
-            fcntl.flock(self._fd, fcntl.LOCK_UN)
+            _funlock(self._fd)
             os.close(self._fd)
             self._fd = None
         return False
@@ -500,7 +665,7 @@ class fanout:
 def build_argv(lim, tool, argv, in_scope):
     """Insert the required headers and clamp the tool's own rate flag."""
     spec = TOOLS[tool]
-    out = list(argv)
+    out = _normalize(spec, list(argv))
     if in_scope and lim.headers and spec["header"]:
         add = []
         for k, v in lim.headers.items():
@@ -511,18 +676,41 @@ def build_argv(lim, tool, argv, in_scope):
             add += [spec["header"], f"{k}: {v}"]
         out = out[:1] + add + out[1:]
     if in_scope and spec["fanout"] and spec["rate"] and lim.requests > 0:
-        # The tool's own flag is per second, so convert.
-        ceiling = max(1, int(lim.requests / lim.period))
-        flag = spec["rate"]
-        for i, a in enumerate(out):
-            if a == flag and i + 1 < len(out):
-                try:
-                    if int(out[i + 1]) > ceiling:
-                        out[i + 1] = str(ceiling)
-                except ValueError:
-                    out[i + 1] = str(ceiling)
-                return out
-        out = out[:1] + [flag, str(ceiling)] + out[1:]
+        flag, period_flag = spec["rate"], spec.get("rate_period")
+        # Strip every rate and period the caller passed, remembering the last
+        # value of each (the tool's own last-wins rule), and emit exactly one
+        # pair. A second `-rl 99` or a `-rld 100ms` left beside the clamped
+        # flag would otherwise override it.
+        kept, theirs, pending = [], {}, None
+        for a in out:
+            if pending:
+                theirs[pending], pending = a, None
+            elif a in (flag, period_flag):
+                pending = a
+            else:
+                kept.append(a)
+        if not period_flag:
+            raise ThrottleError(
+                f"{tool} has no verified interval flag, so its burst shape "
+                f"cannot be held to the ceiling. Add one to TOOLS.")
+        # One request per interval, never N per second. nuclei's own limiter
+        # is a token bucket: `-rl 5` measured 10 arrivals in a sliding second
+        # at the wire (a burst of 5, then 5 more at the refill). One per
+        # interval has no burst, and the interval carries the same margin
+        # Window uses, which measured 6 in a second without it. This also
+        # says "30 per minute" exactly, as one per 2.2 s, with nothing
+        # rounded up. The caller's own rate stays only when it is plainly
+        # lower: a number under the ceiling with no period of its own.
+        rate = lim.per_second
+        if period_flag not in theirs:
+            try:
+                mine = float(theirs.get(flag, rate))
+                if 0 < mine < rate:
+                    rate = mine
+            except ValueError:
+                pass
+        interval = math.ceil(1000 * (1 + Window.JITTER_MARGIN) / rate)
+        out = kept[:1] + [flag, "1", period_flag, f"{interval}ms"] + kept[1:]
     return out
 
 
@@ -561,15 +749,21 @@ def do_exec(argv, start=None):
             "budget and the headers cannot be applied to only part of it. "
             "Split it into one command per scope.")
 
+    if in_scope:
+        refuse_redirects(tool, argv[1:])
     final = build_argv(lim, tool, argv, in_scope)
     spec = TOOLS[tool]
     waited, held = 0.0, False
     if in_scope and lim.requests > 0:
+        lock = os.path.join(lim.state_dir, FANOUT_NAME)
         if spec["fanout"]:
-            hold_fanout_lock(os.path.join(lim.state_dir, FANOUT_NAME))
+            hold_fanout_lock(lock)
             held = True
         else:
+            # Held shared across the exec, so a scanner cannot start while
+            # this request is in flight, and this waits while one runs.
             n = request_estimate(tool, argv[1:], len(scoped))
+            hold_fanout_lock(lock, shared=True)
             waited = Window(os.path.join(lim.state_dir, STATE_NAME),
                             lim.requests, lim.period).take(n)
 
@@ -789,6 +983,68 @@ def _selftest():
                        "rate_limit": {"requests": 100, "per_seconds": 60}}, fh)
         pl = Limits.load(perm)
         assert pl.requests == 100 and pl.period == 60 and pl.active
+        # a ceiling under one per second keeps its pacing, never rounded up
+        slow = os.path.join(d, "slow.json")
+        with open(slow, "w", encoding="utf-8") as fh:
+            json.dump({"in_scope": ["target.example"],
+                       "rate_limit": {"requests": 30, "per_seconds": 60}}, fh)
+        sl = Limits.load(slow)
+        assert sl.per_second == 0.5
+        half = os.path.join(d, "half.json")
+        with open(half, "w", encoding="utf-8") as fh:
+            json.dump({"in_scope": ["x.example"],
+                       "rate_limit": {"requests_per_second": 0.5}}, fh)
+        hl = Limits.load(half)
+        assert hl.requests == 1 and hl.period == 2, (hl.requests, hl.period)
+        s = build_argv(sl, "nuclei", ["nuclei", "-rl", "150", "-u",
+                                       "https://target.example"], True)
+        assert s[s.index("-rl") + 1] == "1" and s[s.index("-rld") + 1] == "2200ms", s
+        assert s.count("-rl") == 1, s
+        # an alias or =value form beside the clamped flag cannot override it
+        s2 = build_argv(sl, "nuclei", ["nuclei", "-rl", "1", "-rate-limit-duration",
+                                        "2s", "-rate-limit=99", "-u",
+                                        "https://target.example"], True)
+        assert s2[1:5] == ["-rl", "1", "-rld", "2200ms"], s2
+        assert "-rate-limit-duration" not in s2 and "2s" not in s2 and "99" not in s2, s2
+        n4 = build_argv(lim, "nuclei", ["nuclei", "-rate-limit=150", "-u",
+                                        "https://target.example"], True)
+        five = ["-rl", "1", "-rld", "220ms"]      # 5/s as one per 220 ms
+        assert n4[1:5] == five and "-rate-limit=150" not in n4, n4
+        # a second rate, or a period beside the rate, cannot slip past at 5/s
+        n5 = build_argv(lim, "nuclei", ["nuclei", "-rl", "1", "-rl", "99", "-u",
+                                        "https://target.example"], True)
+        assert n5.count("-rl") == 1 and n5[1:5] == five, n5
+        n6 = build_argv(lim, "nuclei", ["nuclei", "-rl", "5", "-rld", "100ms",
+                                        "-u", "https://target.example"], True)
+        assert n6.count("-rl") == 1 and n6.count("-rld") == 1 and "100ms" not in n6, n6
+        assert n6[1:5] == five, n6
+        # curl operands are never split on `=`: `-dfoo=http://x` is data
+        c2 = build_argv(lim, "curl", ["curl", "-dfoo=http://outside.example/",
+                                      "https://target.example/"], True)
+        assert "-dfoo=http://outside.example/" in c2 and \
+            "http://outside.example/" not in c2, c2
+        try:
+            with fanout(d):
+                pass
+            # 5/s in d/engagement.json is expressible; the slow one is not
+            os.environ[ENV_ENGAGEMENT] = slow
+            try:
+                with fanout():
+                    assert False, "0.5 req/s must refuse a per-second flag"
+            except ThrottleError:
+                pass
+        finally:
+            os.environ.pop(ENV_ENGAGEMENT, None)
+
+        # an env var naming a missing file is a refusal, not an absence
+        os.environ[ENV_ENGAGEMENT] = os.path.join(d, "typo.json")
+        try:
+            find_engagement(d)
+            assert False, "a missing explicit engagement must refuse"
+        except ThrottleError:
+            pass
+        finally:
+            os.environ.pop(ENV_ENGAGEMENT, None)
 
         # inert when the engagement asks for nothing
         off = os.path.join(d, "off.json")
@@ -818,13 +1074,13 @@ def _selftest():
 
         # the rate flag is clamped down, added when absent, left when lower
         n = build_argv(lim, "nuclei", ["nuclei", "-u", "https://target.example"], True)
-        assert n[n.index("-rl") + 1] == "5", n
+        assert n[1:5] == five, n
         n2 = build_argv(lim, "nuclei", ["nuclei", "-rl", "150", "-u",
                                         "https://target.example"], True)
-        assert n2[n2.index("-rl") + 1] == "5", n2
+        assert n2[1:5] == five and "150" not in n2, n2
         n3 = build_argv(lim, "nuclei", ["nuclei", "-rl", "2", "-u",
                                         "https://target.example"], True)
-        assert n3[n3.index("-rl") + 1] == "2", n3
+        assert n3[1:5] == ["-rl", "1", "-rld", "550ms"], n3
 
         # targets are read out of argv and out of a list file
         lst = os.path.join(d, "hosts.txt")
@@ -836,6 +1092,24 @@ def _selftest():
         assert targets_in("curl", ["-s", "https://target.example/x"]) == \
             ["https://target.example/x"]
         assert targets_in("curl", ["-s", "-H", "A: b"]) == []
+        # an operand is consumed, not read as a host: -o file, -sSo file,
+        # -XPOST, -d json, --output=file, --url
+        if _curl_value_flags():
+            assert targets_in("curl", ["https://target.example/", "-o",
+                                       "index.html"]) == ["https://target.example/"]
+            assert targets_in("curl", ["-sSo", "index.html", "-XPOST", "-d",
+                                       "a.b", "--output=x.html", "--url",
+                                       "https://target.example/"]) == \
+                ["https://target.example/"]
+        # an empty inline operand does not swallow the URL after it
+        assert targets_in("curl", ["--data=", "https://outside.example",
+                                   "https://target.example"]) == \
+            ["https://outside.example", "https://target.example"]
+        try:
+            targets_in("curl", ["-K", "curlrc", "https://target.example/"])
+            assert False, "curl -K must refuse"
+        except ThrottleError:
+            pass
         # a list file that is not there must refuse, not scan unchecked
         try:
             targets_in("nuclei", ["-l", os.path.join(d, "nope.txt")])
@@ -843,16 +1117,26 @@ def _selftest():
         except ThrottleError:
             pass
 
-        # curl request estimate
+        # curl request estimate: globbing is judged on the URLs, not on -d
         assert request_estimate("curl", ["-s", "https://t.example/"], 1) == 1
-        assert request_estimate("curl", ["-sL", "https://t.example/"], 1) == 1
-        assert request_estimate("curl", ["-s", "-L", "https://t.example/"], 1) == 2
+        assert request_estimate("curl", ["-d", '{"a":[1]}',
+                                         "https://t.example/"], 1) == 1
         try:
             request_estimate("curl", ["https://t.example/[1-100]"], 1)
             assert False, "URL globbing must refuse"
         except ThrottleError:
             pass
         assert request_estimate("curl", ["-g", "https://t.example/[1-100]"], 1) == 1
+        assert request_estimate("curl", ["-sg", "https://t.example/[1-100]"], 1) == 1
+        # -L would carry the header off-host and hide the hop count
+        for bad in (["-L", "https://t.example/"], ["-sL", "https://t.example/"],
+                    ["--location", "https://t.example/"]):
+            try:
+                refuse_redirects("curl", bad)
+                assert False, bad
+            except ThrottleError:
+                pass
+        refuse_redirects("curl", ["-s", "-H", "L: x", "https://t.example/"])
 
         # the budget is shared across processes, and it holds
         st = os.path.join(d, "shared.json")
@@ -901,8 +1185,15 @@ def _selftest():
             got = False
         finally:
             os.close(fd)
-        p.wait()
         assert not got, "the fan-out lock did not survive execvp"
+        # and a single request waits for the scanner, so the two share one
+        # ceiling instead of each filling it
+        t2 = time.monotonic()
+        sfd = hold_fanout_lock(lk, shared=True)
+        assert time.monotonic() - t2 >= 0.5, "a request ran beside a scanner"
+        _funlock(sfd)
+        os.close(sfd)
+        p.wait()
 
         # the hook's check
         cwd = d
@@ -963,6 +1254,27 @@ def _selftest():
         # inert where no engagement asks for a limit
         with tempfile.TemporaryDirectory() as empty:
             assert check_command("curl https://anything.example/", empty) is None
+
+        # the hook itself, as Claude Code runs it: WebFetch in scope is a
+        # refusal that names the ceiling; out of scope passes; a typo in
+        # BUGHUNTER_ENGAGEMENT fails closed
+        hook = os.path.join(os.path.dirname(here), "hooks", "throttle-guard.py")
+        env = {k: v for k, v in os.environ.items() if k != ENV_ENGAGEMENT}
+
+        def run_hook(payload, **extra):
+            return subprocess.run([sys.executable, "-I", hook],
+                                  input=json.dumps(payload), capture_output=True,
+                                  text=True, env={**env, **extra})
+        r = run_hook({"tool_name": "WebFetch", "cwd": d,
+                      "tool_input": {"url": "https://target.example/x"}})
+        assert r.returncode == 2 and "5 req / 1s" in r.stderr, r
+        r = run_hook({"tool_name": "WebFetch", "cwd": d,
+                      "tool_input": {"url": "https://nvd.nist.gov/"}})
+        assert r.returncode == 0, r
+        r = run_hook({"tool_name": "Bash", "cwd": d,
+                      "tool_input": {"command": "curl https://target.example/"}},
+                     **{ENV_ENGAGEMENT: os.path.join(d, "typo.json")})
+        assert r.returncode == 2 and "not a readable file" in r.stderr, r
 
     print("throttle.py self-test: PASS")
 

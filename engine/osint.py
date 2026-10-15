@@ -20,7 +20,7 @@ from shutil import which
 from urllib.parse import urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from throttle import fanout, tool_supports, wrap   # noqa: E402
+from throttle import ThrottleError, fanout, tool_supports, wrap   # noqa: E402
 
 
 def _run(cmd, timeout=120):
@@ -77,9 +77,23 @@ def probe(host, timeout=12):
         url = f"{scheme}://{host}/"
         # Target traffic, so it goes through the engagement budget and carries
         # the required headers. crt.sh and the passive sources above do not.
-        out = _run(wrap(["curl", "-s", "-m", str(timeout), "-L", "-D", "-",
-                         "-o", "/tmp/_osint_body", url]), timeout + 6)
-        codes = re.findall(r'^HTTP/\S+\s+(\d{3})', out, re.M)
+        # Redirects are one wrapped curl per hop, not -L, so every hop is
+        # scope-checked, budgeted and headed on its own.
+        for _ in range(5):
+            out = _run(wrap(["curl", "-s", "-m", str(timeout), "-D", "-",
+                             "-o", "/tmp/_osint_body", "-w", "\\n__RD__%{redirect_url}",
+                             url]), timeout + 6)
+            out, _, nxt = out.rpartition("__RD__") if "__RD__" in out else (out, "", "")
+            codes = re.findall(r'^HTTP/\S+\s+(\d{3})', out, re.M)
+            nxt = nxt.strip()
+            # only HTTP(S) hops: a Location of file:// must not become a
+            # top-level curl of a local file
+            if codes and 300 <= int(codes[-1]) < 400 and nxt.startswith(("http://", "https://")):
+                url = nxt
+                continue
+            break
+        else:
+            continue            # still redirecting after 5 hops: not a page
         if not codes:
             continue
         headers = {}
@@ -128,18 +142,26 @@ def probe_hosts(hosts, log=print):
         # This probes the target, so it holds the engagement's fan-out slot
         # and takes the ceiling on its own rate flag. The flag name is asked
         # of the binary rather than assumed: this file cannot carry a
-        # verified flag table for a tool it was written without.
-        with fanout() as fan:
-            if fan.ceiling:
-                for flag in ("-rl", "-rate-limit"):
-                    if tool_supports(pd, flag):
-                        argv += [flag, str(fan.ceiling)]
-                        break
-                in_scope = [h for h in hosts if fan.in_scope(h)]
-                if in_scope and fan.headers and tool_supports(pd, "-H"):
+        # verified flag table for a tool it was written without. The headers
+        # apply whether or not a ceiling is set.
+        try:
+            with fanout() as fan:
+                if fan.ceiling:
+                    for flag in ("-rl", "-rate-limit"):
+                        if tool_supports(pd, flag):
+                            argv += [flag, str(fan.ceiling)]
+                            break
+                if fan.headers and any(fan.in_scope(h) for h in hosts) \
+                        and tool_supports(pd, "-H"):
                     for k, v in fan.headers.items():
                         argv += ["-H", f"{k}: {v}"]
-            out = _run_stdin(argv, "\n".join(hosts))
+                out = _run_stdin(argv, "\n".join(hosts))
+        except ThrottleError as exc:
+            # A ceiling the tool's per-second flag cannot express: fall back
+            # to one wrapped curl per host, which any ceiling can pace.
+            log(f"osint: {pd} skipped — {exc}; probing with wrapped curl")
+            out, pd = "", None
+    if pd:
         targets = []
         for line in out.splitlines():
             try:

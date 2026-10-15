@@ -52,6 +52,13 @@ export BUGHUNTER_ENGAGEMENT=/path/to/engagement.json
 python3 engine/throttle.py show
 ```
 
+`engine/engine.py --scope my-engagement.json` sets that variable itself, so the
+selected scope file governs recon and every child agent. A variable that names
+a file which is not there is a refusal, not an absence of limits.
+
+The budget needs `fcntl.flock`, so native Windows is refused outright while an
+engagement is active; use WSL.
+
 ### Where the guard runs
 
 `hooks/throttle-guard.py` is a Claude Code `PreToolUse` hook. The plugin install
@@ -96,9 +103,19 @@ behave exactly as they do unwrapped. In order it:
 3. for an **in-scope** target, waits for room in the shared window and adds the
    required headers using the tool's own header flag;
 4. for a **fan-out** tool — one invocation, many requests — clamps the tool's own
-   rate flag to the ceiling and holds an exclusive lock for the whole run, so two
-   scans cannot each run at the ceiling;
+   rate flag to the ceiling as one request per interval (`-rl 1 -rld 220ms`
+   for 5 per second, `-rl 1 -rld 2200ms` for 30 per minute; never rounded up,
+   and never `-rl 5`, whose token bucket measured 10 arrivals in a sliding
+   second at the wire) and holds an exclusive lock for the whole run.
+   Single requests hold the same lock shared, so a scanner and a stream of
+   `curl`s never fill the ceiling side by side;
 5. `execvp`s the tool.
+
+Three `curl` shapes are refused for an in-scope target because the wrapper
+cannot see what they send: `-L` (every `-H` header follows the redirect
+off-host, and the hops are uncounted; read `Location` from `-i` and request the
+next hop through the wrapper), `-K`/`--config` (the URL lives in the file), and
+URL globbing without `-g`.
 
 An **out-of-scope** target passes straight through: no budget, no headers. That
 is deliberate. Reading an NVD page is not engagement traffic, must not spend the
@@ -134,10 +151,10 @@ traffic at all, 5 not covered, and 1 unverified.**
 | How traffic leaves | Status |
 |---|---|
 | `Bash` → `curl` | **Governed.** Counted, header added, and the hook refuses an unwrapped `curl`. Verified at the wire. |
-| `Bash` → `nuclei` | **Governed.** Fan-out lock, `-rl` clamped to the ceiling, header added. Flags verified against the installed v3.8.0. |
+| `Bash` → `nuclei` | **Governed.** Fan-out lock, every `-rl`/`-rld` spelling the caller passed replaced by one `-rl 1 -rld <interval>` pair, header added. Flags verified and the burst shape measured against the installed v3.11.1. |
 | `engine/recon.py` own HTTP (`_get`, the API probe) | **Governed** via `throttle.gate()`. |
 | `engine/recon.py` → `curl` | **Governed** via `throttle.wrap()`. |
-| `engine/recon.py` → `katana` | **Governed.** Its existing `-rl` is clamped to the ceiling and it holds the fan-out lock. |
+| `engine/recon.py` → `katana` | **Governed.** Its existing `-rl` is clamped to the ceiling, it holds the fan-out lock, and the headers go on its own `-H`. Skipped with a logged reason when the ceiling is under one request per second. |
 | `engine/osint.py` → `curl` host probe | **Governed** via `throttle.wrap()`. |
 | `engine/osint.py` → `httpx-toolkit` | **Governed.** Fan-out lock; the rate and header flags are asked of the binary at run time rather than assumed. |
 | `engine/osint.py` → `subfinder`, `assetfinder`, `crt.sh` | **Not target traffic.** Passive third-party sources, so no budget and no header. |

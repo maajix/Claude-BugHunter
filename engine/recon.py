@@ -24,37 +24,79 @@ from shutil import which
 from urllib.parse import urljoin, urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from throttle import fanout, gate, wrap   # noqa: E402  (engagement rate limit + headers)
+from throttle import ThrottleError, fanout, gate, tool_supports, wrap   # noqa: E402
 
 _UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+_HOPS = 5   # redirects are followed one hop at a time, each hop gated on its own
+
+
+def _http(url):
+    """Only HTTP(S) hops are followed: a Location of file:// would otherwise
+    become a top-level fetch of a local file, which curl -L used to refuse."""
+    return url.startswith(("http://", "https://"))
 
 try:
     import requests
     _SESS = requests.Session()
     _SESS.headers["User-Agent"] = _UA
 
-    def _get(url, timeout=20):
+    def _get(url, timeout=20, follow=None):
+        """GET with every redirect hop scope-checked, budgeted and headed on its
+        own: an automatic redirect would carry the engagement header to wherever
+        a 302 points and send hops the budget never saw. `follow(url)` says
+        whether a hop may be taken at all."""
         try:
-            r = _SESS.get(url, timeout=timeout, allow_redirects=True,
-                          headers=gate(url))
-            return r.text, r.url, {k.lower(): v for k, v in r.headers.items()}
+            for _ in range(_HOPS):
+                r = _SESS.get(url, timeout=timeout, allow_redirects=False,
+                              headers=gate(url))
+                nxt = r.headers.get("Location")
+                if not (r.is_redirect and nxt):
+                    break
+                url = urljoin(url, nxt)
+                if not _http(url) or (follow and not follow(url)):
+                    return "", url, {}
+            else:
+                return "", url, {}      # still redirecting: not a page
+            return r.text, url, {k.lower(): v for k, v in r.headers.items()}
         except Exception:
             return "", url, {}
 except ImportError:                          # stdlib fallback
     import gzip
+    import urllib.error
     import urllib.request
 
-    def _get(url, timeout=20):
+    class _NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *a, **k):
+            return None
+
+    _OPENER = urllib.request.build_opener(_NoRedirect)
+
+    def _get(url, timeout=20, follow=None):
+        """See the `requests` variant above: one gated hop at a time."""
         try:
-            hdrs = {"User-Agent": _UA, "Accept-Encoding": "gzip"}
-            hdrs.update(gate(url))
-            req = urllib.request.Request(url, headers=hdrs)
-            r = urllib.request.urlopen(req, timeout=timeout)
+            for _ in range(_HOPS):
+                hdrs = {"User-Agent": _UA, "Accept-Encoding": "gzip"}
+                hdrs.update(gate(url))
+                req = urllib.request.Request(url, headers=hdrs)
+                try:
+                    r = _OPENER.open(req, timeout=timeout)
+                except urllib.error.HTTPError as e:
+                    if e.code not in (301, 302, 303, 307, 308):
+                        raise
+                    r = e
+                nxt = r.headers.get("Location")
+                if not (300 <= r.status < 400 and nxt):
+                    break
+                url = urljoin(url, nxt)
+                if not _http(url) or (follow and not follow(url)):
+                    return "", url, {}
+            else:
+                return "", url, {}      # still redirecting: not a page
             data = r.read()
             if r.headers.get("Content-Encoding") == "gzip":
                 data = gzip.decompress(data)
-            return data.decode("utf-8", "replace"), r.geturl(), {k.lower(): v for k, v in r.headers.items()}
+            return data.decode("utf-8", "replace"), url, {k.lower(): v for k, v in r.headers.items()}
         except Exception:
             return "", url, {}
 
@@ -148,13 +190,13 @@ def spa_recon(scope, seeds=None, max_js=20, interesting_only=True, log=print):
     for seed in (seeds or scope.seeds):
         if not scope.in_scope_host(seed):
             log(f"recon: seed {seed} not in scope — skip"); continue
-        html, final, hdrs = _get(seed)
+        html, final, hdrs = _get(seed, follow=scope.in_scope_host)
         base = f"{urlparse(final).scheme}://{urlparse(final).netloc}"
         if not seed_base:
             seed_base = base
         log(f"recon: fetched {seed} ({len(html)} bytes, server={hdrs.get('server','?')})")
         for p in ("/robots.txt", "/sitemap.xml"):
-            t, _, _ = _get(base + p)
+            t, _, _ = _get(base + p, follow=scope.in_scope_host)
             for a, b in re.findall(r'(?:Allow|Disallow):\s*(\S+)|<loc>([^<]+)</loc>', t):
                 pp = a or b
                 if pp:
@@ -171,7 +213,7 @@ def spa_recon(scope, seeds=None, max_js=20, interesting_only=True, log=print):
                           "params": INPUT_NAME.findall(fm)})
 
     for ju in list(js_urls)[:max_js]:
-        js, _, _ = _get(ju)
+        js, _, _ = _get(ju, follow=scope.in_scope_host)
         if js:
             js_base = f"{urlparse(ju).scheme}://{urlparse(ju).netloc}"
             _mine(js, found_rel, found_abs, js_base)
@@ -373,13 +415,20 @@ def _katana_urls(scope, log, depth=2, timeout=150):
     for seed in scope.seeds:
         try:
             # katana crawls the target, so its own -rl is clamped to the
-            # engagement ceiling and it holds the fan-out slot for the run,
-            # which keeps two crawls from each running at the ceiling.
+            # engagement ceiling, it holds the fan-out slot for the run, which
+            # keeps two crawls from each running at the ceiling, and it carries
+            # the required headers with its own -H (verified on the binary).
             with fanout() as fan:
                 rl = str(min(100, fan.ceiling)) if fan.ceiling else "100"
-                out = subprocess.run(["katana", "-u", seed, "-silent", "-jc", "-d", str(depth),
-                                      "-kf", "all", "-c", "10", "-timeout", "10", "-rl", rl],
-                                     capture_output=True, text=True, timeout=timeout).stdout
+                argv = ["katana", "-u", seed, "-silent", "-jc", "-d", str(depth),
+                        "-kf", "all", "-c", "10", "-timeout", "10", "-rl", rl]
+                if fan.headers and fan.in_scope(seed) and tool_supports("katana", "-H"):
+                    for k, v in fan.headers.items():
+                        argv += ["-H", f"{k}: {v}"]
+                out = subprocess.run(argv, capture_output=True, text=True, timeout=timeout).stdout
+        except ThrottleError as exc:
+            log(f"params: katana skipped — {exc}")
+            return {}
         except Exception:
             out = ""
         for u in out.splitlines():
@@ -393,16 +442,24 @@ def _katana_urls(scope, log, depth=2, timeout=150):
 
 
 def _probe(url, timeout=12):
-    """GET url, return (status_code, body). Status-aware (unlike _get)."""
+    """GET url, return (status_code, body). Status-aware (unlike _get).
+    Redirects are followed one wrapped curl per hop, so each hop is
+    scope-checked, budgeted and headed on its own instead of by -L."""
     import subprocess
     try:
-        out = subprocess.run(wrap(["curl", "-s", "-m", str(timeout), "-L",
-                                   "-w", "\\n__ST__%{http_code}", url]),
-                             capture_output=True, text=True, timeout=timeout + 5).stdout
-        if "__ST__" in out:
-            body, st = out.rsplit("__ST__", 1)
-            return (int(st.strip()) if st.strip().isdigit() else 0), body
-        return 0, out
+        for _ in range(_HOPS):
+            out = subprocess.run(wrap(["curl", "-s", "-m", str(timeout),
+                                       "-w", "\\n__ST__%{http_code} %{redirect_url}", url]),
+                                 capture_output=True, text=True, timeout=timeout + 5).stdout
+            if "__ST__" not in out:
+                return 0, out
+            body, tail = out.rsplit("__ST__", 1)
+            st, _, nxt = tail.strip().partition(" ")
+            code = int(st) if st.isdigit() else 0
+            if not (300 <= code < 400 and _http(nxt)):
+                return code, body
+            url = nxt
+        return 0, ""        # hop budget spent on redirects: unprobeable, not dead
     except Exception:
         return 0, ""
 

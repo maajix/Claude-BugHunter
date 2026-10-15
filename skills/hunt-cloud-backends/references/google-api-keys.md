@@ -44,11 +44,14 @@ Reading:
   only stops browsers that send the right `Referer`; that is the intended
   control, not a bypass).
 - Answering on an API the page never uses (Places on a site that only shows a
-  static map) means no API restriction either.
+  static map) proves that API is allowed for the key. It does not prove the key
+  has no API restriction: a key restricted to Static Maps *and* Places passes
+  the same test. Only the console configuration shows the full policy.
 - Impact is financial: the owner pays for anyone's usage beyond the free
-  thresholds. State it as "unrestricted key, these billable APIs answered", with
-  the SKU names and the per-request prices from Google's pricing page. Do not
-  demonstrate cost.
+  thresholds. State it as "key answers on these billable APIs from outside the
+  site", list exactly the APIs that answered with their SKU names and the
+  per-request prices from Google's pricing page, and leave the complete
+  restriction policy as unverified. Do not demonstrate cost.
 
 Grade: Informative to Low on most programs; Medium only where the program
 lists billing abuse as in scope.

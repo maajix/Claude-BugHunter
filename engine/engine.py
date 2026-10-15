@@ -24,6 +24,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from scope import Scope            # noqa: E402
 from state import Engagement       # noqa: E402
+from throttle import ENV_ENGAGEMENT  # noqa: E402
 import agent as A                  # noqa: E402
 import memory                     # noqa: E402  (autopilot ledger; import-isolated)
 
@@ -56,6 +57,10 @@ class Engine:
     def __init__(self, scope_path, base, model, max_hunts, max_turns, timeout, mock=False,
                  allow_intrusive=False, parallel=3, expand=False, use_memory=False):
         self.scope = Scope.load(scope_path)
+        # The selected scope file is the engagement: its rate_limit and headers
+        # must govern recon and every child agent, not whatever engagement.json
+        # happens to sit above the working directory.
+        os.environ[ENV_ENGAGEMENT] = os.path.abspath(scope_path)
         self.eng = Engagement(base, self.scope.name)
         self.model, self.max_hunts = model, max_hunts
         self.max_turns, self.timeout, self.mock = max_turns, timeout, mock
