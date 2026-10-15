@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Offensive-security skill bundles for Claude Code by ElementalSoul.",
-    "version": "2.3.1"
+    "version": "2.3.2"
   },
   "plugins": [
     {
       "name": "bughunter",
       "source": "./",
       "description": "111-skill bug-hunting, external infrastructure and red-team bundle — 70 hunt-* web/vuln-class + framework skills, 16 infra-* external-infrastructure skills (ports and services from SSH to AI/ML serving), cloud misconfig/IAM/backend skills, enterprise platform attack chains (M365/Entra, Okta, SharePoint, vCenter, SSL-VPN, APK/iOS), recon/OSINT, reporting & validation gates, Burp MCP integration. Skills auto-load by topic; 15 slash commands.",
-      "version": "2.3.1",
+      "version": "2.3.2",
       "author": {
         "name": "Sachin Sharma",
         "url": "https://github.com/elementalsouls"

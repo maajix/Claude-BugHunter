@@ -22,7 +22,8 @@ Never write a report before validating. N/A submissions hurt your validity ratio
 Provide when prompted:
 - Platform (HackerOne / Bugcrowd / Intigriti / Immunefi)
 - Bug class
-- Affected endpoint
+- Affected endpoint / vulnerable component (exact URL, path, parameter or package)
+- Intigriti only: the asset from the program's asset list (name + tier) and the Type dropdown entry (one category > type, one CWE)
 - Your two test accounts and their IDs
 - The exact HTTP request that demonstrates the bug
 - The exact response that shows the impact
@@ -30,7 +31,7 @@ Provide when prompted:
 
 ## What This Generates
 
-1. Title following the formula: `[Bug Class] in [Endpoint] allows [actor] to [impact]`
+1. Title following the formula: `[Bug Class] in [Endpoint] allows [actor] to [impact]`, 100 characters or fewer
 2. Summary paragraph (impact-first, no "could potentially")
 3. Vulnerability details with CVSS 3.1 score and vector string
 4. Steps to Reproduce with copy-paste HTTP requests
@@ -52,8 +53,9 @@ Provide when prompted:
 - Severity Justification section referencing Bugcrowd VRT
 
 ### Intigriti Format
-- CVSS score prominent at top
-- Clear reproduction steps
+- Form fields table first: Title (max 100 characters, the form truncates), Asset (exact entry from the program's asset list, with tier), Endpoint / Vulnerable component, Type (ONE dropdown entry with its CWE, never `A / B`), Severity with CVSS, Personal data yes/no
+- Then Proof of Concept, Impact, Recommended solution, Attachments
+- Ask for the asset and the Type dropdown entry if not given; the full type list is only served by the company API (`/external/company/v2/submission-possible-types`), so tell the user to search the dropdown by CWE number
 - Business impact focused
 
 ### Immunefi Format (Web3)
@@ -102,7 +104,8 @@ Use when payout is being downgraded:
 ## Final Checklist Before Submitting
 
 ```
-[ ] Title follows formula
+[ ] Title follows formula and is <= 100 characters
+[ ] Intigriti: Asset + tier, Endpoint / Vulnerable component, one Type filled
 [ ] First sentence states exact impact
 [ ] HTTP request is copy-pasteable
 [ ] Response showing impact included

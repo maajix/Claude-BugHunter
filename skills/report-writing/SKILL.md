@@ -1,6 +1,7 @@
 ---
 name: report-writing
 description: "Bug bounty report writing for HackerOne, Bugcrowd, Intigriti and Immunefi: report templates, human tone, impact-first writing, CVSS 3.1 scoring, title and impact-statement formulas, severity decision guide, downgrade counters, pre-submit checklist. Validation gates and submittability belong to triage-validation; this skill owns the written report. Use after validating a finding and before submitting. Never write could potentially; prove it or do not report."
+user-invocable: false
 metadata:
   sources: community, operator_experience
 ---
@@ -33,6 +34,8 @@ GOOD: "An attacker can access any user's order history by changing the user_id
 ```
 
 Asset = exact host + endpoint/feature. Bug class = include the attacker role (unauthenticated / authenticated). Impact = what the attacker gets and whose. Same format as the Operator Notes below.
+
+**Length:** Intigriti's title field cuts off at 100 characters (anything after character 100 is silently dropped on the form). Keep every title at 100 characters or fewer on all platforms; count before you print it. Drop adjectives and parentheticals first, never the asset or the impact.
 
 **Good titles (specific, impact-first):**
 ```
@@ -169,22 +172,24 @@ Add ownership verification: `if order.user_id != current_user.id: raise 403`
 
 ## INTIGRITI REPORT TEMPLATE
 
+The Intigriti form is field-based, not one free-text body. The report has to be printed as the form fields first (the table), then the three text bodies the form asks for. Field names below are the form's own (the company API returns a submission as `originalTitle`, `domain` (asset + tier), `endpointVulnerableComponent`, `type` (category, name, cwe), `pocDescription`, `impact`, `personalData`, `recommendedSolution`, `attachments`).
+
 ```markdown
-# [Bug Class]: [Exact Impact] in [Endpoint/Feature]
+| Field | Value |
+|---|---|
+| Title | [<= 100 characters. `<bug class>: <impact> in <endpoint/feature>`] |
+| Asset | [Exact entry from the program's asset list, e.g. `www.target.example` (URL, Tier 1)] |
+| Endpoint / Vulnerable component | [Full URL, path, parameter, package or component the bug lives in, e.g. `https://www.target.example/slides/slide/<id>?fullscreen=1`] |
+| Type | [ONE entry from the form's Type dropdown, e.g. `Broken Access Control > Improper Access Control` (CWE-284)] |
+| Severity | [Critical/High/Medium/Low] — CVSS 3.0 (or 4.0 if the form shows it) X.X, AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N |
+| Personal data | [Yes/No — Yes if the PoC exposes any real user's PII] |
 
-## Description
-
-[Impact-first paragraph. Start with what an attacker can do, not with how you found it.
-Include: endpoint, method, parameter, data exposed, required privileges.]
-
-## Steps to Reproduce
+## Proof of Concept
 
 **Environment:**
 - Attacker: email=attacker@test.com (standard account, no special role)
 - Victim: email=victim@test.com
 - Tested: [date]
-
-**Reproduction steps:**
 
 1. [Login as attacker / visit URL / send request]
 
@@ -207,25 +212,25 @@ Content-Type: application/json
 
 ## Impact
 
-[Specific, quantified impact. What data, how many users, what can attacker do.]
+[Impact-first paragraph. What an attacker gets, from whom, how many users, what data. Business impact for the company, not for the researcher.]
 
-CVSS 3.0 (default) / 4.0 Score: X.X ([Severity]) — AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N
-
-## Remediation
+## Recommended solution
 
 [1-3 sentence concrete fix. Include code if helpful.]
 
 ## Attachments
 
-[Screenshot or Loom video showing the impact — Intigriti triagers prefer video for complex bugs]
+[Screenshot or video showing the impact — Intigriti triagers prefer video for complex bugs. Upload on the platform, external hosting is generally disallowed.]
 ```
 
-**Intigriti-specific notes:**
-- Title format: `[Bug Class]: [One-line impact]` (no formula required, but keep it specific)
-- Severity is set by you: Critical/High/Medium/Low/Exceptional
-- The built-in calculator is CVSS 3.0; companies can switch to CVSS 4.0 at company level (opt-in). Score with whatever the submission form shows (see Platform policy below)
-- PoC video is valued much more than screenshot alone — record with Loom
-- Safe harbor: Intigriti enforces it, be comfortable going slightly aggressive with testing
+**Field rules (each one has cost a resubmission in practice):**
+
+- **Title: hard limit 100 characters.** The form drops everything after character 100 with no warning. Count the characters before printing the table; if over, shorten the impact clause, never the asset.
+- **Asset is mandatory and comes from the program's list.** Every program has a fixed asset list (URL / Android / iOS / Other, each with a Tier). Pick the exact entry the endpoint belongs to and print it with its tier, because the bounty is paid by the tier of the linked asset. Submitting under `Other` means no automatic bounty. The list is on the program's scope page, in the engagement's `scope.md`, or via the researcher API: `GET https://api.intigriti.com/external/researcher/v1/programs/{programId}/domains/{versionId}` (personal access token; returns `endpoint`, `type`, `tier` per asset). If the asset is not known, ask before printing the report.
+- **Endpoint / Vulnerable component is a separate field.** One URL, path, parameter, package or component. Not a sentence.
+- **Type is ONE dropdown entry, never two.** The dropdown is a fixed taxonomy `Category > Type`, each type mapped to exactly one CWE. There is no free text and no `A / B` combination. `Broken Access Control / Information Disclosure (CWE-284, CWE-200)` cannot be entered. Decide on the primary impact, print one type with its CWE, and name the second one only in the Impact text. The authoritative list is served by `GET https://api.intigriti.com/external/company/v2/submission-possible-types` (company OAuth token only, so not reachable with a researcher account). Before printing the table: ask whether the user has that list cached, otherwise tell them to search the form's Type dropdown by the CWE number and give one fallback CWE in case the first is not offered.
+- **Severity is set by you, confirmed by triage.** The built-in calculator is CVSS 3.0; companies can switch to CVSS 4.0 at company level (opt-in). Score with whatever the submission form shows (see Platform policy below).
+- **Safe harbor:** Intigriti enforces it, be comfortable going slightly aggressive with testing.
 
 ---
 
@@ -376,6 +381,8 @@ Each YES raises severity:
 
 ```
 [ ] Title follows formula: <asset> | <bug class> | <impact>
+[ ] Title is 100 characters or fewer (Intigriti truncates at 100)
+[ ] Intigriti: Asset (with tier), Endpoint / Vulnerable component and ONE Type from the dropdown are filled
 [ ] First sentence states exact impact in plain English
 [ ] Steps to Reproduce has exact HTTP request (copy-paste ready)
 [ ] Response showing the bug is included (screenshot or JSON body)
@@ -565,7 +572,7 @@ Cross-link `evidence-hygiene` for the full capture-and-redact protocol.
 |---|---|---|---|
 | HackerOne | Narrative | Summary -> Steps -> Impact -> Suggested fix | Researcher-set with the program's method (mandatory from 2026-09-21 unless switched off), triager-adjusted, contestable |
 | Bugcrowd | Structured | Severity request -> VRT category -> Title -> Body -> Remediation | VRT-default + manual override paragraph |
-| Intigriti | Between | Summary -> PoC -> Impact -> Recommendation | Researcher-proposed, triager-confirmed |
+| Intigriti | Between | Form fields table (Title <= 100 chars, Asset + tier, Endpoint / Vulnerable component, one Type) -> PoC -> Impact -> Recommended solution | Researcher-proposed, triager-confirmed |
 | Immunefi | PoC-first | Working PoC code -> Walkthrough -> Impact -> Severity | Foundry/Hardhat code is the primary deliverable |
 
 Picking the wrong template style costs validity. A narrative-heavy Bugcrowd report misses the VRT mapping the triager needs; a structured H1 report reads as terse and gets follow-up questions that delay payout.

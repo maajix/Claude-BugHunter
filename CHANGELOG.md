@@ -6,6 +6,21 @@ versioning is loosely [SemVer](https://semver.org/) at the bundle level.
 
 ## [Unreleased]
 
+### Changed
+- **Intigriti report template is form-shaped.** `report-writing` now prints the
+  submission form fields first (Title, Asset with tier, Endpoint / Vulnerable
+  component, one Type with its CWE, Severity, Personal data) and then PoC,
+  Impact and Recommended solution. Titles are capped at 100 characters on every
+  platform because Intigriti's form truncates there. Type is one dropdown entry,
+  never a slash-combined pair; the authoritative list is the company API
+  `submission-possible-types` endpoint, so the skill tells the user to search
+  the dropdown by CWE number.
+
+### Fixed
+- `report-writing` and `triage-validation` are `user-invocable: false`, so the
+  slash picker no longer shows them next to `/report`, `/validate` and
+  `/triage`, which are the user entry points.
+
 ### Added
 - **External infrastructure layer, 16 `infra-*` skills.** `infra-external-methodology`
   owns discovery and the port-to-skill routing table; per-service skills for SSH,

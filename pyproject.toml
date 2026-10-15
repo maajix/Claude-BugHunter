@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claude-bughunter"
-version = "2.3.1"
+version = "2.3.2"
 description = "cbh — terminal-native recon/classify/triage/report runner for the Claude-BugHunter skill bundle"
 readme = "README.md"
 requires-python = ">=3.9"
