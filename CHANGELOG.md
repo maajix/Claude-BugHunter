@@ -71,6 +71,20 @@ versioning is loosely [SemVer](https://semver.org/) at the bundle level.
   the `settings.json` block for copy installs; CI fails when `docs/skills.md` or
   `cbh/data/skill_index.json` is stale.
 
+### Fixed
+- **Request ceiling and required headers (2.3.1).** `engine.py --scope` now
+  exports the selected file as `BUGHUNTER_ENGAGEMENT`; a variable naming a
+  missing file refuses instead of disabling limits. Scanners and single
+  requests share one budget through a shared and exclusive fan-out lock.
+  Redirects are followed one gated hop at a time, http(s) only, and wrapped
+  `curl -L` and `-K` are refused. curl operands are no longer read as targets.
+  nuclei gets one `-rl 1 -rld <interval>` pair, because its `-rl N` token
+  bucket measured 10 arrivals in a sliding second against a ceiling of 5.
+  Ceilings under one request per second keep their pacing. katana and httpx
+  carry the headers. The WebFetch refusal in the hook no longer raises. The
+  Google API key reference no longer reads a single answering API as an
+  unrestricted key.
+
 ### Removed
 - `bb-local-toolkit`: a byte-identical copy of `bug-bounty` (18.7k tokens, over
   the description limit).

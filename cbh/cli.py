@@ -394,7 +394,7 @@ def write_recon_summary(target: str, subs: set[str], resolved: dict, live: list,
 # ============================================================
 # recon→hunt manifest (the integration handoff contract)
 # ============================================================
-PRODUCER = "cbh-recon/2.3.0"
+PRODUCER = "cbh-recon/2.3.1"
 
 # subdomain keywords → triage priority + rationale for ranked_surface
 _P1_HINTS = ("api.", "api-", "graphql", "auth.", "sso.", "login.", "account.",
